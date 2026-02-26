@@ -1,0 +1,2308 @@
+{
+  "dsoName": "Stadtwerk Winterthur",
+  "dsoNumber": 10186012345,
+  "tariffs": [
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Basic KlimaGold",
+      "tariffType": "electricity",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "KlimaGold",
+      "customerType": "Basic",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.1455,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.153,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.1455,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.1455,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Basic KlimaSilber",
+      "tariffType": "electricity",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "KlimaSilber",
+      "customerType": "Basic",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.1384,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.1459,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.1384,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.1384,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Basic KlimaBronze",
+      "tariffType": "electricity",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "KlimaBronze",
+      "customerType": "Basic",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.135,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.1425,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.135,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.135,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Basic Netznutzung",
+      "tariffType": "grid",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "",
+      "customerType": "Basic",
+      "prices": {
+        "base": {
+          "price": 2.7,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.0847,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.1127,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.0847,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.0847,
+            "priceUnit": "CHF/kWh"
+          }
+        ],
+        "refundStorage": {
+          "price": 0,
+          "priceUnit": "CHF/kWh"
+        }
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Profil KlimaGold",
+      "tariffType": "electricity",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "Klima Gold",
+      "customerType": "Profil",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.1415,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.149,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.1415,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.1415,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Profil KlimaSilber",
+      "tariffType": "electricity",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "KlimaSilber",
+      "customerType": "Profil",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.1344,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.1419,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.1344,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.1344,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Profil KlimaBronze",
+      "tariffType": "electricity",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "KlimaBronze",
+      "customerType": "Profil",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.131,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.1385,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.131,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.131,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Profil Netznutzung",
+      "tariffType": "grid",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "",
+      "customerType": "Profil",
+      "prices": {
+        "base": {
+          "price": 35.7,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.0532,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.0611,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.0532,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.0532,
+            "priceUnit": "CHF/kWh"
+          }
+        ],
+        "power": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 15.5,
+            "priceUnit": "CHF/kW/M"
+          }
+        ],
+        "reactivePower": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.0563,
+            "priceUnit": "CHF/kVarh"
+          }
+        ],
+        "refundStorage": {
+          "price": 0,
+          "priceUnit": "CHF/kWh"
+        }
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Profil GK KlimaGold",
+      "tariffType": "electricity",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "KlimaGold",
+      "customerType": "Profil GK",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.1415,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.149,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.1415,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.1415,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Profil GK KlimaSilber",
+      "tariffType": "electricity",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "Klima Silber",
+      "customerType": "Profil GK",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.1344,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.1419,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.1344,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.1344,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Profil GK KlimaBronze",
+      "tariffType": "electricity",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "Klima Bronze",
+      "customerType": "Profil GK",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.131,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.1385,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.131,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.131,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Profil GK Netznutzung",
+      "tariffType": "grid",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "",
+      "customerType": "Profil GK",
+      "prices": {
+        "base": {
+          "price": 35.7,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.0487,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.0532,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.0487,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.0487,
+            "priceUnit": "CHF/kWh"
+          }
+        ],
+        "power": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 17,
+            "priceUnit": "CHF/kW/M"
+          }
+        ],
+        "reactivePower": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.0563,
+            "priceUnit": "CHF/kVarh"
+          }
+        ],
+        "refundStorage": {
+          "price": 0,
+          "priceUnit": "CHF/kWh"
+        }
+      }
+    },
+    {
+      "customerVoltageLevel": 5,
+      "tariffName": "Profil Plus KlimaGold",
+      "tariffType": "electricity",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "KlimaGold",
+      "customerType": "Profil Plus",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.1415,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.149,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.1415,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.1415,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 5,
+      "tariffName": "Profil Plus KlimaSilber",
+      "tariffType": "electricity",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "KlimaSilber",
+      "customerType": "Profil Plus",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.1344,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.1419,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.1344,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.1344,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 5,
+      "tariffName": "Profil Plus KlimaBronze",
+      "tariffType": "electricity",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "KlimaBronze",
+      "customerType": "Profil Plus",
+      "prices": {
+        "base": {
+          "price": 0,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.131,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.1385,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.131,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.131,
+            "priceUnit": "CHF/kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 5,
+      "tariffName": "Profil Plus Netznutzung",
+      "tariffType": "grid",
+      "tariffForm": "multilevel",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "",
+      "customerType": "Profil Plus",
+      "prices": {
+        "base": {
+          "price": 38,
+          "priceUnit": "CHF/M"
+        },
+        "energy": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "00:00",
+            "to": "06:59",
+            "price": 0.0377,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.0417,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "20:00",
+            "to": "23:59",
+            "price": 0.0377,
+            "priceUnit": "CHF/kWh"
+          },
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Sa",
+              "Su"
+            ],
+            "from": "00:00",
+            "to": "23:59",
+            "price": 0.0377,
+            "priceUnit": "CHF/kWh"
+          }
+        ],
+        "power": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 12,
+            "priceUnit": "CHF/kW/M"
+          }
+        ],
+        "reactivePower": [
+          {
+            "months": [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec"
+            ],
+            "weekdays": [
+              "Mo",
+              "Tu",
+              "We",
+              "Th",
+              "Fr"
+            ],
+            "from": "07:00",
+            "to": "19:59",
+            "price": 0.0563,
+            "priceUnit": "CHF/kVarh"
+          }
+        ],
+        "refundStorage": {
+          "price": 0,
+          "priceUnit": "CHF/kWh"
+        }
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Messtarif",
+      "tariffType": "metering",
+      "tariffForm": "constant",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "direkte Messung Niederspannung",
+      "customerType": "Basic, Profil",
+      "prices": {
+        "base": {
+          "price": 7.3,
+          "priceUnit": "CHF/M"
+        }
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Messtarif Wandler",
+      "tariffType": "metering",
+      "tariffForm": "constant",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "halbindirekte Messung Niederspannung",
+      "customerType": "Basic, Profil, Profil GK",
+      "prices": {
+        "base": {
+          "price": 14.3,
+          "priceUnit": "CHF/M"
+        }
+      }
+    },
+    {
+      "customerVoltageLevel": 5,
+      "tariffName": "Messtarif MS",
+      "tariffType": "metering",
+      "tariffForm": "constant",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "Mittelspannungsmessung",
+      "customerType": "Profil Plus",
+      "prices": {
+        "base": {
+          "price": 52,
+          "priceUnit": "CHF/M"
+        }
+      }
+    },
+    {
+      "customerVoltageLevel": 7,
+      "tariffName": "Abgabe Gemeinwesen NE7",
+      "tariffType": "regional_fees",
+      "tariffForm": "constant",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "",
+      "customerType": "Basic, Profil, Profil GK",
+      "prices": {
+        "municipalityTaxes": [
+          {
+            "municipalityNumber": 230,
+            "municipalityName": "Winterthur",
+            "municipalityBase": {
+              "price": 0,
+              "priceUnit": "CHF/M"
+            },
+            "municipalityEnergy": [
+              {
+                "from": "00:00",
+                "to": "00:00",
+                "price": 0.009,
+                "priceUnit": "CHF/kWh"
+              }
+            ],
+            "municipalityComment": "bis 100'000 kWh"
+          },
+          {
+            "municipalityNumber": 230,
+            "municipalityName": "Winterthur",
+            "municipalityBase": {
+              "price": 0,
+              "priceUnit": "CHF/M"
+            },
+            "municipalityEnergy": [
+              {
+                "from": "00:00",
+                "to": "00:00",
+                "price": 0.006,
+                "priceUnit": "CHF/kWh"
+              }
+            ],
+            "municipalityComment": "ab 101'000 kWh"
+          }
+        ]
+      }
+    },
+    {
+      "customerVoltageLevel": 5,
+      "tariffName": "Abgabe Gemeinwesen NE5",
+      "tariffType": "regional_fees",
+      "tariffForm": "constant",
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "comment": "",
+      "customerType": "Profil Plus",
+      "prices": {
+        "municipalityTaxes": [
+          {
+            "municipalityNumber": 230,
+            "municipalityName": "Winterthur",
+            "municipalityBase": {
+              "price": 0,
+              "priceUnit": "CHF/M"
+            },
+            "municipalityEnergy": [
+              {
+                "from": "00:00",
+                "to": "00:00",
+                "price": 0.009,
+                "priceUnit": "CHF/kWh"
+              }
+            ],
+            "municipalityComment": "bis 100'000 kWh"
+          },
+          {
+            "municipalityNumber": 230,
+            "municipalityName": "Winterthur",
+            "municipalityBase": {
+              "price": 0,
+              "priceUnit": "CHF/M"
+            },
+            "municipalityEnergy": [
+              {
+                "from": "00:00",
+                "to": "00:00",
+                "price": 0.006,
+                "priceUnit": "CHF/kWh"
+              }
+            ],
+            "municipalityComment": "ab 100'001 kWh"
+          }
+        ]
+      }
+    }
+  ]
+}
