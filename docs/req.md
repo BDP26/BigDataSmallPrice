@@ -10,10 +10,40 @@ Um die "Big Data"-Anforderungen skalierbar umzusetzen, empfehle ich folgenden St
 *   **Orchestrierung / ETL:** Apache Airflow oder Prefect
 *   **Datenbank (Time-Series):** TimescaleDB (PostgreSQL-Erweiterung) oder InfluxDB.
 *   **Machine Learning:** scikit-learn, XGBoost/LightGBM.
-*   **Backend / API:** FastAPI (schnell, asynchron, automatische Swagger-Doku)
-*   **Frontend / Dashboard:** Google Stitch (für ein massgeschneidertes, nicht vollständig generiertes Frontend-Erlebnis)
+*   **Backend / API:** FastAPI (schnell, asynchron, automatische Swagger-Doku). **FastAPI wird zudem genutzt, um die statischen HTML-Dashboards (`user_dash.html`, `admin_dash.html`) direkt auszuliefern (via `Jinja2Templates` oder `StaticFiles`), welche ihre Daten asynchron über die REST-API-Endpunkte beziehen.**
+*   **Frontend / Dashboard:** Native HTML/Tailwind CSS Dashboards, ausgeliefert durch das FastAPI-Backend.
 
 ---
+
+## 2. Skalierungs- & Container-Architektur (Scaling Strategy)
+
+Um die Anwendung für "Big Data" und hohe Lasten robust aufzustellen, wird folgende Containerisierungs- und Skalierungsstrategie empfohlen:
+
+### Containerisierung (Docker)
+Das gesamte System wird in Microservices unterteilt und via Docker containerisiert:
+*   **API-Container:** Führt die FastAPI-Anwendung via `uvicorn` / `gunicorn` aus.
+*   **Worker-Container (ETL & ML):** Führen die Airflow/Prefect Tasks und rechenintensive XGBoost-Inferences aus.
+*   **DB-Container:** TimescaleDB Instanz (oft ausgelagert in Managed Services bei Produktion, lokal in Docker).
+
+### Vertical Scaling (Scale Up) vs. Horizontal Scaling (Scale Out)
+
+**1. Vertical Scaling (CPU/RAM-Upgrades) – *Der primäre Hebel für ML & TimescaleDB***
+Vertical Scaling bedeutet, einer bestehenden Maschine mehr Ressourcen (z.B. 16 Cores statt 4, 64GB RAM statt 16GB) zuzuweisen.
+*   *Wann sinnvoll?* 
+    *   **Datenbank (TimescaleDB):** Relationale Time-Series Datenbanken profitieren enorm von Vertical Scaling (mehr RAM für In-Memory Indexing und Caching der neuesten Sensordaten).
+    *   **ML-Training (XGBoost):** Das Einlesen großer `.parquet`-Dateien in Pandas und das Training kompletter Modelle erfordert punktuell massive Mengen an RAM. Dies lässt sich leichter vertikal auf einer starken Maschine abbilden (oder durch GPU-Instanzen).
+
+**2. Horizontal Scaling (Replikation von Trail-Instanzen) – *Der primäre Hebel für API & ETL***
+Horizontal Scaling bedeutet, mehrere Server-Instanzen hinter einen Load Balancer zu schalten (z.B. von 1 Container auf 5 Container).
+*   *Wann sinnvoll?*
+    *   **FastAPI Backend:** Da FastAPI stateless (zustandlos) ist, können beliebig viele Container-Instanzen (Pods in Kubernetes oder Tasks in AWS ECS) gestartet werden, um tausende Nutzeranfragen (Dashboard-Aufrufe, `/predict`-Requests) parallel abzufangen. Ein Load-Balancer (z.B. NGINX oder AWS ALB) verteilt den Traffic.
+    *   **Airflow/Prefect Workers:** Wenn viele verschiedene Datenquellen zeitgleich abgefragt und transformiert werden müssen (Kafka-Streams, verschiedene Wetter-APIs), können mehrere Worker-Nodes diese Aufgaben parallel abarbeiten.
+
+### Umsetzung der Skalierung (Tools)
+*   **Lokal / Entwicklung:** `docker-compose.yml` (einfache Orchestrierung der Services).
+*   **Produktion (Cloud):** 
+    *   **Kubernetes (K8s) / AWS EKS / Google GKE:** Erlaubt automatisches Horizontal Autoscaling (HPA) der FastAPI-Pods bei CPU-Spitzen sowie automatisches Deployment auf stärkere Nodes für ML-Jobs.
+    *   **Serverless Alternativen:** AWS Fargate (für Container ohne Server-Management) oder AWS Lambda (für winzige ETL-Scraping-Cronjobs).
 
 ## 2. Detaillierte Implementationsschritte & Testing
 

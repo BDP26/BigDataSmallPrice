@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Model Health Analytics | Big Data Insights</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .chart-bar {
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 antialiased">
+    <div class="relative flex min-h-screen flex-col">
+        <!-- Top Navigation -->
+        <header
+            class="sticky top-0 z-50 w-full border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md px-6 lg:px-10 py-3">
+            <div class="flex items-center justify-between max-w-7xl mx-auto">
+                <div class="flex items-center gap-8">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-primary p-1.5 rounded-lg text-white">
+                            <span class="material-symbols-outlined text-xl">analytics</span>
+                        </div>
+                        <h2 class="text-slate-900 dark:text-white text-lg font-bold tracking-tight">Model Health Console
+                        </h2>
+                    </div>
+                    <nav class="hidden md:flex items-center gap-6">
+                        <a class="text-primary text-sm font-semibold border-b-2 border-primary pb-1"
+                            href="#">Dashboard</a>
+                        <a class="text-slate-500 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors"
+                            href="#">Inference Logs</a>
+                        <a class="text-slate-500 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors"
+                            href="#">Data Pipelines</a>
+                        <a class="text-slate-500 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors"
+                            href="#">Model Registry</a>
+                    </nav>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="relative hidden sm:block">
+                        <span
+                            class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
+                        <input
+                            class="bg-slate-100 dark:bg-slate-800 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary w-64"
+                            placeholder="Search parameters..." />
+                    </div>
+                    <div
+                        class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold uppercase tracking-wider">
+                        <span class="relative flex h-2 w-2">
+                            <span
+                                class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        </span>
+                        Live
+                    </div>
+                    <div class="h-8 w-8 rounded-full bg-primary/10 border border-primary/20 overflow-hidden">
+                        <img alt="User Profile" data-alt="Professional user profile avatar"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBWFsvag8zVXNij8AOkXvLEEom624UnAG7Fvo9BQXXRX8s8FLwVthbEf7ZP9W8pD1YwLvWjMHn52tz-vGLrEEH-pILpxzlxXBVGFBF1xiLiW7lWSqekuIaup36X8xPXg3jc3Hx-Dd4M4v_OR2xDfcTgG3pwnQB0aWqBCZ3I0cNtNaNeNfpAPm7G2kD6KS_Ft9UVK9s8plmdMsxY_yIIj7ropPknPjEqhiHbGxW07Sa8b3lxGOnKtEzFLjQdL3MuHfXXq3uWWFdHKBY" />
+                    </div>
+                </div>
+            </div>
+        </header>
+        <main class="flex-1 max-w-7xl mx-auto w-full p-6 lg:p-10 space-y-8">
+            <!-- Header & Summary Section -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 class="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Model Health: Dynamic
+                        Price Predictor</h1>
+                    <p class="text-slate-500 dark:text-slate-400 mt-1">Real-time monitoring of ENTSO-E &amp;
+                        MeteoSchweiz data pipeline.</p>
+                </div>
+                <div class="flex gap-3">
+                    <button
+                        class="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-slate-800 rounded-lg text-sm font-bold hover:bg-slate-300 transition-colors">
+                        <span class="material-symbols-outlined text-lg">file_download</span> Export CSV
+                    </button>
+                    <button
+                        class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-colors">
+                        <span class="material-symbols-outlined text-lg">refresh</span> Retrain Model
+                    </button>
+                </div>
+            </div>
+            <!-- Metric Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div
+                    class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <div class="flex justify-between items-start mb-2">
+                        <span
+                            class="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">MAE</span>
+                        <span
+                            class="text-red-500 text-xs font-bold bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded">-2.1%
+                            Δ</span>
+                    </div>
+                    <div class="text-3xl font-black text-slate-900 dark:text-white">0.142</div>
+                    <p class="text-slate-400 text-xs mt-1">Mean Absolute Error (Target: &lt;0.150)</p>
+                </div>
+                <div
+                    class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <div class="flex justify-between items-start mb-2">
+                        <span
+                            class="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">MAPE</span>
+                        <span
+                            class="text-green-500 text-xs font-bold bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">+0.5%
+                            Δ</span>
+                    </div>
+                    <div class="text-3xl font-black text-slate-900 dark:text-white">4.2%</div>
+                    <p class="text-slate-400 text-xs mt-1">Percentage error on validation set</p>
+                </div>
+                <div
+                    class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <div class="flex justify-between items-start mb-2">
+                        <span
+                            class="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">Model
+                            Latency</span>
+                        <span
+                            class="text-slate-500 text-xs font-bold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">Stable</span>
+                    </div>
+                    <div class="text-3xl font-black text-slate-900 dark:text-white">45<span
+                            class="text-lg font-medium ml-1">ms</span></div>
+                    <p class="text-slate-400 text-xs mt-1">P95 Inference response time</p>
+                </div>
+                <div
+                    class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <div class="flex justify-between items-start mb-2">
+                        <span
+                            class="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">Last
+                            Training</span>
+                        <span class="material-symbols-outlined text-primary text-xl">history</span>
+                    </div>
+                    <div class="text-3xl font-black text-slate-900 dark:text-white">2h <span
+                            class="text-lg font-medium">ago</span></div>
+                    <p class="text-slate-400 text-xs mt-1">Full epoch recalibration completed</p>
+                </div>
+            </div>
+            <!-- Main Dashboard Content -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Feature Importance -->
+                <div
+                    class="lg:col-span-7 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <div class="flex items-center justify-between mb-8">
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">bar_chart</span>
+                            Feature Importance (Top 5 Drivers)
+                        </h3>
+                        <select
+                            class="bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-xs font-bold py-1 px-3">
+                            <option>SHAP Values</option>
+                            <option>Feature Permutation</option>
+                        </select>
+                    </div>
+                    <div class="space-y-6">
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm font-medium">
+                                <span>Solar Forecast (MeteoSchweiz)</span>
+                                <span class="text-primary">85%</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
+                                <div class="bg-primary h-full rounded-full w-[88%]" style="width: 85%"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm font-medium">
+                                <span>Day-Ahead Price (ENTSO-E)</span>
+                                <span class="text-primary">78%</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
+                                <div class="bg-primary h-full rounded-full w-[74%]" style="width: 78%"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm font-medium">
+                                <span>Wind Generation</span>
+                                <span class="text-primary">55%</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
+                                <div class="bg-primary h-full rounded-full w-[62%]" style="width: 55%"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm font-medium">
+                                <span>Temperature (Meteo)</span>
+                                <span class="text-primary">42%</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
+                                <div class="bg-primary h-full rounded-full w-[45%]" style="width: 42%"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm font-medium">
+                                <span>Weekday/Peak-Hour</span>
+                                <span class="text-primary">35%</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
+                                <div class="bg-primary h-full rounded-full w-[31%]" style="width: 35%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Pipeline & Drift -->
+                <div class="lg:col-span-5 space-y-6">
+                    <!-- Drift Indicator -->
+                    <div
+                        class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="bg-primary/10 p-2 rounded-lg text-primary">
+                                <span class="material-symbols-outlined">speed</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-slate-900 dark:text-white">Stability Indicator</h3>
+                        </div>
+                        <div class="flex items-center justify-center py-4">
+                            <div class="relative flex items-center justify-center">
+                                <!-- Simple SVG Gauge for Drift -->
+                                <svg class="w-48 h-24 transform rotate-180" viewbox="0 0 100 50">
+                                    <path class="text-slate-200 dark:text-slate-800" d="M 10 50 A 40 40 0 0 1 90 50"
+                                        fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="12">
+                                    </path>
+                                    <path class="text-primary" d="M 10 50 A 40 40 0 0 1 75 22" fill="none"
+                                        stroke="currentColor" stroke-linecap="round" stroke-width="12"></path>
+                                </svg>
+                                <div class="absolute bottom-0 text-center">
+                                    <div class="text-2xl font-black text-slate-900 dark:text-white">Normal</div>
+                                    <div class="text-xs text-slate-400 font-bold uppercase">Population Stability Index
+                                        (PSI)</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex justify-between items-center text-xs font-bold text-slate-400">
+                            <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-primary"></span>
+                                Low Drift</span>
+                            <span class="flex items-center gap-1"><span
+                                    class="h-2 w-2 rounded-full bg-amber-400"></span> Moderate</span>
+                            <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-red-500"></span>
+                                Critical</span>
+                        </div>
+                    </div>
+                    <!-- Data Pipeline Visualization -->
+                    <div
+                        class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex-1">
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-6">Pipeline Health</h3>
+                        <div class="space-y-4">
+                            <!-- Source 1 -->
+                            <div class="flex items-center gap-4 group">
+                                <div
+                                    class="h-10 w-10 shrink-0 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                                    <span
+                                        class="material-symbols-outlined text-slate-500 dark:text-slate-400 group-hover:text-primary">api</span>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="flex justify-between items-center">
+                                        <p class="text-sm font-bold text-slate-700 dark:text-slate-200">ENTSO-E API</p>
+                                        <span
+                                            class="text-[10px] font-black px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-600">ONLINE</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500">2.8 MB/min • 0ms lag</p>
+                                </div>
+                            </div>
+                            <!-- Flow Animation Mock -->
+                            <div class="flex justify-center h-4 relative">
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <div class="w-1 h-full bg-slate-200 dark:bg-slate-800 rounded-full"></div>
+                                </div>
+                                <div class="absolute h-2 w-2 bg-primary rounded-full animate-bounce"></div>
+                            </div>
+                            <!-- Source 2 -->
+                            <div class="flex items-center gap-4 group">
+                                <div
+                                    class="h-10 w-10 shrink-0 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                                    <span
+                                        class="material-symbols-outlined text-slate-500 dark:text-slate-400 group-hover:text-primary">cloud_sync</span>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="flex justify-between items-center">
+                                        <p class="text-sm font-bold text-slate-700 dark:text-slate-200">MeteoSchweiz API
+                                        </p>
+                                        <span
+                                            class="text-[10px] font-black px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-600">ONLINE</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500">150 KB/min • 8s lag</p>
+                                </div>
+                            </div>
+                            <!-- Flow Animation Mock -->
+                            <div class="flex justify-center h-4 relative">
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <div class="w-1 h-full bg-slate-200 dark:bg-slate-800 rounded-full"></div>
+                                </div>
+                            </div>
+                            <!-- Sink -->
+                            <div class="flex items-center gap-4 bg-primary/5 p-3 rounded-lg border border-primary/20">
+                                <div
+                                    class="h-10 w-10 shrink-0 bg-primary rounded-lg flex items-center justify-center text-white">
+                                    <span class="material-symbols-outlined">psychology</span>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-bold text-primary">Inference Engine</p>
+                                    <p class="text-xs text-primary/70">XGBoost-Regressor_v12</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- System Logs Table (Secondary technical info) -->
+            <div
+                class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white">Recent Pipeline Events</h3>
+                    <button class="text-primary text-sm font-bold hover:underline">View all logs</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm border-collapse">
+                        <thead
+                            class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+                            <tr>
+                                <th class="px-6 py-4">Timestamp</th>
+                                <th class="px-6 py-4">Event Type</th>
+                                <th class="px-6 py-4">Status</th>
+                                <th class="px-6 py-4">Latency</th>
+                                <th class="px-6 py-4">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                <td class="px-6 py-4 font-mono text-xs">2023-10-27 14:15:02</td>
+                                <td class="px-6 py-4 font-semibold">Validation Set Check</td>
+                                <td class="px-6 py-4">
+                                    <span
+                                        class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                        <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span> Success
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 font-mono text-xs">12.4ms</td>
+                                <td class="px-6 py-4"><span
+                                        class="material-symbols-outlined text-slate-400 cursor-pointer hover:text-primary">visibility</span>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                <td class="px-6 py-4 font-mono text-xs">2023-10-27 13:30:45</td>
+                                <td class="px-6 py-4 font-semibold">Model Re-training</td>
+                                <td class="px-6 py-4">
+                                    <span
+                                        class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                        <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span> Success
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 font-mono text-xs">841.0ms</td>
+                                <td class="px-6 py-4"><span
+                                        class="material-symbols-outlined text-slate-400 cursor-pointer hover:text-primary">visibility</span>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                <td class="px-6 py-4 font-mono text-xs">2023-10-27 13:15:10</td>
+                                <td class="px-6 py-4 font-semibold">Data Ingestion (ENTSO-E)</td>
+                                <td class="px-6 py-4"><span
+                                        class="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"><span
+                                            class="h-1.5 w-1.5 rounded-full bg-green-500"></span> Success</span></td>
+                                <td class="px-6 py-4 font-mono text-xs">4.2s</td>
+                                <td class="px-6 py-4"><span
+                                        class="material-symbols-outlined text-slate-400 cursor-pointer hover:text-primary">visibility</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+        <!-- Footer for data credits -->
+        <footer
+            class="mt-auto py-10 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark px-10">
+            <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+                <div class="flex items-center gap-6">
+                    <div
+                        class="flex items-center gap-2 grayscale opacity-50 hover:opacity-100 transition-opacity cursor-pointer">
+                        <span class="material-symbols-outlined text-xl">database</span>
+                        <span class="text-xs font-bold tracking-widest uppercase">ENTSO-E Data</span>
+                    </div>
+                    <div
+                        class="flex items-center gap-2 grayscale opacity-50 hover:opacity-100 transition-opacity cursor-pointer">
+                        <span class="material-symbols-outlined text-xl">thermostat</span>
+                        <span class="text-xs font-bold tracking-widest uppercase">MeteoSchweiz</span>
+                    </div>
+                </div>
+                <p class="text-slate-400 text-xs">© 2023 Advanced Model Analytics Platform. Secure High-Performance
+                    Monitoring.</p>
+            </div>
+        </footer>
+    </div>
+</body>
+
+</html>

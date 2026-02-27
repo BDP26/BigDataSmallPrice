@@ -1,0 +1,4 @@
+ENTSO-E Transparency Platform: https://transparencyplatform.zendesk.com/hc/en-us/articles/12845911031188-How-to-get-security-token
+MeteoSchweiz Open Data / API: https://open-meteo.com/en/docs
+EKZ: https://api.tariffs.ekz.ch/swagger/index.html?urls.primaryName=EKZ
+BFU: https://www.bafu.admin.ch/de/datenservice-hydrologie-fuer-fliessgewaesser-und-seen
