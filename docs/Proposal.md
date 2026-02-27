@@ -52,8 +52,9 @@ Die Daten umfassen historische Zeitreihen sowie laufend aktualisierte Werte und 
 
 1. Aufbau einer ETL-Pipeline (Extraction, Transformation, Loading) und speichern in einer Datenbank  
 2. Feature Engineering (z.B. Lag-Variablen, gleitende Mittelwerte, Interaktionen zwischen Wetter und Preis)  
-3. Modellierung mittels Machine-Learning-Verfahren (z.B. XGBoost, Random Forest oder LSTM für Zeitreihen)  
-4. Evaluation der Modellgüte anhand historischer Testperioden  
+3. Erstellung einer Export-Pipeline, die Daten aus der Datenbank ausliest und für die effiziente Modellierung in Big-Data-Formaten (`.h5` oder `.parquet`) speichert  
+4. Modellierung mittels Machine-Learning-Verfahren (z.B. XGBoost, Random Forest oder LSTM für Zeitreihen), welche die exportierten Dateien nutzen  
+5. Evaluation der Modellgüte anhand historischer Testperioden  
 
 ---
 
