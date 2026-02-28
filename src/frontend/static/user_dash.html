@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+
+<html class="light" lang="de">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <title>Swiss Energy Pulse - Dashboard</title>
+</head>
+
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
+    <div class="relative flex min-h-screen w-full flex-col overflow-x-hidden">
+        <div class="layout-container flex h-full grow flex-col">
+            <!-- Header Section -->
+            <header
+                class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-800 px-6 md:px-10 py-4 bg-white dark:bg-slate-900 shadow-sm">
+                <div class="flex items-center gap-4">
+                    <div class="size-8 flex items-center justify-center bg-primary rounded-lg text-white">
+                        <span class="material-symbols-outlined">bolt</span>
+                    </div>
+                    <h2 class="text-slate-900 dark:text-slate-100 text-xl font-bold leading-tight tracking-tight">Swiss
+                        Energy Pulse</h2>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button
+                        class="flex min-w-[100px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold transition-all hover:bg-primary/90">
+                        <span class="material-symbols-outlined mr-2 text-sm">location_on</span>
+                        <span class="truncate">Winterthur</span>
+                    </button>
+                    <div
+                        class="flex items-center justify-center rounded-lg h-10 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 gap-2 text-sm font-medium border border-slate-200 dark:border-slate-700">
+                        <span class="material-symbols-outlined text-[20px]">schedule</span>
+                        <span>14:35</span>
+                    </div>
+                </div>
+            </header>
+            <main class="flex-1 flex justify-center p-4 md:p-8">
+                <div class="max-w-5xl w-full flex flex-col gap-6">
+                    <!-- Dashboard Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <!-- Left Column: Traffic Light & Explanation -->
+                        <div class="lg:col-span-5 flex flex-col gap-6">
+                            <!-- Price Traffic Light -->
+                            <div
+                                class="bg-white dark:bg-slate-900 p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center text-center">
+                                <p
+                                    class="text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider text-xs mb-4">
+                                    Aktueller Stromtarif</p>
+                                <div class="relative flex items-center justify-center mb-6">
+                                    <div class="absolute w-40 h-40 bg-emerald-500/20 rounded-full animate-pulse"></div>
+                                    <div
+                                        class="relative w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center border-4 border-white dark:border-slate-800 shadow-lg">
+                                        <span class="material-symbols-outlined text-white text-6xl"
+                                            style="font-variation-settings: 'FILL' 1">energy_savings_leaf</span>
+                                    </div>
+                                </div>
+                                <h1 class="text-3xl font-black text-slate-900 dark:text-slate-100 mb-2">JETZT GÜNSTIG
+                                </h1>
+                                <p class="text-emerald-600 dark:text-emerald-400 font-bold text-lg mb-4">Grün-Phase bis
+                                    16:00</p>
+                                <div
+                                    class="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-lg flex justify-between items-center border border-slate-100 dark:border-slate-700">
+                                    <span class="text-slate-600 dark:text-slate-400 text-sm">Aktueller Preis:</span>
+                                    <span class="text-2xl font-bold text-primary italic">14.2<small
+                                            class="text-sm font-normal"> Rp/kWh</small></span>
+                                </div>
+                            </div>
+                            <!-- Why Box -->
+                            <div class="bg-primary/5 border border-primary/20 p-6 rounded-xl flex gap-4">
+                                <div class="text-primary pt-1">
+                                    <span class="material-symbols-outlined text-3xl">info</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-slate-900 dark:text-slate-100 mb-1">Warum ist es gerade
+                                        günstig?</h3>
+                                    <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
+                                        Hohe Solarprognose in der Region Winterthur trifft auf eine moderate Nachfrage.
+                                        Das Netz verfügt über hohe Kapazitäten. Ideal für energieintensive
+                                        Haushaltsgeräte.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Right Column: Chart & Recommendations -->
+                        <div class="lg:col-span-7 flex flex-col gap-6">
+                            <!-- Price Chart Preview -->
+                            <div
+                                class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                <div class="flex justify-between items-center mb-6">
+                                    <h3 class="font-bold text-lg">Preisverlauf (24h)</h3>
+                                    <div class="flex gap-2">
+                                        <span class="flex items-center gap-1 text-xs font-medium text-slate-500">
+                                            <div class="w-2 h-2 rounded-full bg-primary"></div> Preis
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="h-48 w-full relative">
+                                    <!-- Simplified SVG Line Chart -->
+                                    <svg class="w-full h-full overflow-visible" viewbox="0 0 400 100">
+                                        <defs>
+                                            <lineargradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+                                                <stop offset="0%" stop-color="#137fec" stop-opacity="0.2"></stop>
+                                                <stop offset="100%" stop-color="#137fec" stop-opacity="0"></stop>
+                                            </lineargradient>
+                                        </defs>
+                                        <path d="M0,80 Q50,70 80,40 T150,20 T220,60 T300,90 T400,30" fill="none"
+                                            stroke="#137fec" stroke-linecap="round" stroke-width="3"></path>
+                                        <path d="M0,80 Q50,70 80,40 T150,20 T220,60 T300,90 T400,30 V100 H0 Z"
+                                            fill="url(#chartGradient)"></path>
+                                        <circle cx="150" cy="20" fill="#137fec" r="4"></circle>
+                                    </svg>
+                                    <div
+                                        class="absolute top-0 left-0 w-full h-full flex items-end justify-between px-1 text-[10px] text-slate-400 pt-4">
+                                        <span>00:00</span>
+                                        <span>06:00</span>
+                                        <span class="text-primary font-bold">12:00</span>
+                                        <span>18:00</span>
+                                        <span>23:59</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Best Time to Run Section -->
+                            <div class="flex flex-col gap-4">
+                                <div class="flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-primary">schedule_send</span>
+                                    <h3 class="font-bold text-lg">Beste Nutzungszeiten</h3>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <!-- Device 1 -->
+                                    <div
+                                        class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors">
+                                        <div
+                                            class="p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-lg">
+                                            <span class="material-symbols-outlined">dishwasher_gen</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-slate-500 font-medium">Waschmaschine / Spüler</p>
+                                            <p class="font-bold text-emerald-600">13:00 - 15:00</p>
+                                        </div>
+                                    </div>
+                                    <!-- Device 2 -->
+                                    <div
+                                        class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors">
+                                        <div
+                                            class="p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-lg">
+                                            <span class="material-symbols-outlined">ev_station</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-slate-500 font-medium">EV Ladestation</p>
+                                            <p class="font-bold text-emerald-600">01:00 - 05:00</p>
+                                        </div>
+                                    </div>
+                                    <!-- Device 3 -->
+                                    <div
+                                        class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 opacity-75">
+                                        <div class="p-3 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-lg">
+                                            <span class="material-symbols-outlined">oven</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-slate-500 font-medium">Ofen / Herd</p>
+                                            <p class="font-bold text-slate-700 dark:text-slate-300">Nach 20:00</p>
+                                        </div>
+                                    </div>
+                                    <!-- Device 4 -->
+                                    <div
+                                        class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 opacity-75">
+                                        <div class="p-3 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-lg">
+                                            <span class="material-symbols-outlined">heat_pump</span>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-slate-500 font-medium">Wärmepumpe</p>
+                                            <p class="font-bold text-slate-700 dark:text-slate-300">11:00 - 16:00</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Additional Context Footer -->
+                    <div
+                        class="border-t border-slate-200 dark:border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-xs">
+                        <div class="flex items-center gap-6">
+                            <span class="flex items-center gap-1"><span
+                                    class="material-symbols-outlined text-[14px]">shield</span> Offizielle Daten von
+                                Stadtwerk Winterthur</span>
+                            <span class="flex items-center gap-1"><span
+                                    class="material-symbols-outlined text-[14px]">update</span> Letztes Update: Vor 4
+                                Min.</span>
+                        </div>
+                        <div class="flex gap-4">
+                            <a class="hover:text-primary transition-colors" href="#">Tarifdetails</a>
+                            <a class="hover:text-primary transition-colors" href="#">Energiespartipps</a>
+                        </div>
+                    </div>
+                </div>
+            </main>
+            <!-- Navigation Bar (Bottom Mobile / Fixed Desktop Sidebar Context) -->
+            <nav
+                class="sticky bottom-0 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-6 py-3 block md:hidden">
+                <div class="flex justify-around items-center">
+                    <button class="flex flex-col items-center gap-1 text-primary">
+                        <span class="material-symbols-outlined"
+                            style="font-variation-settings: 'FILL' 1">dashboard</span>
+                        <span class="text-[10px] font-bold">Home</span>
+                    </button>
+                    <button class="flex flex-col items-center gap-1 text-slate-400">
+                        <span class="material-symbols-outlined">analytics</span>
+                        <span class="text-[10px] font-medium">Verbrauch</span>
+                    </button>
+                    <button class="flex flex-col items-center gap-1 text-slate-400">
+                        <span class="material-symbols-outlined">devices_other</span>
+                        <span class="text-[10px] font-medium">Geräte</span>
+                    </button>
+                    <button class="flex flex-col items-center gap-1 text-slate-400">
+                        <span class="material-symbols-outlined">settings</span>
+                        <span class="text-[10px] font-medium">Profil</span>
+                    </button>
+                </div>
+            </nav>
+        </div>
+    </div>
+</body>
+
+</html>

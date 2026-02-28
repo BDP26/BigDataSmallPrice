@@ -1,0 +1,25 @@
+[project]
+name = "bigdatasmallprice"
+version = "0.1.0"
+description = "Dynamic electricity price forecasting for Winterthur"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27",
+  "psycopg2-binary>=2.9",
+  "pandas>=2.2",
+  "pyarrow>=15",
+  "apache-airflow>=2.9",
+  "pytest>=8",
+  "pytest-mock>=3.14",
+  "responses>=0.25",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["src/testing"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
