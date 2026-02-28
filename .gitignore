@@ -1,1 +1,43 @@
+# Environment
 .env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.egg
+
+# Data directories
+data/raw/
+data/clean/
+data/processed/
+src/utils/ekz_tariffs_*.json
+
+# Airflow
+airflow/logs/
+airflow/airflow.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
