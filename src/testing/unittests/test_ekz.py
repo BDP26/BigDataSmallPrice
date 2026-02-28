@@ -54,10 +54,11 @@ class TestEkzCollector:
 
     def test_fetch_passes_date_param(self):
         mock_response = MagicMock()
-        mock_response.text = '{"intervals": []}'
+        mock_response.text = '{"prices": []}'
+        mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
 
-        with patch("src.data_collection.ekz_collector.httpx.get", return_value=mock_response) as mock_get:
+        with patch("src.data_collection.base_collector.httpx.get", return_value=mock_response) as mock_get:
             collector = EkzCollector(date="2026-02-28")
             collector.fetch()
             params = mock_get.call_args.kwargs.get("params", {})

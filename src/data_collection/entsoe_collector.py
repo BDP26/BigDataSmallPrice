@@ -10,8 +10,6 @@ import os
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 
-import httpx
-
 from .base_collector import BaseCollector
 
 _API_URL = "https://web-api.tp.entsoe.eu/api"
@@ -49,8 +47,7 @@ class EntsoeCollector(BaseCollector):
             "periodStart": self.period_start.strftime("%Y%m%d%H%M"),
             "periodEnd": self.period_end.strftime("%Y%m%d%H%M"),
         }
-        response = httpx.get(_API_URL, params=params, timeout=30)
-        response.raise_for_status()
+        response = self._fetch_with_retry(_API_URL, params=params)
         return response.content
 
     def parse(self, raw: bytes | str) -> list[dict]:

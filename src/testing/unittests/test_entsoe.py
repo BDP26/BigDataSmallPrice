@@ -62,9 +62,10 @@ class TestEntsoeCollector:
     def test_fetch_calls_api_with_correct_params(self):
         mock_response = MagicMock()
         mock_response.content = b"<root/>"
+        mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
 
-        with patch("src.data_collection.entsoe_collector.httpx.get", return_value=mock_response) as mock_get:
+        with patch("src.data_collection.base_collector.httpx.get", return_value=mock_response) as mock_get:
             collector = EntsoeCollector(token="my-token")
             collector.fetch()
             call_kwargs = mock_get.call_args

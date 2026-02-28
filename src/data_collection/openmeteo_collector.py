@@ -7,8 +7,6 @@ Coordinates: Winterthur, Switzerland (lat=47.5001, lon=8.7502)
 
 from datetime import datetime, timezone
 
-import httpx
-
 from .base_collector import BaseCollector
 
 _API_URL = "https://api.open-meteo.com/v1/forecast"
@@ -45,8 +43,7 @@ class OpenMeteoCollector(BaseCollector):
             "forecast_days": self.forecast_days,
             "timezone": "UTC",
         }
-        response = httpx.get(_API_URL, params=params, timeout=30)
-        response.raise_for_status()
+        response = self._fetch_with_retry(_API_URL, params=params)
         return response.text
 
     def parse(self, raw: bytes | str) -> list[dict]:

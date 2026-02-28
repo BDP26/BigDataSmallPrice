@@ -1,5 +1,3 @@
-version: "3.9"
-
 x-airflow-common: &airflow-common
   image: apache/airflow:2.9.3
   environment: &airflow-common-env
@@ -94,6 +92,23 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
+
+  api:
+    build: ./src/api
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./src/frontend/static:/app/static:ro
+    environment:
+      BDSP_DB_HOST: timescaledb
+      BDSP_DB_PORT: 5432
+      BDSP_DB_NAME: bdsp
+      BDSP_DB_USER: bdsp
+      BDSP_DB_PASSWORD: ${BDSP_DB_PASSWORD:-password}
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    restart: always
 
   airflow-scheduler:
     <<: *airflow-common

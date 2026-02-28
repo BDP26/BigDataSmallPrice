@@ -336,6 +336,84 @@
                     </div>
                 </div>
             </div>
+            <!-- DB Source Status -->
+            <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">storage</span>
+                        DB Source Status
+                    </h3>
+                    <div class="flex items-center gap-4">
+                        <span class="text-xs text-slate-400">Last refreshed: <span id="db-last-refreshed">—</span></span>
+                        <button onclick="loadDbStatus()" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                            <span class="material-symbols-outlined text-base">refresh</span> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800">
+                    <!-- ENTSO-E -->
+                    <div class="p-6 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary text-lg">bolt</span>
+                                <span class="text-sm font-bold text-slate-700 dark:text-slate-200">ENTSO-E</span>
+                            </div>
+                            <span id="db-status-entsoe" class="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">—</span>
+                        </div>
+                        <div class="text-3xl font-black text-slate-900 dark:text-white" id="db-count-entsoe">—</div>
+                        <div class="text-xs text-slate-400 space-y-0.5">
+                            <div>From: <span id="db-oldest-entsoe" class="font-mono">—</span></div>
+                            <div>To: <span id="db-newest-entsoe" class="font-mono">—</span></div>
+                        </div>
+                    </div>
+                    <!-- Weather -->
+                    <div class="p-6 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary text-lg">partly_cloudy_day</span>
+                                <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Open-Meteo</span>
+                            </div>
+                            <span id="db-status-weather" class="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">—</span>
+                        </div>
+                        <div class="text-3xl font-black text-slate-900 dark:text-white" id="db-count-weather">—</div>
+                        <div class="text-xs text-slate-400 space-y-0.5">
+                            <div>From: <span id="db-oldest-weather" class="font-mono">—</span></div>
+                            <div>To: <span id="db-newest-weather" class="font-mono">—</span></div>
+                        </div>
+                    </div>
+                    <!-- EKZ -->
+                    <div class="p-6 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary text-lg">receipt_long</span>
+                                <span class="text-sm font-bold text-slate-700 dark:text-slate-200">EKZ Tariffs</span>
+                            </div>
+                            <span id="db-status-ekz" class="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">—</span>
+                        </div>
+                        <div class="text-3xl font-black text-slate-900 dark:text-white" id="db-count-ekz">—</div>
+                        <div class="text-xs text-slate-400 space-y-0.5">
+                            <div>From: <span id="db-oldest-ekz" class="font-mono">—</span></div>
+                            <div>To: <span id="db-newest-ekz" class="font-mono">—</span></div>
+                        </div>
+                    </div>
+                    <!-- BAFU -->
+                    <div class="p-6 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary text-lg">water</span>
+                                <span class="text-sm font-bold text-slate-700 dark:text-slate-200">BAFU Hydro</span>
+                            </div>
+                            <span id="db-status-bafu" class="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">—</span>
+                        </div>
+                        <div class="text-3xl font-black text-slate-900 dark:text-white" id="db-count-bafu">—</div>
+                        <div class="text-xs text-slate-400 space-y-0.5">
+                            <div>From: <span id="db-oldest-bafu" class="font-mono">—</span></div>
+                            <div>To: <span id="db-newest-bafu" class="font-mono">—</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- System Logs Table (Secondary technical info) -->
             <div
                 class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -421,6 +499,48 @@
             </div>
         </footer>
     </div>
+    <script>
+        function fmt(iso) {
+            if (!iso) return '—';
+            return new Date(iso).toLocaleString('de-CH', { dateStyle: 'short', timeStyle: 'short' });
+        }
+
+        function setSource(key, data) {
+            document.getElementById('db-count-' + key).textContent =
+                data.count !== undefined ? data.count.toLocaleString() : 'ERR';
+
+            document.getElementById('db-oldest-' + key).textContent = fmt(data.oldest);
+            document.getElementById('db-newest-' + key).textContent = fmt(data.newest);
+
+            const badge = document.getElementById('db-status-' + key);
+            if (data.count > 0) {
+                badge.textContent = 'OK';
+                badge.className = 'text-[10px] font-black px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-600';
+            } else {
+                badge.textContent = 'EMPTY';
+                badge.className = 'text-[10px] font-black px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600';
+            }
+        }
+
+        async function loadDbStatus() {
+            try {
+                const res = await fetch('/api/db-status');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                ['entsoe', 'weather', 'ekz', 'bafu'].forEach(k => setSource(k, data[k] || {}));
+                document.getElementById('db-last-refreshed').textContent =
+                    new Date().toLocaleTimeString('de-CH');
+            } catch (e) {
+                document.getElementById('db-last-refreshed').textContent = 'Error: ' + e.message;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDbStatus();
+            setInterval(loadDbStatus, 60000);
+        });
+    </script>
 </body>
 
 </html>

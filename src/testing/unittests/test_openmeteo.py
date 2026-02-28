@@ -61,9 +61,10 @@ class TestOpenMeteoCollector:
     def test_fetch_calls_correct_url(self):
         mock_response = MagicMock()
         mock_response.text = '{"hourly": {"time": [], "temperature_2m": [], "wind_speed_10m": [], "shortwave_radiation": [], "cloud_cover": []}}'
+        mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
 
-        with patch("src.data_collection.openmeteo_collector.httpx.get", return_value=mock_response) as mock_get:
+        with patch("src.data_collection.base_collector.httpx.get", return_value=mock_response) as mock_get:
             collector = OpenMeteoCollector()
             collector.fetch()
             url = mock_get.call_args.args[0]

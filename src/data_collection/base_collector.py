@@ -1,7 +1,10 @@
 """Abstract base class for all data collectors."""
 
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime
+
+import httpx
 
 
 class BaseCollector(ABC):
@@ -32,6 +35,37 @@ class BaseCollector(ABC):
         return records
 
     # ── Internal ──────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _fetch_with_retry(
+        url: str,
+        params: dict | None = None,
+        timeout: int = 30,
+        max_retries: int = 3,
+    ) -> httpx.Response:
+        """
+        GET *url* with automatic retry on 429 / 5xx responses.
+
+        - 429 Too Many Requests: waits Retry-After seconds (default 60).
+        - 500/502/503: exponential back-off (1s, 2s, 4s).
+        - All other errors raise immediately via raise_for_status().
+        """
+        response: httpx.Response | None = None
+        for attempt in range(max_retries):
+            response = httpx.get(url, params=params, timeout=timeout)
+            if response.status_code == 429:
+                retry_after = int(response.headers.get("Retry-After", 60))
+                time.sleep(retry_after)
+                continue
+            if response.status_code in (500, 502, 503):
+                time.sleep(2 ** attempt)
+                continue
+            response.raise_for_status()
+            return response
+        # Last attempt exhausted – raise whatever we got
+        assert response is not None
+        response.raise_for_status()
+        return response  # unreachable, but satisfies type checkers
 
     @staticmethod
     def _validate(records: list[dict]) -> None:

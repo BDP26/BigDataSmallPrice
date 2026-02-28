@@ -5,11 +5,12 @@ API: https://api.tariffs.ekz.ch/v1/tariffs
 Returns 15-minute dynamic tariff intervals.
 """
 
+import logging
 from datetime import datetime, timezone
 
-import httpx
-
 from .base_collector import BaseCollector
+
+_LOG = logging.getLogger(__name__)
 
 _API_URL = "https://api.tariffs.ekz.ch/v1/tariffs"
 _TARIFF_TYPE = "dynamic"
@@ -37,8 +38,7 @@ class EkzCollector(BaseCollector):
             "date": self.date,
             "tariffType": self.tariff_type,
         }
-        response = httpx.get(_API_URL, params=params, timeout=30)
-        response.raise_for_status()
+        response = self._fetch_with_retry(_API_URL, params=params)
         return response.text
 
     def parse(self, raw: bytes | str) -> list[dict]:
@@ -49,13 +49,25 @@ class EkzCollector(BaseCollector):
         data = json.loads(raw)
 
         records: list[dict] = []
-        intervals = data.get("intervals", data.get("data", []))
+        prices = data.get("prices", [])
 
-        for interval in intervals:
-            ts_raw = interval.get("startTime") or interval.get("timestamp") or interval.get("time")
-            price_raw = interval.get("price") or interval.get("value")
+        if not prices and isinstance(data, dict):
+            _LOG.warning(
+                "EKZ parse: 0 records found. Response keys: %s. "
+                "Top-level structure: %s",
+                list(data.keys()),
+                {k: type(v).__name__ for k, v in data.items()},
+            )
 
-            if ts_raw is None or price_raw is None:
+        for entry in prices:
+            ts_raw = entry.get("start_timestamp")
+            if ts_raw is None:
+                continue
+
+            # Extract CHF_kWh from the electricity component
+            electricity = {e["unit"]: e["value"] for e in entry.get("electricity", [])}
+            price_raw = electricity.get("CHF_kWh")
+            if price_raw is None:
                 continue
 
             ts_utc = _parse_timestamp(ts_raw)

@@ -1,24 +1,26 @@
 """
 BAFU (Bundesamt für Umwelt) – Hydro data collector.
 
-REST API: https://ogd.bafu.admin.ch/hydro/
+API: https://api.existenz.ch/apiv1/hydro/daterange
 Station: Rhein-Rekingen, ID 2018
-Data: discharge (m³/s) and water level (m.a.s.l.)
+Parameters: flow = Abfluss (m³/s), height = Pegel (m.ü.M.)
 """
 
+import json
+import logging
 from datetime import datetime, timedelta, timezone
-
-import httpx
 
 from .base_collector import BaseCollector
 
-_BASE_URL = "https://ogd.bafu.admin.ch/hydro"
+_LOG = logging.getLogger(__name__)
+
+_BASE_URL = "https://api.existenz.ch/apiv1/hydro/daterange"
 _STATION_ID = "2018"  # Rhein-Rekingen
 
 
 class BafuCollector(BaseCollector):
     """
-    Fetches hydrological data from the BAFU REST API.
+    Fetches hydrological data from the existenz.ch hydro API (BAFU data).
 
     Args:
         station_id:  BAFU station ID. Defaults to Rhein-Rekingen (2018).
@@ -38,54 +40,54 @@ class BafuCollector(BaseCollector):
         date_from = (now_utc - timedelta(days=self.days_back)).strftime("%Y-%m-%d")
         date_to = now_utc.strftime("%Y-%m-%d")
 
-        url = f"{_BASE_URL}/stations/{self.station_id}/measurements"
         params = {
-            "from": date_from,
-            "to": date_to,
-            "format": "json",
+            "locations": self.station_id,
+            "parameters": "flow,height",
+            "startdate": date_from,
+            "enddate": date_to,
+            "app": "bdsp",
+            "version": "0.1",
         }
-        response = httpx.get(url, params=params, timeout=30)
-        response.raise_for_status()
+        response = self._fetch_with_retry(_BASE_URL, params=params)
         return response.text
 
     def parse(self, raw: bytes | str) -> list[dict]:
-        import json
-
         if isinstance(raw, bytes):
             raw = raw.decode()
         data = json.loads(raw)
 
-        records: list[dict] = []
-        measurements = data if isinstance(data, list) else data.get("measurements", data.get("data", []))
+        payload = data.get("payload", [])
+        if not payload:
+            _LOG.warning("BAFU parse: empty payload. Response keys: %s", list(data.keys()))
+            return []
 
-        for entry in measurements:
-            ts_raw = entry.get("timestamp") or entry.get("time") or entry.get("date")
-            if ts_raw is None:
+        # Merge flow and height entries that share the same timestamp into one record.
+        # Timestamps are Unix epoch integers.
+        by_ts: dict[int, dict] = {}
+        for entry in payload:
+            ts_unix = entry.get("timestamp")
+            par = entry.get("par")
+            val = entry.get("val")
+            if ts_unix is None or par is None:
                 continue
+            if ts_unix not in by_ts:
+                by_ts[ts_unix] = {"ts_unix": ts_unix}
+            if par == "flow":
+                by_ts[ts_unix]["discharge_m3s"] = float(val) if val is not None else None
+            elif par == "height":
+                by_ts[ts_unix]["level_masl"] = float(val) if val is not None else None
 
-            ts_utc = _parse_timestamp(ts_raw)
+        records: list[dict] = []
+        for ts_unix, fields in by_ts.items():
+            ts_utc = datetime.fromtimestamp(fields["ts_unix"], tz=timezone.utc)
             records.append(
                 {
                     "time": ts_utc,
                     "station_id": self.station_id,
-                    "discharge_m3s": _safe_float(entry, "discharge") or _safe_float(entry, "q") or _safe_float(entry, "abfluss"),
-                    "level_masl": _safe_float(entry, "level") or _safe_float(entry, "w") or _safe_float(entry, "pegel"),
+                    "discharge_m3s": fields.get("discharge_m3s"),
+                    "level_masl": fields.get("level_masl"),
                 }
             )
 
+        records.sort(key=lambda r: r["time"])
         return records
-
-
-def _parse_timestamp(ts: str) -> datetime:
-    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt
-
-
-def _safe_float(d: dict, key: str) -> float | None:
-    v = d.get(key)
-    try:
-        return float(v) if v is not None else None
-    except (TypeError, ValueError):
-        return None
