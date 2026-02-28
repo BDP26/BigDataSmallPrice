@@ -23,7 +23,7 @@ def _get_dsn() -> str:
         f"port={os.environ.get('BDSP_DB_PORT', '5433')} "
         f"dbname={os.environ.get('BDSP_DB_NAME', 'bdsp')} "
         f"user={os.environ.get('BDSP_DB_USER', 'bdsp')} "
-        f"password={os.environ.get('BDSP_DB_PASSWORD', 'password')}"
+        f"password={os.environ['BDSP_DB_PASSWORD']}"
     )
 
 

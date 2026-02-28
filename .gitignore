@@ -20,6 +20,9 @@ data/clean/
 data/processed/
 src/utils/ekz_tariffs_*.json
 
+# Exported feature splits (timestamped parquet files)
+data/*.parquet
+
 # Airflow
 airflow/logs/
 airflow/airflow.db

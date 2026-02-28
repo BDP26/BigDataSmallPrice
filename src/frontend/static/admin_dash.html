@@ -350,7 +350,7 @@
                         </button>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800">
                     <!-- ENTSO-E -->
                     <div class="p-6 space-y-3">
                         <div class="flex items-center justify-between">
@@ -411,6 +411,113 @@
                             <div>To: <span id="db-newest-bafu" class="font-mono">—</span></div>
                         </div>
                     </div>
+                    <!-- Feature DB -->
+                    <div class="p-6 space-y-3 bg-indigo-50/40 dark:bg-indigo-950/20">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-indigo-500 text-lg">schema</span>
+                                <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Feature DB</span>
+                            </div>
+                            <span id="feature-status-badge" class="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">—</span>
+                        </div>
+                        <div class="text-3xl font-black text-slate-900 dark:text-white" id="feature-row-count">—</div>
+                        <div class="text-xs text-slate-400 space-y-0.5">
+                            <div><span id="feature-oldest" class="font-mono">—</span> → <span id="feature-newest" class="font-mono">—</span></div>
+                            <div>Lags: <span id="feature-lag-pct" class="font-mono font-semibold text-indigo-500">—</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Airflow Pipeline Status -->
+            <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-200 dark:border-slate-800">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">autorenew</span>
+                            Airflow Pipeline Status
+                        </h3>
+                        <div class="flex items-center gap-3">
+                            <button onclick="loadAirflowStatus()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                                <span class="material-symbols-outlined text-sm">refresh</span>Refresh
+                            </button>
+                            <span class="text-xs text-slate-400">Updated: <span id="airflow-last-refreshed">—</span></span>
+                        </div>
+                    </div>
+                </div>
+                <div id="airflow-error" class="hidden mx-5 my-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400"></div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-100 dark:border-slate-800 text-xs text-slate-500 uppercase tracking-wide">
+                                <th class="px-5 py-3 text-left font-semibold">DAG</th>
+                                <th class="px-5 py-3 text-left font-semibold">Schedule</th>
+                                <th class="px-5 py-3 text-left font-semibold">Last Run</th>
+                                <th class="px-5 py-3 text-left font-semibold">Status</th>
+                                <th class="px-5 py-3 text-left font-semibold">Next Run</th>
+                            </tr>
+                        </thead>
+                        <tbody id="airflow-table-body">
+                            <tr><td colspan="5" class="px-5 py-8 text-center text-slate-400 text-sm">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DB Explorer -->
+            <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <!-- Header + tabs -->
+                <div class="p-5 border-b border-slate-200 dark:border-slate-800">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">manage_search</span>
+                            DB Explorer
+                        </h3>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <div id="explorer-tabs" class="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg"></div>
+                            <div class="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                                <button id="view-schema-btn" onclick="Explorer.setView('schema')"
+                                    class="px-3 py-1 text-xs font-bold rounded transition-colors text-slate-500 dark:text-slate-400">Schema</button>
+                                <button id="view-browse-btn" onclick="Explorer.setView('browse')"
+                                    class="px-3 py-1 text-xs font-bold rounded transition-colors text-slate-500 dark:text-slate-400">Browse</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Schema view -->
+                <div id="explorer-schema" class="p-5 hidden">
+                    <div id="schema-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2"></div>
+                </div>
+                <!-- Browse view -->
+                <div id="explorer-browse" class="hidden">
+                    <div class="px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs text-slate-400 font-medium" id="explorer-row-info">—</span>
+                            <select id="explorer-limit" onchange="Explorer.changeLimit()"
+                                class="bg-slate-100 dark:bg-slate-800 border-none rounded text-xs font-bold py-1 px-2 cursor-pointer">
+                                <option value="20">20 rows</option>
+                                <option value="50">50 rows</option>
+                                <option value="100">100 rows</option>
+                            </select>
+                        </div>
+                        <div class="flex gap-1">
+                            <button id="explorer-prev" onclick="Explorer.prev()"
+                                class="px-3 py-1 text-xs font-bold bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors">← Prev</button>
+                            <button id="explorer-next" onclick="Explorer.next()"
+                                class="px-3 py-1 text-xs font-bold bg-slate-100 dark:bg-slate-800 rounded hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors">Next →</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto" style="max-height:420px;overflow-y:auto">
+                        <table id="explorer-table" class="w-full text-left text-xs border-collapse"></table>
+                    </div>
+                </div>
+                <!-- Loading / error -->
+                <div id="explorer-loading" class="p-8 text-center text-slate-400 text-sm hidden">
+                    <span class="material-symbols-outlined text-primary text-2xl" style="animation:spin 1s linear infinite">refresh</span>
+                    <p class="mt-2">Loading…</p>
+                </div>
+                <div id="explorer-error" class="hidden px-5 pb-4">
+                    <p class="text-xs text-red-500 font-mono" id="explorer-error-msg"></p>
                 </div>
             </div>
 
@@ -499,7 +606,11 @@
             </div>
         </footer>
     </div>
+    <style>
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
     <script>
+        // ── DB Status ────────────────────────────────────────────────────────
         function fmt(iso) {
             if (!iso) return '—';
             return new Date(iso).toLocaleString('de-CH', { dateStyle: 'short', timeStyle: 'short' });
@@ -508,10 +619,8 @@
         function setSource(key, data) {
             document.getElementById('db-count-' + key).textContent =
                 data.count !== undefined ? data.count.toLocaleString() : 'ERR';
-
             document.getElementById('db-oldest-' + key).textContent = fmt(data.oldest);
             document.getElementById('db-newest-' + key).textContent = fmt(data.newest);
-
             const badge = document.getElementById('db-status-' + key);
             if (data.count > 0) {
                 badge.textContent = 'OK';
@@ -536,9 +645,255 @@
             }
         }
 
+        // ── Feature DB Status ────────────────────────────────────────────────
+        async function loadFeatureStatus() {
+            try {
+                const res = await fetch('/api/feature-status');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const d = await res.json();
+                if (d.error) throw new Error(d.error);
+
+                document.getElementById('feature-row-count').textContent =
+                    d.row_count ? d.row_count.toLocaleString() : '0';
+                document.getElementById('feature-oldest').textContent = fmt(d.oldest);
+                document.getElementById('feature-newest').textContent = fmt(d.newest);
+
+                const lagPct = d.row_count > 0
+                    ? (d.rows_with_lags / d.row_count * 100).toFixed(1) + '%'
+                    : '—';
+                document.getElementById('feature-lag-pct').textContent = lagPct;
+
+                const badge = document.getElementById('feature-status-badge');
+                if (d.row_count > 0) {
+                    badge.textContent = 'OK';
+                    badge.className = 'text-[10px] font-black px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-600';
+                } else {
+                    badge.textContent = 'EMPTY';
+                    badge.className = 'text-[10px] font-black px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-600';
+                }
+            } catch (e) {
+                document.getElementById('feature-status-badge').textContent = 'ERR';
+                document.getElementById('feature-status-badge').className =
+                    'text-[10px] font-black px-2 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600';
+            }
+        }
+
+        // ── Airflow Status ───────────────────────────────────────────────────
+        function airflowStateBadge(state) {
+            if (!state) return '<span class="text-slate-400">—</span>';
+            const cfg = {
+                success: 'bg-green-100 dark:bg-green-900/30 text-green-700',
+                failed:  'bg-red-100   dark:bg-red-900/30   text-red-700',
+                running: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 animate-pulse',
+            };
+            const cls = cfg[state] || 'bg-slate-100 dark:bg-slate-800 text-slate-500';
+            const icon = state === 'success' ? '✓' : state === 'failed' ? '✕' : '●';
+            return `<span class="text-[11px] font-black px-2 py-0.5 rounded ${cls}">${icon} ${state}</span>`;
+        }
+
+        async function loadAirflowStatus() {
+            const tbody = document.getElementById('airflow-table-body');
+            const errBox = document.getElementById('airflow-error');
+            try {
+                const res = await fetch('/api/airflow/dags');
+                const data = await res.json();
+                errBox.classList.add('hidden');
+
+                if (!res.ok || data.error) {
+                    errBox.textContent = data.error || 'Airflow nicht erreichbar';
+                    errBox.classList.remove('hidden');
+                    tbody.innerHTML = '';
+                    return;
+                }
+
+                tbody.innerHTML = data.map(dag => {
+                    const lastDate = dag.last_run?.execution_date
+                        ? fmt(dag.last_run.execution_date) : '—';
+                    const nextDate = dag.next_run ? fmt(dag.next_run) : '—';
+                    const paused = dag.is_paused
+                        ? '<span class="ml-1 text-[10px] text-amber-500 font-semibold">(paused)</span>' : '';
+                    return `<tr class="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td class="px-5 py-3 font-mono font-semibold text-slate-800 dark:text-slate-200">${dag.dag_id}${paused}</td>
+                        <td class="px-5 py-3 font-mono text-slate-500">${dag.schedule || '—'}</td>
+                        <td class="px-5 py-3 text-slate-500">${lastDate}</td>
+                        <td class="px-5 py-3">${airflowStateBadge(dag.last_run?.state)}</td>
+                        <td class="px-5 py-3 text-slate-500">${nextDate}</td>
+                    </tr>`;
+                }).join('');
+
+                document.getElementById('airflow-last-refreshed').textContent =
+                    new Date().toLocaleTimeString('de-CH');
+            } catch (e) {
+                errBox.textContent = 'Fehler: ' + e.message;
+                errBox.classList.remove('hidden');
+                tbody.innerHTML = '';
+            }
+        }
+
+        // ── DB Explorer ──────────────────────────────────────────────────────
+        const Explorer = (() => {
+            const TABLES = {
+                'entsoe_day_ahead_prices': 'ENTSO-E',
+                'weather_hourly':          'Weather',
+                'ekz_tariffs_raw':         'EKZ',
+                'bafu_hydro':              'BAFU',
+                'training_features':       'Features',
+            };
+            const TYPE_COLOR = {
+                'timestamp with time zone': 'bg-purple-100 text-purple-700',
+                'double precision':         'bg-blue-100   text-blue-700',
+                'numeric':                  'bg-blue-100   text-blue-700',
+                'integer':                  'bg-blue-100   text-blue-700',
+                'bigint':                   'bg-blue-100   text-blue-700',
+                'character varying':        'bg-amber-100  text-amber-700',
+                'text':                     'bg-amber-100  text-amber-700',
+            };
+            const ACTIVE   = 'px-3 py-1 text-xs font-bold rounded transition-colors bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm';
+            const INACTIVE = 'px-3 py-1 text-xs font-bold rounded transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200';
+
+            let currentTable = 'entsoe_day_ahead_prices';
+            let currentView  = 'browse';
+            let offset       = 0;
+            let limit        = 20;
+            let schemaCache  = null;
+
+            const $ = id => document.getElementById(id);
+
+            function loading(show) { $('explorer-loading').classList.toggle('hidden', !show); }
+            function showErr(msg)  {
+                $('explorer-error-msg').textContent = msg;
+                $('explorer-error').classList.remove('hidden');
+            }
+            function hideErr()     { $('explorer-error').classList.add('hidden'); }
+
+            function refreshTabStyles() {
+                Object.keys(TABLES).forEach(k => {
+                    const b = $('etab-' + k);
+                    if (b) b.className = k === currentTable ? ACTIVE : INACTIVE;
+                });
+                ['schema', 'browse'].forEach(v => {
+                    const b = $('view-' + v + '-btn');
+                    if (b) b.className = v === currentView ? ACTIVE : INACTIVE;
+                });
+                $('explorer-schema').classList.toggle('hidden', currentView !== 'schema');
+                $('explorer-browse').classList.toggle('hidden', currentView !== 'browse');
+            }
+
+            async function fetchSchema() {
+                if (schemaCache) { renderSchema(schemaCache[currentTable] || []); return; }
+                hideErr(); loading(true);
+                try {
+                    const r = await fetch('/api/db-explorer/schema');
+                    const d = await r.json();
+                    if (d.error) throw new Error(d.error);
+                    schemaCache = d;
+                    renderSchema(schemaCache[currentTable] || []);
+                } catch (e) { showErr(e.message); }
+                finally { loading(false); }
+            }
+
+            function renderSchema(cols) {
+                const el = $('schema-grid');
+                if (!cols.length) {
+                    el.innerHTML = '<p class="col-span-4 text-xs text-slate-400 py-4">No schema info available.</p>';
+                    return;
+                }
+                el.innerHTML = cols.map(c => {
+                    const cls = TYPE_COLOR[c.type] || 'bg-slate-100 text-slate-600';
+                    const short = c.type
+                        .replace('timestamp with time zone', 'timestamptz')
+                        .replace('character varying', 'varchar')
+                        .replace('double precision', 'float8');
+                    return `<div class="flex flex-col gap-1.5 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
+                        <span class="text-xs font-bold font-mono text-slate-800 dark:text-slate-100">${c.column}</span>
+                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded self-start ${cls}">${short}</span>
+                        ${c.nullable ? '' : '<span class="text-[10px] text-slate-400 font-semibold">NOT NULL</span>'}
+                    </div>`;
+                }).join('');
+            }
+
+            async function fetchRows() {
+                hideErr(); loading(true);
+                limit = parseInt($('explorer-limit').value) || 20;
+                try {
+                    const r = await fetch(`/api/db-explorer/rows/${currentTable}?limit=${limit}&offset=${offset}`);
+                    const d = await r.json();
+                    if (d.error) throw new Error(d.error);
+                    renderRows(d);
+                } catch (e) { showErr(e.message); }
+                finally { loading(false); }
+            }
+
+            function renderRows({ columns, rows, offset: off, limit: lim }) {
+                $('explorer-row-info').textContent = rows.length
+                    ? `Rows ${off + 1}–${off + rows.length} · newest first`
+                    : 'No rows found';
+                $('explorer-prev').disabled = off === 0;
+                $('explorer-next').disabled = rows.length < lim;
+
+                if (!rows.length) {
+                    $('explorer-table').innerHTML =
+                        `<tr><td colspan="99" class="px-6 py-8 text-center text-slate-400">Table is empty.</td></tr>`;
+                    return;
+                }
+
+                const thead = `<thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-500 font-bold uppercase text-[10px] tracking-wider sticky top-0 z-10">
+                    <tr>${columns.map(c => `<th class="px-4 py-2.5 whitespace-nowrap border-b border-slate-100 dark:border-slate-800">${c}</th>`).join('')}</tr>
+                </thead>`;
+
+                const tbody = `<tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                    ${rows.map((row, i) => `<tr class="${i % 2 ? 'bg-slate-50/50 dark:bg-slate-800/20' : ''} hover:bg-primary/5 transition-colors">
+                        ${columns.map(c => {
+                            const v = row[c];
+                            const cell = v === null
+                                ? '<span class="text-slate-300 dark:text-slate-600">null</span>'
+                                : `<span class="text-slate-700 dark:text-slate-300">${String(v)}</span>`;
+                            return `<td class="px-4 py-2 whitespace-nowrap text-xs">${cell}</td>`;
+                        }).join('')}
+                    </tr>`).join('')}
+                </tbody>`;
+
+                $('explorer-table').innerHTML = thead + tbody;
+            }
+
+            return {
+                init() {
+                    const tabsEl = $('explorer-tabs');
+                    Object.entries(TABLES).forEach(([key, label]) => {
+                        const btn = document.createElement('button');
+                        btn.id        = 'etab-' + key;
+                        btn.textContent = label;
+                        btn.className = INACTIVE;
+                        btn.onclick   = () => this.selectTable(key);
+                        tabsEl.appendChild(btn);
+                    });
+                    this.selectTable(currentTable);
+                    this.setView('browse');
+                },
+                selectTable(t) {
+                    currentTable = t; offset = 0;
+                    refreshTabStyles(); this._load();
+                },
+                setView(v) {
+                    currentView = v;
+                    refreshTabStyles(); this._load();
+                },
+                _load()       { currentView === 'schema' ? fetchSchema() : fetchRows(); },
+                prev()        { if (offset >= limit) { offset -= limit; fetchRows(); } },
+                next()        { offset += limit; fetchRows(); },
+                changeLimit() { offset = 0; fetchRows(); },
+            };
+        })();
+
+        // ── Boot ─────────────────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', () => {
             loadDbStatus();
+            loadFeatureStatus();
+            loadAirflowStatus();
             setInterval(loadDbStatus, 60000);
+            setInterval(loadFeatureStatus, 60000);
+            setInterval(loadAirflowStatus, 60000);
+            Explorer.init();
         });
     </script>
 </body>
