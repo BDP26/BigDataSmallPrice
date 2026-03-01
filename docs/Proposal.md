@@ -3,7 +3,7 @@
 ## Vorhersage dynamischer Strompreise unter Einbezug von Echtzeit-Wetterdaten und Day-Ahead-Preisen
 ### Big Data Projekt DS23t PM4
 
-**Team:** [Namen einfügen]
+**Team:** [Bachmann Ryan, Dinis Silva Miguel, Ruchti Gian]
 
 ---
 
