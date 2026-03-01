@@ -83,19 +83,13 @@ Das Endprodukt umfasst:
 
 | Phase | Aufgabe | Verantwortlich |
 |---|---|---|
-| Woche 2 | Proposal schreiben & Requirements definieren | Alle |
-| Woche 3 | Datenbeschaffung & API-Integration (ENTSO-E, MeteoSchweiz, EKZ, BFU) | Ryan |
-| Woche 4 | Aufbau ETL-Pipeline & Datenbank-Speicherung | Gian |
-| Woche 5 | Initiale Datenanalyse (EDA) & Datenbereinigung | Miguel |
-| Woche 6 | Feature Engineering (Lag-Variablen, Wetter-Preis-Interaktionen) | Ryan, Gian |
-| Woche 7 | User Onboarding & User Management Konzepte | Miguel |
-| Woche 8 | Baseline-Modellierung & erste Zeitreihenmodelle | Gian |
-| Woche 9 | Fortgeschrittene Zeitreihen-Modellierung (XGBoost, Random Forest, LSTM) | Ryan |
-| Woche 10 | Quantitative Evaluation mit EKZ-Daten & Modelloptimierung | Miguel |
-| Woche 11 | Backend-Entwicklung für Dashboard-Integration | Gian |
-| Woche 12 | Interaktives Dashboard Frontend (Preisprognosen, Empfehlungen) | Ryan, Miguel |
-| Woche 13 | Gesamtsystem-Testing, Bugfixing & Integration | Alle |
-| Woche 14 | Abschluss-Dokumentation & Vorbereitung der Präsentation | Alle |
+| Woche 2–3 | Proposal, Requirements & API-Integration (ENTSO-E, MeteoSchweiz, EKZ, BFU) | Alle |
+| Woche 4–5 | ETL-Pipeline, Datenbank-Speicherung, EDA & Datenbereinigung | Gian / Miguel |
+| Woche 6–7 | Feature Engineering & User Onboarding/Management | Miguel / Ryan |
+| Woche 8–9 | Baseline- & fortgeschrittene Modellierung (XGBoost, RF, LSTM) | Gian / Ryan |
+| Woche 10–11 | Evaluation mit EKZ-Daten, Optimierung & Backend-Entwicklung | Gian / Miguel |
+| Woche 12–13 | Dashboard Frontend, Testing & Integration | Gian |
+| Woche 14 | Abschluss-Dokumentation & Präsentation | Miguel / Ryan |
 
 ---
 
