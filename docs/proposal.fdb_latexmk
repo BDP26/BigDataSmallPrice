@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1772380648.96357 "g:/Meine Ablage/ZHAW/GitHub/BigDataSmallPrice/docs/proposal.tex" "proposal.pdf" "proposal" 1772380651.61215 0
+["pdflatex"] 1772393636.73791 "g:/Meine Ablage/ZHAW/GitHub/BigDataSmallPrice/docs/proposal.tex" "proposal.pdf" "proposal" 1772393639.53443 0
   "C:/Users/migue/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map" 1772379387 80909 eab91d9745dd2edfd62a31d53cd5fe15 ""
   "C:/Users/migue/AppData/Local/MiKTeX/fonts/pk/ljfour/jknappen/ec/dpi600/ecbx1095.pk" 1772380396 28976 28f695784bfdaf6678c956f6ff4952f9 ""
   "C:/Users/migue/AppData/Local/MiKTeX/fonts/pk/ljfour/jknappen/ec/dpi600/ecbx1440.pk" 1772380403 40136 8705512d21df9b98f42fb0b834facf8c ""
@@ -75,10 +75,10 @@
   "C:/Users/migue/AppData/Local/Programs/MiKTeX/tex/latex/tools/tabularx.sty" 1761901070 7243 a2c17f18e2c9b702b84fad03d5f9c78b ""
   "C:/Users/migue/AppData/Local/Programs/MiKTeX/tex/latex/url/url.sty" 1388490452 12796 8edb7d69a20b857904dd0ea757c14ec9 ""
   "C:/Users/migue/AppData/Local/Programs/MiKTeX/tex/latex/xcolor/xcolor.sty" 1729265222 55384 b454dec21c2d9f45ec0b793f0995b992 ""
-  "g:/Meine Ablage/ZHAW/GitHub/BigDataSmallPrice/docs/proposal.tex" 1772380647 6689 983bc07f8a092b53c00d2b89e6240f46 ""
-  "proposal.aux" 1772380650 1261 ebe1079da183eab0838a567ea25b4640 "pdflatex"
-  "proposal.out" 1772380650 1403 acfc02c77ab28ff284362d65c00bc4a8 "pdflatex"
-  "proposal.tex" 1772380647 6689 983bc07f8a092b53c00d2b89e6240f46 ""
+  "g:/Meine Ablage/ZHAW/GitHub/BigDataSmallPrice/docs/proposal.tex" 1772393635 6689 983bc07f8a092b53c00d2b89e6240f46 ""
+  "proposal.aux" 1772393638 1261 ebe1079da183eab0838a567ea25b4640 "pdflatex"
+  "proposal.out" 1772393638 1403 acfc02c77ab28ff284362d65c00bc4a8 "pdflatex"
+  "proposal.tex" 1772393635 6689 983bc07f8a092b53c00d2b89e6240f46 ""
   (generated)
   "proposal.aux"
   "proposal.log"
