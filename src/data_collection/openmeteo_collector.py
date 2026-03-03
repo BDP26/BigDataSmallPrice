@@ -12,7 +12,7 @@ from .base_collector import BaseCollector
 _API_URL = "https://api.open-meteo.com/v1/forecast"
 _LATITUDE = 47.5001
 _LONGITUDE = 8.7502
-_HOURLY_VARS = "temperature_2m,wind_speed_10m,shortwave_radiation,cloud_cover"
+_HOURLY_VARS = "temperature_2m,wind_speed_10m,shortwave_radiation,cloud_cover,precipitation"
 
 
 class OpenMeteoCollector(BaseCollector):
@@ -59,6 +59,7 @@ class OpenMeteoCollector(BaseCollector):
         winds = hourly.get("wind_speed_10m", [])
         radiations = hourly.get("shortwave_radiation", [])
         clouds = hourly.get("cloud_cover", [])
+        precip = hourly.get("precipitation", [])
 
         records: list[dict] = []
         for i, t_str in enumerate(times):
@@ -72,6 +73,7 @@ class OpenMeteoCollector(BaseCollector):
                     "wind_speed_10m": _safe_float(winds, i),
                     "shortwave_radiation": _safe_float(radiations, i),
                     "cloud_cover": _safe_float(clouds, i),
+                    "precipitation_mm": _safe_float(precip, i),
                 }
             )
 

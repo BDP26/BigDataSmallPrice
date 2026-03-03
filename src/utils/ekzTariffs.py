@@ -9,7 +9,7 @@ REGION_NAME = "Sihl" # Fokusregion
 
 params = {
     "date": TARGET_DATE,
-    "tariffType": "dynamic"
+    "TarifffName": "electricity_dynamic"
 }
 
 try:
