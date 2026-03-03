@@ -350,7 +350,7 @@
                         </button>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800">
                     <!-- ENTSO-E -->
                     <div class="p-6 space-y-3">
                         <div class="flex items-center justify-between">
@@ -381,19 +381,34 @@
                             <div>To: <span id="db-newest-weather" class="font-mono">—</span></div>
                         </div>
                     </div>
-                    <!-- EKZ -->
+                    <!-- CKW -->
                     <div class="p-6 space-y-3">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-2">
                                 <span class="material-symbols-outlined text-primary text-lg">receipt_long</span>
-                                <span class="text-sm font-bold text-slate-700 dark:text-slate-200">EKZ Tariffs</span>
+                                <span class="text-sm font-bold text-slate-700 dark:text-slate-200">CKW</span>
                             </div>
-                            <span id="db-status-ekz" class="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">—</span>
+                            <span id="db-status-ckw" class="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">—</span>
                         </div>
-                        <div class="text-3xl font-black text-slate-900 dark:text-white" id="db-count-ekz">—</div>
+                        <div class="text-3xl font-black text-slate-900 dark:text-white" id="db-count-ckw">—</div>
                         <div class="text-xs text-slate-400 space-y-0.5">
-                            <div>From: <span id="db-oldest-ekz" class="font-mono">—</span></div>
-                            <div>To: <span id="db-newest-ekz" class="font-mono">—</span></div>
+                            <div>From: <span id="db-oldest-ckw" class="font-mono">—</span></div>
+                            <div>To: <span id="db-newest-ckw" class="font-mono">—</span></div>
+                        </div>
+                    </div>
+                    <!-- Groupe E -->
+                    <div class="p-6 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary text-lg">price_change</span>
+                                <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Groupe E</span>
+                            </div>
+                            <span id="db-status-groupe_e" class="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">—</span>
+                        </div>
+                        <div class="text-3xl font-black text-slate-900 dark:text-white" id="db-count-groupe_e">—</div>
+                        <div class="text-xs text-slate-400 space-y-0.5">
+                            <div>From: <span id="db-oldest-groupe_e" class="font-mono">—</span></div>
+                            <div>To: <span id="db-newest-groupe_e" class="font-mono">—</span></div>
                         </div>
                     </div>
                     <!-- BAFU -->
@@ -637,7 +652,7 @@
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 if (data.error) throw new Error(data.error);
-                ['entsoe', 'weather', 'ekz', 'bafu'].forEach(k => setSource(k, data[k] || {}));
+                ['entsoe', 'weather', 'ckw', 'groupe_e', 'bafu'].forEach(k => setSource(k, data[k] || {}));
                 document.getElementById('db-last-refreshed').textContent =
                     new Date().toLocaleTimeString('de-CH');
             } catch (e) {
@@ -735,6 +750,8 @@
             const TABLES = {
                 'entsoe_day_ahead_prices': 'ENTSO-E',
                 'weather_hourly':          'Weather',
+                'ckw_tariffs_raw':         'CKW',
+                'groupe_e_tariffs_raw':    'Groupe E',
                 'ekz_tariffs_raw':         'EKZ',
                 'bafu_hydro':              'BAFU',
                 'training_features':       'Features',

@@ -9,7 +9,7 @@ REGION_NAME = "Sihl" # Fokusregion für euer Proposal
 
 params = {
     "date": TARGET_DATE,
-    "tariffType": "dynamic"
+    "TarifffName": "electricity_dynamic"
 }
 
 try:

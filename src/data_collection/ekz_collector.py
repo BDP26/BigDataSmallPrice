@@ -1,10 +1,19 @@
 """
-EKZ Tariff collector – refactored from src/utils/ekzTariffs.py.
+EKZ dynamic tariff collector.
 
 API: https://api.tariffs.ekz.ch/v1/tariffs
 Returns 15-minute dynamic tariff intervals.
+
+Two tariffs are collected per day:
+  electricity_dynamic → component 'electricity'  (pure energy price)
+  integrated_400D     → component 'integrated'   (all-in price, highest variability)
+
+Correct parameters (confirmed 2026-03):
+  tariff_type, tariff_name, start_timestamp, end_timestamp (ISO with +01:00)
+  — NOT the old date/tariffType params which returned a flat rate.
 """
 
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -13,78 +22,67 @@ from .base_collector import BaseCollector
 _LOG = logging.getLogger(__name__)
 
 _API_URL = "https://api.tariffs.ekz.ch/v1/tariffs"
-_TARIFF_TYPE = "dynamic"
+
+# (tariff_type param, tariff_name param) → component key in response
+_TARIFFS = (
+    ("electricity", "electricity_dynamic"),
+    ("integrated",  "integrated_400D"),
+)
 
 
 class EkzCollector(BaseCollector):
     """
     Fetches EKZ dynamic electricity tariffs (15-min intervals).
 
+    Makes two API calls per day (electricity_dynamic + integrated_400D)
+    and stores each as a separate record keyed by tariff_type.
+
     Args:
-        date:        Date string "YYYY-MM-DD". Defaults to today (UTC).
-        tariff_type: Tariff type string. Defaults to "dynamic".
+        date: Date string "YYYY-MM-DD". Defaults to today (UTC).
     """
 
-    def __init__(
-        self,
-        date: str | None = None,
-        tariff_type: str = _TARIFF_TYPE,
-    ) -> None:
+    def __init__(self, date: str | None = None) -> None:
         self.date = date or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
-        self.tariff_type = tariff_type
 
     def fetch(self) -> str:
-        params = {
-            "date": self.date,
-            "tariffType": self.tariff_type,
-        }
-        response = self._fetch_with_retry(_API_URL, params=params)
-        return response.text
+        start = f"{self.date}T00:00:00+01:00"
+        end   = f"{self.date}T23:59:59+01:00"
+
+        combined: list[dict] = []
+        for tariff_type, tariff_name in _TARIFFS:
+            params = {
+                "tariff_type":      tariff_type,
+                "tariff_name":      tariff_name,
+                "start_timestamp":  start,
+                "end_timestamp":    end,
+            }
+            resp = self._fetch_with_retry(_API_URL, params=params)
+            data = json.loads(resp.text)
+            combined.extend(data.get("prices", []))
+
+        if not combined:
+            _LOG.warning("EKZ fetch: 0 price entries for date %s", self.date)
+
+        return json.dumps({"prices": combined})
 
     def parse(self, raw: bytes | str) -> list[dict]:
-        import json
-
         if isinstance(raw, bytes):
             raw = raw.decode()
         data = json.loads(raw)
 
         records: list[dict] = []
-        prices = data.get("prices", [])
-
-        if not prices and isinstance(data, dict):
-            _LOG.warning(
-                "EKZ parse: 0 records found. Response keys: %s. "
-                "Top-level structure: %s",
-                list(data.keys()),
-                {k: type(v).__name__ for k, v in data.items()},
-            )
-
-        for entry in prices:
+        for entry in data.get("prices", []):
             ts_raw = entry.get("start_timestamp")
             if ts_raw is None:
                 continue
-
-            # Extract CHF_kWh from the electricity component
-            electricity = {e["unit"]: e["value"] for e in entry.get("electricity", [])}
-            price_raw = electricity.get("CHF_kWh")
-            if price_raw is None:
-                continue
-
-            ts_utc = _parse_timestamp(ts_raw)
-            records.append(
-                {
-                    "time": ts_utc,
-                    "price_chf_kwh": float(price_raw),
-                    "tariff_type": self.tariff_type,
-                }
-            )
+            ts_utc = datetime.fromisoformat(ts_raw).astimezone(timezone.utc)
+            for tariff_type, _ in _TARIFFS:
+                for item in entry.get(tariff_type, []):
+                    if item.get("unit") == "CHF_kWh":
+                        records.append({
+                            "time":         ts_utc,
+                            "tariff_type":  tariff_type,
+                            "price_chf_kwh": float(item["value"]),
+                        })
 
         return records
-
-
-def _parse_timestamp(ts: str) -> datetime:
-    """Parse ISO-8601 timestamp and ensure UTC-awareness."""
-    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt

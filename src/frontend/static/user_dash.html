@@ -11,9 +11,6 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
         rel="stylesheet" />
-    <link
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
-        rel="stylesheet" />
     <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
@@ -54,13 +51,20 @@
                         <span class="material-symbols-outlined mr-2 text-sm">location_on</span>
                         <span class="truncate">Winterthur</span>
                     </button>
-                    <div
+                    <div id="clock"
                         class="flex items-center justify-center rounded-lg h-10 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 gap-2 text-sm font-medium border border-slate-200 dark:border-slate-700">
                         <span class="material-symbols-outlined text-[20px]">schedule</span>
-                        <span>14:35</span>
+                        <span id="clock-time">--:--</span>
                     </div>
                 </div>
             </header>
+
+            <!-- Error Banner -->
+            <div id="error-banner" class="hidden bg-amber-50 border-b border-amber-200 px-6 py-3 text-amber-800 text-sm flex items-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">warning</span>
+                <span id="error-text">Modelldaten nicht verfügbar – es werden Platzhalterwerte angezeigt.</span>
+            </div>
+
             <main class="flex-1 flex justify-center p-4 md:p-8">
                 <div class="max-w-5xl w-full flex flex-col gap-6">
                     <!-- Dashboard Grid -->
@@ -74,75 +78,71 @@
                                     class="text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider text-xs mb-4">
                                     Aktueller Stromtarif</p>
                                 <div class="relative flex items-center justify-center mb-6">
-                                    <div class="absolute w-40 h-40 bg-emerald-500/20 rounded-full animate-pulse"></div>
-                                    <div
+                                    <div id="pulse-ring" class="absolute w-40 h-40 rounded-full animate-pulse bg-emerald-500/20"></div>
+                                    <div id="traffic-light"
                                         class="relative w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center border-4 border-white dark:border-slate-800 shadow-lg">
-                                        <span class="material-symbols-outlined text-white text-6xl"
+                                        <span id="traffic-icon" class="material-symbols-outlined text-white text-6xl"
                                             style="font-variation-settings: 'FILL' 1">energy_savings_leaf</span>
                                     </div>
                                 </div>
-                                <h1 class="text-3xl font-black text-slate-900 dark:text-slate-100 mb-2">JETZT GÜNSTIG
-                                </h1>
-                                <p class="text-emerald-600 dark:text-emerald-400 font-bold text-lg mb-4">Grün-Phase bis
-                                    16:00</p>
+                                <h1 id="price-label" class="text-3xl font-black text-slate-900 dark:text-slate-100 mb-2">WIRD GELADEN…</h1>
+                                <p id="price-phase" class="text-emerald-600 dark:text-emerald-400 font-bold text-lg mb-4">–</p>
                                 <div
                                     class="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-lg flex justify-between items-center border border-slate-100 dark:border-slate-700">
                                     <span class="text-slate-600 dark:text-slate-400 text-sm">Aktueller Preis:</span>
-                                    <span class="text-2xl font-bold text-primary italic">14.2<small
-                                            class="text-sm font-normal"> Rp/kWh</small></span>
+                                    <span class="text-2xl font-bold text-primary italic">
+                                        <span id="price-value">–</span><small class="text-sm font-normal"> Rp/kWh</small>
+                                    </span>
                                 </div>
                             </div>
                             <!-- Why Box -->
-                            <div class="bg-primary/5 border border-primary/20 p-6 rounded-xl flex gap-4">
+                            <div id="why-box" class="bg-primary/5 border border-primary/20 p-6 rounded-xl flex gap-4">
                                 <div class="text-primary pt-1">
                                     <span class="material-symbols-outlined text-3xl">info</span>
                                 </div>
                                 <div>
                                     <h3 class="font-bold text-slate-900 dark:text-slate-100 mb-1">Warum ist es gerade
-                                        günstig?</h3>
-                                    <p class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
-                                        Hohe Solarprognose in der Region Winterthur trifft auf eine moderate Nachfrage.
-                                        Das Netz verfügt über hohe Kapazitäten. Ideal für energieintensive
-                                        Haushaltsgeräte.
+                                        so?</h3>
+                                    <p id="why-text" class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
+                                        Preisprognose wird geladen…
                                     </p>
                                 </div>
                             </div>
                         </div>
                         <!-- Right Column: Chart & Recommendations -->
                         <div class="lg:col-span-7 flex flex-col gap-6">
-                            <!-- Price Chart Preview -->
+                            <!-- Price Chart -->
                             <div
                                 class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                                 <div class="flex justify-between items-center mb-6">
-                                    <h3 class="font-bold text-lg">Preisverlauf (24h)</h3>
+                                    <h3 class="font-bold text-lg">Preisverlauf (letzte 24h)</h3>
                                     <div class="flex gap-2">
                                         <span class="flex items-center gap-1 text-xs font-medium text-slate-500">
-                                            <div class="w-2 h-2 rounded-full bg-primary"></div> Preis
+                                            <div class="w-2 h-2 rounded-full bg-primary"></div> ENTSO-E EUR/MWh
                                         </span>
                                     </div>
                                 </div>
                                 <div class="h-48 w-full relative">
-                                    <!-- Simplified SVG Line Chart -->
-                                    <svg class="w-full h-full overflow-visible" viewbox="0 0 400 100">
+                                    <svg id="price-chart" class="w-full h-full overflow-visible" viewBox="0 0 400 100">
                                         <defs>
-                                            <lineargradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+                                            <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
                                                 <stop offset="0%" stop-color="#137fec" stop-opacity="0.2"></stop>
                                                 <stop offset="100%" stop-color="#137fec" stop-opacity="0"></stop>
-                                            </lineargradient>
+                                            </linearGradient>
                                         </defs>
-                                        <path d="M0,80 Q50,70 80,40 T150,20 T220,60 T300,90 T400,30" fill="none"
+                                        <path id="chart-line" d="M0,80 Q50,70 80,40 T150,20 T220,60 T300,90 T400,30" fill="none"
                                             stroke="#137fec" stroke-linecap="round" stroke-width="3"></path>
-                                        <path d="M0,80 Q50,70 80,40 T150,20 T220,60 T300,90 T400,30 V100 H0 Z"
+                                        <path id="chart-area" d="M0,80 Q50,70 80,40 T150,20 T220,60 T300,90 T400,30 V100 H0 Z"
                                             fill="url(#chartGradient)"></path>
-                                        <circle cx="150" cy="20" fill="#137fec" r="4"></circle>
+                                        <circle id="chart-dot" cx="150" cy="20" fill="#137fec" r="4"></circle>
                                     </svg>
-                                    <div
+                                    <div id="chart-labels"
                                         class="absolute top-0 left-0 w-full h-full flex items-end justify-between px-1 text-[10px] text-slate-400 pt-4">
-                                        <span>00:00</span>
-                                        <span>06:00</span>
-                                        <span class="text-primary font-bold">12:00</span>
-                                        <span>18:00</span>
-                                        <span>23:59</span>
+                                        <span id="label-0">–</span>
+                                        <span id="label-1">–</span>
+                                        <span id="label-2">–</span>
+                                        <span id="label-3">–</span>
+                                        <span id="label-4">–</span>
                                     </div>
                                 </div>
                             </div>
@@ -154,7 +154,7 @@
                                 </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <!-- Device 1 -->
-                                    <div
+                                    <div id="dev1"
                                         class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors">
                                         <div
                                             class="p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-lg">
@@ -162,11 +162,11 @@
                                         </div>
                                         <div>
                                             <p class="text-xs text-slate-500 font-medium">Waschmaschine / Spüler</p>
-                                            <p class="font-bold text-emerald-600">13:00 - 15:00</p>
+                                            <p id="dev1-time" class="font-bold text-emerald-600">–</p>
                                         </div>
                                     </div>
                                     <!-- Device 2 -->
-                                    <div
+                                    <div id="dev2"
                                         class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors">
                                         <div
                                             class="p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-lg">
@@ -174,7 +174,7 @@
                                         </div>
                                         <div>
                                             <p class="text-xs text-slate-500 font-medium">EV Ladestation</p>
-                                            <p class="font-bold text-emerald-600">01:00 - 05:00</p>
+                                            <p id="dev2-time" class="font-bold text-emerald-600">–</p>
                                         </div>
                                     </div>
                                     <!-- Device 3 -->
@@ -185,7 +185,7 @@
                                         </div>
                                         <div>
                                             <p class="text-xs text-slate-500 font-medium">Ofen / Herd</p>
-                                            <p class="font-bold text-slate-700 dark:text-slate-300">Nach 20:00</p>
+                                            <p id="dev3-time" class="font-bold text-slate-700 dark:text-slate-300">–</p>
                                         </div>
                                     </div>
                                     <!-- Device 4 -->
@@ -196,32 +196,31 @@
                                         </div>
                                         <div>
                                             <p class="text-xs text-slate-500 font-medium">Wärmepumpe</p>
-                                            <p class="font-bold text-slate-700 dark:text-slate-300">11:00 - 16:00</p>
+                                            <p id="dev4-time" class="font-bold text-slate-700 dark:text-slate-300">–</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <!-- Additional Context Footer -->
+                    <!-- Footer -->
                     <div
                         class="border-t border-slate-200 dark:border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-xs">
                         <div class="flex items-center gap-6">
                             <span class="flex items-center gap-1"><span
-                                    class="material-symbols-outlined text-[14px]">shield</span> Offizielle Daten von
-                                Stadtwerk Winterthur</span>
+                                    class="material-symbols-outlined text-[14px]">shield</span> Daten: ENTSO-E, Open-Meteo, BAFU</span>
                             <span class="flex items-center gap-1"><span
-                                    class="material-symbols-outlined text-[14px]">update</span> Letztes Update: Vor 4
-                                Min.</span>
+                                    class="material-symbols-outlined text-[14px]">update</span>
+                                Letztes Update: <span id="last-update">–</span></span>
                         </div>
                         <div class="flex gap-4">
-                            <a class="hover:text-primary transition-colors" href="#">Tarifdetails</a>
-                            <a class="hover:text-primary transition-colors" href="#">Energiespartipps</a>
+                            <a class="hover:text-primary transition-colors" href="/docs">API Docs</a>
+                            <a class="hover:text-primary transition-colors" href="/">Admin</a>
                         </div>
                     </div>
                 </div>
             </main>
-            <!-- Navigation Bar (Bottom Mobile / Fixed Desktop Sidebar Context) -->
+            <!-- Mobile Navigation -->
             <nav
                 class="sticky bottom-0 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-6 py-3 block md:hidden">
                 <div class="flex justify-around items-center">
@@ -246,6 +245,183 @@
             </nav>
         </div>
     </div>
+
+    <script>
+        // ── Live clock ────────────────────────────────────────────────────────
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock-time').textContent =
+                now.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+        }
+        updateClock();
+        setInterval(updateClock, 30000);
+
+        // ── Traffic-light helpers ─────────────────────────────────────────────
+        const LEVELS = {
+            low: {
+                bg: 'bg-emerald-500',
+                pulse: 'bg-emerald-500/20',
+                icon: 'energy_savings_leaf',
+                label: 'JETZT GÜNSTIG',
+                labelColor: 'text-emerald-600 dark:text-emerald-400',
+                phase: 'Günstiger Tarif – jetzt Geräte starten!',
+                why: 'Hohe erneuerbare Einspeisung trifft auf moderate Nachfrage. Ideal für energieintensive Haushaltsgeräte.',
+                dev1: 'Jetzt optimal',
+                dev2: 'Jetzt laden',
+                dev3: 'Jetzt nutzbar',
+                dev4: 'Jetzt starten',
+            },
+            medium: {
+                bg: 'bg-amber-400',
+                pulse: 'bg-amber-400/20',
+                icon: 'electric_bolt',
+                label: 'MITTLERER TARIF',
+                labelColor: 'text-amber-600 dark:text-amber-400',
+                phase: 'Normaler Tarif – warten wenn möglich.',
+                why: 'Die Stromnachfrage ist durchschnittlich. Nicht-dringende Verbraucher besser auf günstigere Stunden verschieben.',
+                dev1: 'Wenn nötig',
+                dev2: 'Besser warten',
+                dev3: 'Normalbetrieb',
+                dev4: 'Normalbetrieb',
+            },
+            high: {
+                bg: 'bg-red-500',
+                pulse: 'bg-red-500/20',
+                icon: 'priority_high',
+                label: 'SPITZENTARIF',
+                labelColor: 'text-red-600 dark:text-red-400',
+                phase: 'Hoher Tarif – Verbrauch reduzieren!',
+                why: 'Hohe Stromnachfrage bei geringer erneuerbarer Einspeisung. Nicht-essenzielle Geräte ausschalten.',
+                dev1: 'Verschieben',
+                dev2: 'Nicht laden',
+                dev3: 'Verschieben',
+                dev4: 'Reduzieren',
+            },
+        };
+
+        function applyLevel(level) {
+            const cfg = LEVELS[level] || LEVELS.medium;
+            const tl = document.getElementById('traffic-light');
+            const pr = document.getElementById('pulse-ring');
+
+            // Remove all possible color classes
+            ['bg-emerald-500', 'bg-amber-400', 'bg-red-500'].forEach(c => tl.classList.remove(c));
+            ['bg-emerald-500/20', 'bg-amber-400/20', 'bg-red-500/20'].forEach(c => pr.classList.remove(c));
+            tl.classList.add(cfg.bg);
+            pr.classList.add(cfg.pulse);
+
+            document.getElementById('traffic-icon').textContent = cfg.icon;
+            document.getElementById('price-label').textContent = cfg.label;
+
+            const phaseEl = document.getElementById('price-phase');
+            phaseEl.textContent = cfg.phase;
+            ['text-emerald-600', 'text-amber-600', 'text-red-600',
+             'dark:text-emerald-400', 'dark:text-amber-400', 'dark:text-red-400'].forEach(c => phaseEl.classList.remove(c));
+            cfg.labelColor.split(' ').forEach(c => phaseEl.classList.add(c));
+
+            document.getElementById('why-text').textContent = cfg.why;
+            document.getElementById('dev1-time').textContent = cfg.dev1;
+            document.getElementById('dev2-time').textContent = cfg.dev2;
+            document.getElementById('dev3-time').textContent = cfg.dev3;
+            document.getElementById('dev4-time').textContent = cfg.dev4;
+        }
+
+        // ── SVG chart from price array ────────────────────────────────────────
+        function renderChart(prices, times) {
+            if (!prices || prices.length < 2) return;
+
+            const W = 400, H = 100, pad = 5;
+            const min = Math.min(...prices);
+            const max = Math.max(...prices);
+            const range = max - min || 1;
+
+            const toX = i => (i / (prices.length - 1)) * W;
+            const toY = p => H - pad - ((p - min) / range) * (H - 2 * pad);
+
+            // Build SVG polyline path
+            const pts = prices.map((p, i) => `${toX(i).toFixed(1)},${toY(p).toFixed(1)}`).join(' L ');
+            const linePath = `M ${pts}`;
+            const areaPath = `${linePath} L ${W},${H} L 0,${H} Z`;
+
+            document.getElementById('chart-line').setAttribute('d', linePath);
+            document.getElementById('chart-area').setAttribute('d', areaPath);
+
+            // Place dot at the last (most recent) point
+            const lastX = toX(prices.length - 1);
+            const lastY = toY(prices[prices.length - 1]);
+            document.getElementById('chart-dot').setAttribute('cx', lastX.toFixed(1));
+            document.getElementById('chart-dot').setAttribute('cy', lastY.toFixed(1));
+
+            // Update time labels at 0, 25%, 50%, 75%, 100%
+            const indices = [0, Math.floor(prices.length * 0.25), Math.floor(prices.length * 0.5),
+                             Math.floor(prices.length * 0.75), prices.length - 1];
+            indices.forEach((idx, i) => {
+                const t = times && times[idx] ? new Date(times[idx]) : null;
+                const label = t ? t.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }) : '–';
+                const el = document.getElementById(`label-${i}`);
+                if (el) el.textContent = label;
+            });
+        }
+
+        // ── Main data fetch ───────────────────────────────────────────────────
+        async function loadDashboard() {
+            let usedFallback = false;
+
+            // 1. Fetch current forecast
+            try {
+                const resp = await fetch('/api/forecast');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (!data.error) {
+                        document.getElementById('price-value').textContent =
+                            (data.price_rp_kwh ?? '–').toString();
+                        applyLevel(data.price_level ?? 'medium');
+
+                        // Update timestamp
+                        if (data.time) {
+                            const t = new Date(data.time);
+                            document.getElementById('last-update').textContent =
+                                t.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+                        }
+                    } else {
+                        usedFallback = true;
+                    }
+                } else {
+                    usedFallback = true;
+                }
+            } catch {
+                usedFallback = true;
+            }
+
+            // 2. Fetch price history for chart
+            try {
+                const resp = await fetch('/api/price-history?hours=24');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.prices && data.prices.length > 1) {
+                        renderChart(data.prices, data.times);
+                    }
+                }
+            } catch {
+                // keep static chart
+            }
+
+            // 3. Show warning if model not available
+            if (usedFallback) {
+                // Use static fallback values
+                applyLevel('medium');
+                document.getElementById('price-value').textContent = '–';
+                document.getElementById('last-update').textContent = 'nicht verfügbar';
+                const banner = document.getElementById('error-banner');
+                banner.classList.remove('hidden');
+                banner.classList.add('flex');
+            }
+        }
+
+        // Load on startup and refresh every 5 minutes
+        loadDashboard();
+        setInterval(loadDashboard, 5 * 60 * 1000);
+    </script>
 </body>
 
 </html>

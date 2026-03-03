@@ -70,15 +70,16 @@ def upsert_weather(records: list[dict]) -> int:
     Insert open-meteo weather records.
 
     Expected keys: time, latitude, longitude, temperature_2m, wind_speed_10m,
-                   shortwave_radiation, cloud_cover
+                   shortwave_radiation, cloud_cover, precipitation_mm
     """
     sql = """
         INSERT INTO weather_hourly
             (time, latitude, longitude, temperature_2m, wind_speed_10m,
-             shortwave_radiation, cloud_cover)
+             shortwave_radiation, cloud_cover, precipitation_mm)
         VALUES
             (%(time)s, %(latitude)s, %(longitude)s, %(temperature_2m)s,
-             %(wind_speed_10m)s, %(shortwave_radiation)s, %(cloud_cover)s)
+             %(wind_speed_10m)s, %(shortwave_radiation)s, %(cloud_cover)s,
+             %(precipitation_mm)s)
         ON CONFLICT (time, latitude, longitude) DO NOTHING
     """
     return _bulk_execute(sql, records)
@@ -108,6 +109,34 @@ def upsert_bafu(records: list[dict]) -> int:
         INSERT INTO bafu_hydro (time, station_id, discharge_m3s, level_masl)
         VALUES (%(time)s, %(station_id)s, %(discharge_m3s)s, %(level_masl)s)
         ON CONFLICT (time, station_id) DO NOTHING
+    """
+    return _bulk_execute(sql, records)
+
+
+def upsert_ckw(records: list[dict]) -> int:
+    """
+    Insert CKW tariff records (15-min raw).
+
+    Expected keys: time, tariff_type, price_chf_kwh
+    """
+    sql = """
+        INSERT INTO ckw_tariffs_raw (time, tariff_type, price_chf_kwh)
+        VALUES (%(time)s, %(tariff_type)s, %(price_chf_kwh)s)
+        ON CONFLICT (time, tariff_type) DO NOTHING
+    """
+    return _bulk_execute(sql, records)
+
+
+def upsert_groupe_e(records: list[dict]) -> int:
+    """
+    Insert Groupe E tariff records (15-min raw).
+
+    Expected keys: time, tariff_type, price_chf_kwh
+    """
+    sql = """
+        INSERT INTO groupe_e_tariffs_raw (time, tariff_type, price_chf_kwh)
+        VALUES (%(time)s, %(tariff_type)s, %(price_chf_kwh)s)
+        ON CONFLICT (time, tariff_type) DO NOTHING
     """
     return _bulk_execute(sql, records)
 

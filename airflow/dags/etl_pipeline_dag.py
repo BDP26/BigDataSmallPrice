@@ -6,10 +6,12 @@ Runs at 06:00 UTC – after ENTSO-E publishes next-day prices (~12:00 CET = 11:0
 but previous-day prices are available from early morning).
 
 Task graph:
-  fetch_entsoe ─► load_entsoe
-  fetch_weather ─► load_weather      (all fetch tasks run in parallel)
-  fetch_ekz ─► load_ekz
-  fetch_bafu ─► load_bafu
+  fetch_entsoe   ─► (independent)
+  fetch_weather  ─► (independent)    (all fetch tasks run in parallel)
+  fetch_ekz      ─► (independent)
+  fetch_ckw      ─► (independent)
+  fetch_groupe_e ─► (independent)
+  fetch_bafu     ─► (independent)
 """
 
 import sys
@@ -64,6 +66,26 @@ def _fetch_ekz(**ctx) -> None:
     print(f"EKZ: fetched {len(records)} records, inserted {inserted}.")
 
 
+def _fetch_ckw(**ctx) -> None:
+    from data_collection.ckw_collector import CKWCollector
+    from db.timescale_client import upsert_ckw
+
+    collector = CKWCollector()
+    records = collector.run()
+    inserted = upsert_ckw(records)
+    print(f"CKW: fetched {len(records)} records, inserted {inserted}.")
+
+
+def _fetch_groupe_e(**ctx) -> None:
+    from data_collection.groupe_e_collector import GroupeECollector
+    from db.timescale_client import upsert_groupe_e
+
+    collector = GroupeECollector()
+    records = collector.run()
+    inserted = upsert_groupe_e(records)
+    print(f"Groupe E: fetched {len(records)} records, inserted {inserted}.")
+
+
 def _fetch_bafu(**ctx) -> None:
     from data_collection.bafu_collector import BafuCollector
     from db.timescale_client import upsert_bafu
@@ -78,7 +100,7 @@ def _fetch_bafu(**ctx) -> None:
 
 with DAG(
     dag_id="bdsp_etl_daily",
-    description="Daily ETL: ENTSO-E, Open-Meteo, EKZ, BAFU → TimescaleDB",
+    description="Daily ETL: ENTSO-E, Open-Meteo, CKW, Groupe E, BAFU → TimescaleDB",
     schedule="0 6 * * *",
     start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
     catchup=False,
@@ -101,6 +123,16 @@ with DAG(
         python_callable=_fetch_ekz,
     )
 
+    fetch_ckw = PythonOperator(
+        task_id="fetch_ckw",
+        python_callable=_fetch_ckw,
+    )
+
+    fetch_groupe_e = PythonOperator(
+        task_id="fetch_groupe_e",
+        python_callable=_fetch_groupe_e,
+    )
+
     fetch_bafu = PythonOperator(
         task_id="fetch_bafu",
         python_callable=_fetch_bafu,
@@ -108,4 +140,4 @@ with DAG(
 
     # All fetch tasks are independent – they run in parallel automatically
     # when the LocalExecutor picks them up.
-    # (No explicit dependency between the four pipelines.)
+    # (No explicit dependency between the five pipelines.)

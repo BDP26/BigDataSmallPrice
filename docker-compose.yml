@@ -19,6 +19,7 @@ x-airflow-common: &airflow-common
     - ./airflow/plugins:/opt/airflow/plugins
     - ./src:/opt/airflow/src
     - ./data:/opt/airflow/data
+    - ./models:/opt/airflow/models
   depends_on:
     postgres:
       condition: service_healthy
@@ -103,12 +104,16 @@ services:
       - "8001:8000"
     volumes:
       - ./src/frontend/static:/app/static:ro
+      - ./src:/app/src:ro
+      - ./models:/app/models:ro
     environment:
       BDSP_DB_HOST: timescaledb
       BDSP_DB_PORT: 5432
       BDSP_DB_NAME: bdsp
       BDSP_DB_USER: bdsp
       BDSP_DB_PASSWORD: ${BDSP_DB_PASSWORD}
+      BDSP_JWT_SECRET: ${BDSP_JWT_SECRET}
+      BDSP_MODELS_DIR: /app/models
       AIRFLOW_API_URL:      http://airflow-webserver:8080
       AIRFLOW_API_USER:     ${AIRFLOW_ADMIN_USER}
       AIRFLOW_API_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}

@@ -48,12 +48,14 @@ FEATURE_COLS: list[str] = [
     "wind_speed_10m",
     "shortwave_radiation",
     "cloud_cover",
+    "precipitation_mm",     # Niederschlag – req.md Phase 1
     "temp_rolling_avg_24h",
     # Hydro
     "discharge_m3s",
     "level_masl",
-    # EKZ
-    "ekz_price_chf_kwh_avg",
+    # Tariff signals (dynamic providers)
+    "tariff_price_chf_kwh_avg",   # Groupe E 'integrated' – primary signal
+    "ckw_price_chf_kwh_avg",      # CKW 'integrated'      – secondary signal
 ]
 
 # ─── Core functions ───────────────────────────────────────────────────────────

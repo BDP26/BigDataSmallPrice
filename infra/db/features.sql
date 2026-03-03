@@ -1,42 +1,114 @@
--- BigDataSmallPrice – Feature View
--- Standalone SQL for the training_features view.
--- This file is also appended to infra/db/init.sql so it runs on first container start.
--- To re-apply on a running DB: psql -U bdsp -d bdsp -f infra/db/features.sql
+-- BigDataSmallPrice – Feature Migration Script
+-- Applies all Phase 2/3 schema changes to a running TimescaleDB instance.
+-- Idempotent: safe to re-run on an existing database.
+--
+-- Usage (against running DB on port 5433):
+--   psql -h localhost -p 5433 -U bdsp -d bdsp -f infra/db/features.sql
 
--- ─── Feature View: training_features ─────────────────────────────────────────
--- Joins ENTSO-E, Weather, BAFU and EKZ into one hourly feature table.
--- Includes lag features, rolling averages, and calendar features.
--- All rows use the ENTSO-E Swiss grid (10YCH-SWISSGRIDZ) as the time base.
+-- ─── CKW Tariffs (15-min raw) ─────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS ckw_tariffs_raw (
+    time          TIMESTAMPTZ      NOT NULL,
+    tariff_type   TEXT             NOT NULL,  -- 'grid_usage'|'grid'|'electricity'|'integrated'
+    price_chf_kwh DOUBLE PRECISION NOT NULL
+);
+
+SELECT create_hypertable(
+    'ckw_tariffs_raw', 'time',
+    chunk_time_interval => INTERVAL '7 days',
+    if_not_exists => TRUE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ckw_tariffs_raw_time_type_idx
+    ON ckw_tariffs_raw (time, tariff_type);
+
+-- ─── Groupe E Tariffs (15-min raw) ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS groupe_e_tariffs_raw (
+    time          TIMESTAMPTZ      NOT NULL,
+    tariff_type   TEXT             NOT NULL,  -- 'grid' | 'integrated'
+    price_chf_kwh DOUBLE PRECISION NOT NULL
+);
+
+SELECT create_hypertable(
+    'groupe_e_tariffs_raw', 'time',
+    chunk_time_interval => INTERVAL '7 days',
+    if_not_exists => TRUE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS groupe_e_tariffs_raw_time_type_idx
+    ON groupe_e_tariffs_raw (time, tariff_type);
+
+-- ─── Continuous Aggregate: CKW 15min → 1h ─────────────────────────────────────
+CREATE MATERIALIZED VIEW IF NOT EXISTS ckw_tariffs_hourly
+WITH (timescaledb.continuous) AS
+SELECT
+    time_bucket('1 hour', time) AS hour,
+    tariff_type,
+    AVG(price_chf_kwh)          AS avg_chf_kwh,
+    MIN(price_chf_kwh)          AS min_chf_kwh,
+    MAX(price_chf_kwh)          AS max_chf_kwh,
+    COUNT(*)                    AS interval_count
+FROM ckw_tariffs_raw
+GROUP BY 1, 2
+WITH NO DATA;
+
+SELECT add_continuous_aggregate_policy(
+    'ckw_tariffs_hourly',
+    start_offset      => INTERVAL '3 days',
+    end_offset        => INTERVAL '1 hour',
+    schedule_interval => INTERVAL '1 day',
+    if_not_exists     => TRUE
+);
+
+-- ─── Continuous Aggregate: Groupe E 15min → 1h ────────────────────────────────
+CREATE MATERIALIZED VIEW IF NOT EXISTS groupe_e_tariffs_hourly
+WITH (timescaledb.continuous) AS
+SELECT
+    time_bucket('1 hour', time) AS hour,
+    tariff_type,
+    AVG(price_chf_kwh)          AS avg_chf_kwh,
+    MIN(price_chf_kwh)          AS min_chf_kwh,
+    MAX(price_chf_kwh)          AS max_chf_kwh,
+    COUNT(*)                    AS interval_count
+FROM groupe_e_tariffs_raw
+GROUP BY 1, 2
+WITH NO DATA;
+
+SELECT add_continuous_aggregate_policy(
+    'groupe_e_tariffs_hourly',
+    start_offset      => INTERVAL '3 days',
+    end_offset        => INTERVAL '1 hour',
+    schedule_interval => INTERVAL '1 day',
+    if_not_exists     => TRUE
+);
+
+-- ─── Migration: add precipitation column (idempotent) ─────────────────────────
+ALTER TABLE weather_hourly ADD COLUMN IF NOT EXISTS precipitation_mm DOUBLE PRECISION;
+
+-- ─── Feature View: training_features ──────────────────────────────────────────
+-- DROP first: CREATE OR REPLACE VIEW cannot rename existing columns.
+DROP VIEW IF EXISTS training_features CASCADE;
+-- Primary tariff signal:  Groupe E 'integrated' (stdev≈0.076, highest variability)
+-- Secondary tariff signal: CKW 'integrated' (regional price differential)
+-- EKZ removed (flat rate, stdev≈0, not useful as price signal).
+-- Weather: now includes precipitation_mm (Niederschlag – req.md Phase 1).
 
 CREATE OR REPLACE VIEW training_features AS
 WITH
-  -- EKZ: average across all tariff types per hour
-  ekz_avg AS (
-    SELECT
-      hour,
-      AVG(price_chf_kwh_avg) AS ekz_price_chf_kwh_avg
-    FROM ekz_tariffs_hourly
-    GROUP BY hour
-  ),
-
   -- ENTSO-E prices with lag and rolling window features
   price_features AS (
     SELECT
       time,
       price_eur_mwh,
-      -- Lag features (assumes hourly, consecutive rows = consecutive hours)
       LAG(price_eur_mwh, 1)   OVER (ORDER BY time) AS lag_1h,
       LAG(price_eur_mwh, 2)   OVER (ORDER BY time) AS lag_2h,
       LAG(price_eur_mwh, 24)  OVER (ORDER BY time) AS lag_24h,
       LAG(price_eur_mwh, 168) OVER (ORDER BY time) AS lag_168h,
-      -- Rolling averages over price
       AVG(price_eur_mwh) OVER (
         ORDER BY time ROWS BETWEEN 23 PRECEDING AND CURRENT ROW
       ) AS rolling_avg_24h,
       AVG(price_eur_mwh) OVER (
         ORDER BY time ROWS BETWEEN 167 PRECEDING AND CURRENT ROW
       ) AS rolling_avg_7d,
-      -- Calendar features
       EXTRACT(hour  FROM time)::INT                                          AS hour_of_day,
       EXTRACT(dow   FROM time)::INT                                          AS day_of_week,
       EXTRACT(month FROM time)::INT                                          AS month,
@@ -46,7 +118,7 @@ WITH
     WHERE domain = '10YCH-SWISSGRIDZ'
   ),
 
-  -- Join weather, BAFU, EKZ; compute temperature rolling average after join
+  -- Join weather, BAFU, Groupe E, CKW; add temperature rolling average
   joined AS (
     SELECT
       pf.time,
@@ -66,12 +138,14 @@ WITH
       w.wind_speed_10m,
       w.shortwave_radiation,
       w.cloud_cover,
+      w.precipitation_mm,
       AVG(w.temperature_2m) OVER (
         ORDER BY pf.time ROWS BETWEEN 23 PRECEDING AND CURRENT ROW
       ) AS temp_rolling_avg_24h,
       bh.discharge_m3s,
       bh.level_masl,
-      ekz.ekz_price_chf_kwh_avg
+      ge.avg_chf_kwh  AS tariff_price_chf_kwh_avg,
+      ck.avg_chf_kwh  AS ckw_price_chf_kwh_avg
     FROM price_features pf
     LEFT JOIN weather_hourly w
       ON  w.time      = pf.time
@@ -80,8 +154,12 @@ WITH
     LEFT JOIN bafu_hydro bh
       ON  bh.time       = pf.time
       AND bh.station_id = '2018'
-    LEFT JOIN ekz_avg ekz
-      ON ekz.hour = pf.time
+    LEFT JOIN groupe_e_tariffs_hourly ge
+      ON  ge.hour        = pf.time
+      AND ge.tariff_type = 'integrated'
+    LEFT JOIN ckw_tariffs_hourly ck
+      ON  ck.hour        = pf.time
+      AND ck.tariff_type = 'integrated'
   )
 
 SELECT * FROM joined;

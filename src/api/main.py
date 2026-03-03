@@ -1,50 +1,104 @@
 """
-Minimal FastAPI backend for the BigDataSmallPrice admin dashboard.
+FastAPI backend for the BigDataSmallPrice platform.
 
 Serves:
-  GET /                              → admin_dash.html
-  GET /api/db-status                 → live row counts + time ranges
-  GET /api/feature-status            → training_features view stats
-  GET /api/airflow/dags              → proxy to Airflow REST API
-  GET /api/db-explorer/schema        → column names + types for all tables
-  GET /api/db-explorer/rows/{table}  → paginated rows (newest first)
+  GET  /                              → admin dashboard (admin_dash.html)
+  GET  /dashboard                     → user dashboard  (user_dash.html)
+  GET  /api/db-status                 → live row counts + time ranges
+  GET  /api/feature-status            → training_features view stats
+  GET  /api/airflow/dags              → proxy to Airflow REST API
+  GET  /api/db-explorer/schema        → column names + types for all tables
+  GET  /api/db-explorer/rows/{table}  → paginated rows (newest first)
+  GET  /api/forecast                  → current price prediction (public)
+  GET  /api/price-history             → last 24 h ENTSO-E prices (public)
+  POST /auth/register                 → create a user account
+  POST /auth/login                    → exchange credentials for JWT
+  POST /api/predict                   → model inference (JWT required)
 """
 
+from __future__ import annotations
+
+import hashlib
 import os
+import time
 from decimal import Decimal
 from pathlib import Path
 
 import httpx
+import jwt
+import pandas as pd
 import psycopg2
-from fastapi import FastAPI, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel
 
-app = FastAPI(title="BDSP Admin API")
+app = FastAPI(title="BDSP API", docs_url="/docs")
 
-_STATIC = Path(__file__).parent / "static"
+# In Docker the static directory is volume-mounted; locally it lives at src/frontend/static
+_STATIC = Path(os.getenv("BDSP_STATIC_DIR", str(Path(__file__).parent.parent / "frontend" / "static")))
 
 _DB = {
     "host": os.getenv("BDSP_DB_HOST", "timescaledb"),
     "port": int(os.getenv("BDSP_DB_PORT", 5432)),
     "dbname": os.getenv("BDSP_DB_NAME", "bdsp"),
     "user": os.getenv("BDSP_DB_USER", "bdsp"),
-    "password": os.environ["BDSP_DB_PASSWORD"],
+    "password": os.getenv("BDSP_DB_PASSWORD", ""),
 }
 
 _TABLES = {
     "entsoe":   "entsoe_day_ahead_prices",
     "weather":  "weather_hourly",
+    "ckw":      "ckw_tariffs_raw",
+    "groupe_e": "groupe_e_tariffs_raw",
     "ekz":      "ekz_tariffs_raw",
     "bafu":     "bafu_hydro",
     "features": "training_features",
 }
 
-_AIRFLOW_URL  = os.getenv("AIRFLOW_API_URL",      "http://airflow-webserver:8080")
-_AIRFLOW_USER = os.getenv("AIRFLOW_API_USER",      "admin")
-_AIRFLOW_PASS = os.getenv("AIRFLOW_API_PASSWORD",  "")
+_AIRFLOW_URL  = os.getenv("AIRFLOW_API_URL",     "http://airflow-webserver:8080")
+_AIRFLOW_USER = os.getenv("AIRFLOW_API_USER",     "admin")
+_AIRFLOW_PASS = os.getenv("AIRFLOW_API_PASSWORD", "")
 
 # Whitelist – prevents SQL injection via table name parameter
 _ALLOWED_TABLES = set(_TABLES.values())
+
+# ── JWT config ────────────────────────────────────────────────────────────────
+
+_JWT_SECRET    = os.getenv("BDSP_JWT_SECRET", "change-me-in-production")
+_JWT_ALGORITHM = "HS256"
+_JWT_EXPIRE_H  = 24
+
+# ── In-memory stores (module-level for easy test access) ──────────────────────
+
+_USERS: dict[str, str] = {}   # username → SHA-256 hashed password
+_model_cache: dict = {}        # prefix → loaded model object
+
+_bearer = HTTPBearer()
+
+# ── Pydantic schemas ──────────────────────────────────────────────────────────
+
+
+class UserIn(BaseModel):
+    username: str
+    password: str
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class PredictRequest(BaseModel):
+    features: dict[str, float]
+
+
+class PredictResponse(BaseModel):
+    prediction_eur_mwh: float
+    model: str
+
+
+# ── Internal helpers ──────────────────────────────────────────────────────────
 
 
 def _serialize(v):
@@ -61,7 +115,160 @@ def _connect():
     return psycopg2.connect(**_DB)
 
 
-# ─── Endpoints ────────────────────────────────────────────────────────────────
+def _hash_pw(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def _make_token(username: str) -> str:
+    payload = {"sub": username, "exp": time.time() + _JWT_EXPIRE_H * 3600}
+    return jwt.encode(payload, _JWT_SECRET, algorithm=_JWT_ALGORITHM)
+
+
+def _current_user(
+    creds: HTTPAuthorizationCredentials = Depends(_bearer),
+) -> str:
+    """FastAPI dependency that validates a Bearer JWT and returns the username."""
+    try:
+        payload = jwt.decode(
+            creds.credentials, _JWT_SECRET, algorithms=[_JWT_ALGORITHM]
+        )
+        return payload["sub"]
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired"
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        )
+
+
+def _get_model(prefix: str = "xgb"):
+    """Load model from disk on first call; return cached instance afterwards."""
+    if prefix not in _model_cache:
+        from modelling.predict import find_latest_model, load_model  # noqa: PLC0415
+        models_dir = os.getenv("BDSP_MODELS_DIR", "models/")
+        path = find_latest_model(models_dir, prefix=prefix)
+        _model_cache[prefix] = load_model(path)
+    return _model_cache[prefix]
+
+
+# ── Auth endpoints ────────────────────────────────────────────────────────────
+
+
+@app.post("/auth/register", status_code=status.HTTP_201_CREATED)
+def register(user: UserIn):
+    """Register a new user account."""
+    if user.username in _USERS:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Username already exists"
+        )
+    _USERS[user.username] = _hash_pw(user.password)
+    return {"message": "User created"}
+
+
+@app.post("/auth/login", response_model=Token)
+def login(user: UserIn):
+    """Authenticate and return a JWT access token."""
+    pw_hash = _USERS.get(user.username)
+    if pw_hash is None or pw_hash != _hash_pw(user.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+        )
+    return {"access_token": _make_token(user.username)}
+
+
+# ── Model inference ───────────────────────────────────────────────────────────
+
+
+@app.post("/api/predict", response_model=PredictResponse)
+def predict_price(
+    request: PredictRequest,
+    _username: str = Depends(_current_user),
+):
+    """
+    Run the XGBoost model on an explicit feature dict (JWT required).
+
+    Body: ``{"features": {"lag_1h": 75.0, "temperature_2m": 8.5, ...}}``
+    """
+    from modelling.predict import predict_from_dict  # noqa: PLC0415
+    try:
+        model = _get_model("xgb")
+        price = predict_from_dict(model, request.features)
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No trained model available. Run the training pipeline first.",
+        )
+    return {"prediction_eur_mwh": price, "model": "xgb"}
+
+
+# ── Public forecast endpoints ─────────────────────────────────────────────────
+
+
+@app.get("/api/forecast")
+def forecast():
+    """
+    Return a price prediction for the most recent feature row in the DB.
+
+    Converts EUR/MWh → Rp/kWh (approx.: × 0.095 using EUR≈0.95 CHF).
+    """
+    from modelling.predict import predict_from_dict  # noqa: PLC0415
+    from processing.export_pipeline import FEATURE_COLS  # noqa: PLC0415
+    try:
+        conn = _connect()
+        df = pd.read_sql(
+            "SELECT * FROM training_features ORDER BY time DESC LIMIT 1",
+            conn,
+            parse_dates=["time"],
+        )
+        conn.close()
+        if df.empty:
+            return JSONResponse({"error": "No feature data available"}, status_code=503)
+
+        row = df.iloc[0]
+        feature_dict = {
+            col: float(row[col]) for col in FEATURE_COLS if col in df.columns
+        }
+        model = _get_model("xgb")
+        price = predict_from_dict(model, feature_dict)
+        level = "low" if price < 60 else ("high" if price > 100 else "medium")
+        return {
+            "time": row["time"].isoformat(),
+            "predicted_price_eur_mwh": round(price, 2),
+            "price_level": level,
+            "price_rp_kwh": round(price * 0.095, 2),
+        }
+    except FileNotFoundError:
+        return JSONResponse({"error": "No trained model available"}, status_code=503)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.get("/api/price-history")
+def price_history(hours: int = Query(default=24, ge=1, le=168)):
+    """Return the last *hours* of actual ENTSO-E day-ahead prices."""
+    try:
+        conn = _connect()
+        df = pd.read_sql(
+            "SELECT time, price_eur_mwh FROM entsoe_day_ahead_prices "
+            "ORDER BY time DESC LIMIT %s",
+            conn,
+            params=(hours,),
+            parse_dates=["time"],
+        )
+        conn.close()
+        df = df.sort_values("time")
+        return {
+            "times": [t.isoformat() for t in df["time"]],
+            "prices": [float(p) for p in df["price_eur_mwh"]],
+        }
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+# ── Admin DB / Airflow endpoints (unchanged from Phase 1) ─────────────────────
+
 
 @app.get("/api/db-status")
 def db_status():
@@ -86,7 +293,7 @@ def db_status():
 
 @app.get("/api/db-explorer/schema")
 def db_schema():
-    """Return column names, types and nullability for all 4 tables."""
+    """Return column names, types and nullability for all tables."""
     sql = """
         SELECT table_name, column_name, data_type, is_nullable
         FROM information_schema.columns
@@ -211,6 +418,14 @@ def airflow_dags():
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
+# ── HTML pages ────────────────────────────────────────────────────────────────
+
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     return (_STATIC / "admin_dash.html").read_text()
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def user_dashboard():
+    return (_STATIC / "user_dash.html").read_text()
