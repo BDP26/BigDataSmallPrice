@@ -113,6 +113,7 @@ services:
       BDSP_DB_USER: bdsp
       BDSP_DB_PASSWORD: ${BDSP_DB_PASSWORD}
       BDSP_JWT_SECRET: ${BDSP_JWT_SECRET}
+      BDSP_STATIC_DIR: /app/static
       BDSP_MODELS_DIR: /app/models
       AIRFLOW_API_URL:      http://airflow-webserver:8080
       AIRFLOW_API_USER:     ${AIRFLOW_ADMIN_USER}

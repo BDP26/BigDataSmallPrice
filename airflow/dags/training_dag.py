@@ -46,6 +46,17 @@ def _run_training(**ctx) -> None:
         print(f"Saved {name}: {path}")
 
 
+def _run_load_training(**ctx) -> None:
+    from modelling.train import run_load_training
+
+    data_dir   = os.environ.get("BDSP_EXPORT_DIR",  "/opt/airflow/data/")
+    models_dir = os.environ.get("BDSP_MODELS_DIR",  "/opt/airflow/models/")
+
+    paths = run_load_training(data_dir=data_dir, models_dir=models_dir)
+    for name, path in paths.items():
+        print(f"Saved {name}: {path}")
+
+
 # ─── DAG definition ───────────────────────────────────────────────────────────
 
 with DAG(
@@ -62,3 +73,11 @@ with DAG(
         task_id="run_training",
         python_callable=_run_training,
     )
+
+    run_load_training_task = PythonOperator(
+        task_id="train_load_model",
+        python_callable=_run_load_training,
+    )
+
+    # Both training tasks are independent – Model B (EPEX) and Model A (load)
+    # use separate parquet files and can train in parallel.

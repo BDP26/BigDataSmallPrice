@@ -42,6 +42,15 @@ def _run_feature_export(**ctx) -> None:
         print(f"  {name}: {path}")
 
 
+def _run_load_feature_export(**ctx) -> None:
+    from processing.export_pipeline import run_load_export
+
+    output_dir = os.environ.get("BDSP_EXPORT_DIR", "/opt/airflow/data/")
+    paths = run_load_export(output_dir=output_dir)
+    for name, path in paths.items():
+        print(f"  {name}: {path}")
+
+
 # ─── DAG definition ───────────────────────────────────────────────────────────
 
 with DAG(
@@ -58,3 +67,11 @@ with DAG(
         task_id="run_feature_export",
         python_callable=_run_feature_export,
     )
+
+    run_load_feature_export = PythonOperator(
+        task_id="run_load_feature_export",
+        python_callable=_run_load_feature_export,
+    )
+
+    # Both export tasks are independent (EPEX features vs. load features)
+    # and can run in parallel.

@@ -6,12 +6,14 @@ Runs at 06:00 UTC – after ENTSO-E publishes next-day prices (~12:00 CET = 11:0
 but previous-day prices are available from early morning).
 
 Task graph:
-  fetch_entsoe   ─► (independent)
-  fetch_weather  ─► (independent)    (all fetch tasks run in parallel)
-  fetch_ekz      ─► (independent)
-  fetch_ckw      ─► (independent)
-  fetch_groupe_e ─► (independent)
-  fetch_bafu     ─► (independent)
+  fetch_entsoe          ─► (independent)
+  fetch_weather         ─► (independent)    (all fetch tasks run in parallel)
+  fetch_ekz             ─► (independent)
+  fetch_ckw             ─► (independent)
+  fetch_groupe_e        ─► (independent)
+  fetch_bafu            ─► (independent)
+  fetch_winterthur_load ─► (independent)
+  fetch_winterthur_pv   ─► (independent)
 """
 
 import sys
@@ -96,6 +98,26 @@ def _fetch_bafu(**ctx) -> None:
     print(f"BAFU: fetched {len(records)} records, inserted {inserted}.")
 
 
+def _fetch_winterthur_load(**ctx) -> None:
+    from data_collection.stadtwerk_winterthur_collector import BruttolastgangCollector
+    from db.timescale_client import upsert_winterthur_load
+
+    collector = BruttolastgangCollector(all_files=False)
+    records = collector.run()
+    inserted = upsert_winterthur_load(records)
+    print(f"Winterthur Load: fetched {len(records)} records, inserted {inserted}.")
+
+
+def _fetch_winterthur_pv(**ctx) -> None:
+    from data_collection.stadtwerk_winterthur_collector import NetzEinspeisungCollector
+    from db.timescale_client import upsert_winterthur_pv
+
+    collector = NetzEinspeisungCollector()
+    records = collector.run()
+    inserted = upsert_winterthur_pv(records)
+    print(f"Winterthur PV: fetched {len(records)} records, inserted {inserted}.")
+
+
 # ─── DAG definition ───────────────────────────────────────────────────────────
 
 with DAG(
@@ -138,6 +160,16 @@ with DAG(
         python_callable=_fetch_bafu,
     )
 
+    fetch_winterthur_load = PythonOperator(
+        task_id="fetch_winterthur_load",
+        python_callable=_fetch_winterthur_load,
+    )
+
+    fetch_winterthur_pv = PythonOperator(
+        task_id="fetch_winterthur_pv",
+        python_callable=_fetch_winterthur_pv,
+    )
+
     # All fetch tasks are independent – they run in parallel automatically
     # when the LocalExecutor picks them up.
-    # (No explicit dependency between the five pipelines.)
+    # (No explicit dependency between the eight pipelines.)

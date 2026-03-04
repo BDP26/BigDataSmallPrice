@@ -18,7 +18,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parents[3]))
 
 from src.modelling.evaluate import compute_metrics, evaluate_all
-from src.modelling.predict import load_model, predict, predict_from_dict
+from src.modelling.predict import load_model, predict_from_dict
 from src.modelling.train import (
     save_model,
     train_linear,

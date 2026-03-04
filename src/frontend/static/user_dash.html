@@ -118,7 +118,10 @@
                                     <h3 class="font-bold text-lg">Preisverlauf (letzte 24h)</h3>
                                     <div class="flex gap-2">
                                         <span class="flex items-center gap-1 text-xs font-medium text-slate-500">
-                                            <div class="w-2 h-2 rounded-full bg-primary"></div> ENTSO-E EUR/MWh
+                                            <div class="w-2 h-2 rounded-full bg-primary"></div> Rp./kWh
+                                        </span>
+                                        <span class="flex items-center gap-1 text-xs font-medium text-emerald-500">
+                                            <div class="w-2 h-2 rounded-full bg-emerald-400"></div> günstig
                                         </span>
                                     </div>
                                 </div>
@@ -327,24 +330,53 @@
         }
 
         // ── SVG chart from price array ────────────────────────────────────────
-        function renderChart(prices, times) {
-            if (!prices || prices.length < 2) return;
+        // prices: EUR/MWh from API → converted to Rp./kWh for display
+        const EUR_MWH_TO_RP_KWH = 0.095;  // approx. 1 EUR/MWh ≈ 0.095 Rp./kWh
+
+        function renderChart(rawPrices, times) {
+            if (!rawPrices || rawPrices.length < 2) return;
+
+            // Convert EUR/MWh → Rp./kWh
+            const prices = rawPrices.map(p => p * EUR_MWH_TO_RP_KWH);
 
             const W = 400, H = 100, pad = 5;
             const min = Math.min(...prices);
             const max = Math.max(...prices);
             const range = max - min || 1;
 
+            // Cheap threshold: < avg * 0.9
+            const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+            const cheapThreshold = avg * 0.90;
+
             const toX = i => (i / (prices.length - 1)) * W;
             const toY = p => H - pad - ((p - min) / range) * (H - 2 * pad);
 
-            // Build SVG polyline path
+            // Build main SVG polyline path
             const pts = prices.map((p, i) => `${toX(i).toFixed(1)},${toY(p).toFixed(1)}`).join(' L ');
             const linePath = `M ${pts}`;
             const areaPath = `${linePath} L ${W},${H} L 0,${H} Z`;
 
             document.getElementById('chart-line').setAttribute('d', linePath);
             document.getElementById('chart-area').setAttribute('d', areaPath);
+
+            // Highlight cheap segments (< avg − 10%) as emerald dots
+            const svg = document.getElementById('price-chart');
+            // Remove previous cheap markers
+            svg.querySelectorAll('.cheap-dot').forEach(el => el.remove());
+            prices.forEach((p, i) => {
+                if (p < cheapThreshold) {
+                    const cx = toX(i).toFixed(1);
+                    const cy = toY(p).toFixed(1);
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('cx', cx);
+                    circle.setAttribute('cy', cy);
+                    circle.setAttribute('r', '3');
+                    circle.setAttribute('fill', '#10b981');
+                    circle.setAttribute('class', 'cheap-dot');
+                    circle.setAttribute('opacity', '0.7');
+                    svg.appendChild(circle);
+                }
+            });
 
             // Place dot at the last (most recent) point
             const lastX = toX(prices.length - 1);
@@ -373,8 +405,10 @@
                 if (resp.ok) {
                     const data = await resp.json();
                     if (!data.error) {
+                        // Prefer gesamttarif (tariff breakdown) if available
+                        const displayPrice = data.gesamttarif_rp_kwh ?? data.price_rp_kwh ?? '–';
                         document.getElementById('price-value').textContent =
-                            (data.price_rp_kwh ?? '–').toString();
+                            typeof displayPrice === 'number' ? displayPrice.toFixed(1) : displayPrice;
                         applyLevel(data.price_level ?? 'medium');
 
                         // Update timestamp

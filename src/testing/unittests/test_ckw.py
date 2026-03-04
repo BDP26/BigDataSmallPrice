@@ -116,6 +116,5 @@ class TestCKWCollectorFetch:
 
     def test_default_date_is_today_utc(self):
         collector = CKWCollector()
-        from datetime import date
         today = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
         assert collector.date == today

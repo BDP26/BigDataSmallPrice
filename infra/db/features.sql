@@ -163,3 +163,59 @@ WITH
   )
 
 SELECT * FROM joined;
+
+-- ─── Winterthur Load (OGD Bruttolastgang) ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS winterthur_load (
+    time     TIMESTAMPTZ      NOT NULL,
+    load_kwh DOUBLE PRECISION,
+    UNIQUE (time)
+);
+
+SELECT create_hypertable(
+    'winterthur_load', 'time',
+    if_not_exists => TRUE,
+    chunk_time_interval => INTERVAL '30 days'
+);
+
+-- ─── Winterthur PV Feed-in (OGD Netzeinspeisung) ──────────────────────────────
+CREATE TABLE IF NOT EXISTS winterthur_pv (
+    time   TIMESTAMPTZ      NOT NULL,
+    pv_kwh DOUBLE PRECISION,
+    UNIQUE (time)
+);
+
+SELECT create_hypertable(
+    'winterthur_pv', 'time',
+    if_not_exists => TRUE,
+    chunk_time_interval => INTERVAL '30 days'
+);
+
+-- ─── Feature View: winterthur_net_load_features (Model A) ─────────────────────
+DROP VIEW IF EXISTS winterthur_net_load_features CASCADE;
+CREATE VIEW winterthur_net_load_features AS
+SELECT
+    w.time,
+    w.load_kwh - COALESCE(p.pv_kwh, 0)               AS net_load_kwh,
+    EXTRACT(HOUR    FROM w.time)::INT                 AS hour_of_day,
+    EXTRACT(DOW     FROM w.time)::INT                 AS day_of_week,
+    EXTRACT(MONTH   FROM w.time)::INT                 AS month,
+    EXTRACT(QUARTER FROM w.time)::INT                 AS quarter,
+    CASE WHEN EXTRACT(DOW FROM w.time) IN (0,6) THEN 1 ELSE 0 END AS is_weekend,
+    LAG(w.load_kwh - COALESCE(p.pv_kwh, 0), 1)   OVER (ORDER BY w.time) AS load_lag_1h,
+    LAG(w.load_kwh - COALESCE(p.pv_kwh, 0), 24)  OVER (ORDER BY w.time) AS load_lag_1d,
+    LAG(w.load_kwh - COALESCE(p.pv_kwh, 0), 168) OVER (ORDER BY w.time) AS load_lag_7d,
+    AVG(w.load_kwh - COALESCE(p.pv_kwh, 0)) OVER (
+        ORDER BY w.time ROWS BETWEEN 23 PRECEDING AND CURRENT ROW
+    )                                                 AS load_rolling_avg_24h,
+    wr.temperature_2m,
+    wr.wind_speed_10m,
+    wr.shortwave_radiation,
+    wr.cloud_cover,
+    wr.precipitation_mm,
+    COALESCE(p.pv_kwh, 0)                            AS pv_feed_in_kwh
+FROM winterthur_load w
+LEFT JOIN winterthur_pv p USING (time)
+LEFT JOIN weather_hourly wr
+    ON  date_trunc('hour', w.time) = wr.time
+    AND wr.latitude  = 47.5001
+    AND wr.longitude = 8.7502;

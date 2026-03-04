@@ -141,6 +141,34 @@ def upsert_groupe_e(records: list[dict]) -> int:
     return _bulk_execute(sql, records)
 
 
+def upsert_winterthur_load(records: list[dict]) -> int:
+    """
+    Insert Winterthur grid load records (OGD Bruttolastgang).
+
+    Expected keys: time (UTC-aware datetime), load_kwh
+    """
+    sql = """
+        INSERT INTO winterthur_load (time, load_kwh)
+        VALUES (%(time)s, %(load_kwh)s)
+        ON CONFLICT (time) DO NOTHING
+    """
+    return _bulk_execute(sql, records)
+
+
+def upsert_winterthur_pv(records: list[dict]) -> int:
+    """
+    Insert Winterthur PV feed-in records (OGD Netzeinspeisung).
+
+    Expected keys: time (UTC-aware datetime), pv_kwh
+    """
+    sql = """
+        INSERT INTO winterthur_pv (time, pv_kwh)
+        VALUES (%(time)s, %(pv_kwh)s)
+        ON CONFLICT (time) DO NOTHING
+    """
+    return _bulk_execute(sql, records)
+
+
 # ─── Internal ─────────────────────────────────────────────────────────────────
 
 def _bulk_execute(sql: str, records: list[dict]) -> int:
