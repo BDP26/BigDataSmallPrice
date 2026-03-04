@@ -14,7 +14,6 @@ Usage (from Airflow):
 
 from __future__ import annotations
 
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -223,6 +222,156 @@ def run_export(
     paths = save_parquet(X_train, X_test, y_train, y_test, output_dir, timestamp)
 
     print(f"Export complete – {len(train_df)} train rows, {len(test_df)} test rows.")
+    for name, p in paths.items():
+        print(f"  {name}: {p}")
+
+    return paths
+
+
+# ─── Model A: Load feature export ────────────────────────────────────────────
+
+LOAD_TARGET_COL = "net_load_kwh"
+
+LOAD_FEATURE_COLS: list[str] = [
+    # Lag features (net load)
+    "load_lag_1h",
+    "load_lag_1d",
+    "load_lag_7d",
+    "load_rolling_avg_24h",
+    # Calendar
+    "hour_of_day",
+    "day_of_week",
+    "month",
+    "quarter",
+    "is_weekend",
+    # Holiday (computed in Python, not in SQL)
+    "is_holiday_zh",
+    # Weather
+    "temperature_2m",
+    "wind_speed_10m",
+    "shortwave_radiation",
+    "cloud_cover",
+    "precipitation_mm",
+    # PV feed-in (exogenous)
+    "pv_feed_in_kwh",
+]
+
+
+def query_load_features(conn) -> pd.DataFrame:
+    """Read the ``winterthur_net_load_features`` view, ordered by time."""
+    sql = "SELECT * FROM winterthur_net_load_features ORDER BY time"
+    return pd.read_sql(sql, conn, parse_dates=["time"])
+
+
+def _add_holiday_flags(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute ``is_holiday_zh`` flag in Python (CH public holidays for ZH).
+
+    Uses the ``holidays`` package if available; otherwise defaults to 0.
+    """
+    try:
+        import holidays as hd  # noqa: PLC0415
+
+        ch_zh = hd.country_holidays("CH", subdiv="ZH")
+        dates = df["time"].dt.date
+        df = df.copy()
+        df["is_holiday_zh"] = dates.apply(lambda d: int(d in ch_zh))
+    except ImportError:
+        df = df.copy()
+        df["is_holiday_zh"] = 0
+    return df
+
+
+def split_by_dates(
+    df: pd.DataFrame,
+    train_end: str = "2022-12-31",
+    val_end: str = "2023-12-31",
+    time_col: str = "time",
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Split a time-ordered DataFrame into train / val / test by calendar date.
+
+    Args:
+        df:        DataFrame sorted by time ascending.
+        train_end: Last date (inclusive) of the training set.
+        val_end:   Last date (inclusive) of the validation set.
+        time_col:  Name of the UTC-aware timestamp column.
+
+    Returns:
+        (train_df, val_df, test_df)
+    """
+    col = df[time_col]
+    train_mask = col.dt.date <= pd.Timestamp(train_end).date()
+    val_mask   = (col.dt.date > pd.Timestamp(train_end).date()) & \
+                 (col.dt.date <= pd.Timestamp(val_end).date())
+    test_mask  = col.dt.date > pd.Timestamp(val_end).date()
+    return df[train_mask].copy(), df[val_mask].copy(), df[test_mask].copy()
+
+
+def run_load_export(
+    output_dir: str = "data/",
+    train_end: str = "2022-12-31",
+    val_end:   str = "2023-12-31",
+) -> dict[str, "Path"]:
+    """
+    End-to-end feature export for Model A (grid-load forecasting):
+
+    1. Validate no target leakage in LOAD_FEATURE_COLS.
+    2. Query the ``winterthur_net_load_features`` view from TimescaleDB.
+    3. Compute ``is_holiday_zh`` flag.
+    4. Date-based train/val/test split (train≤2022, val=2023, test≥2024).
+    5. Save parquet files: X_load_train, X_load_val, X_load_test,
+                           y_load_train, y_load_val, y_load_test.
+
+    Args:
+        output_dir: Directory for parquet files (default ``data/``).
+        train_end:  Last date of training set (YYYY-MM-DD).
+        val_end:    Last date of validation set (YYYY-MM-DD).
+
+    Returns:
+        Dict mapping split name to written Path.
+    """
+    from db.timescale_client import get_conn  # noqa: PLC0415
+
+    validate_no_leakage(LOAD_FEATURE_COLS, LOAD_TARGET_COL)
+
+    with get_conn() as conn:
+        df = query_load_features(conn)
+
+    if df.empty:
+        raise RuntimeError(
+            "winterthur_net_load_features view returned 0 rows. "
+            "Ensure the ETL pipeline has loaded Winterthur OGD data."
+        )
+
+    df = _add_holiday_flags(df)
+
+    # Drop rows where target is NaN
+    df = df.dropna(subset=[LOAD_TARGET_COL])
+
+    train_df, val_df, test_df = split_by_dates(df, train_end, val_end)
+
+    # Only keep feature cols that exist in the dataframe
+    available = [c for c in LOAD_FEATURE_COLS if c in df.columns]
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+
+    paths: dict[str, Path] = {}
+    for split_name, split_df in [("train", train_df), ("val", val_df), ("test", test_df)]:
+        x_path = out / f"X_load_{split_name}_{timestamp}.parquet"
+        y_path = out / f"y_load_{split_name}_{timestamp}.parquet"
+        split_df[available].to_parquet(x_path, index=False)
+        split_df[[LOAD_TARGET_COL]].to_parquet(y_path, index=False)
+        paths[f"X_load_{split_name}"] = x_path
+        paths[f"y_load_{split_name}"] = y_path
+
+    total = len(train_df) + len(val_df) + len(test_df)
+    print(
+        f"Load export complete – {len(train_df)} train, "
+        f"{len(val_df)} val, {len(test_df)} test rows (total {total})."
+    )
     for name, p in paths.items():
         print(f"  {name}: {p}")
 

@@ -86,6 +86,72 @@ def save_model(model: Any, name: str, models_dir: str = "models/") -> Path:
     return path
 
 
+# ── Model A: Load forecasting ─────────────────────────────────────────────────
+
+
+def train_load_model(X_train: pd.DataFrame, y_train: pd.DataFrame) -> XGBRegressor:
+    """
+    Train XGBoost model for grid-load forecasting (Model A).
+
+    Interface is identical to ``train_xgboost()`` so the same evaluate.py
+    helpers work for both models.
+
+    Target: ``net_load_kwh`` (= bruttolastgang − PV feed-in, kWh)
+    Quality goal: MAPE < 8 % on the test set (req.md).
+    """
+    model = XGBRegressor(
+        n_estimators=300,
+        learning_rate=0.05,
+        max_depth=7,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        min_child_weight=3,
+        random_state=42,
+        n_jobs=-1,
+        verbosity=0,
+    )
+    model.fit(X_train, y_train.values.ravel())
+    return model
+
+
+def run_load_training(
+    data_dir: str = "data/",
+    models_dir: str = "models/",
+) -> dict[str, Path]:
+    """
+    End-to-end training pipeline for Model A (grid-load forecasting).
+
+    1. Locate the latest ``X_load_train_*.parquet`` and ``y_load_train_*.parquet``.
+    2. Train the XGBoost load model.
+    3. Serialize the model to *models_dir* as ``model_load_<YYYYMMDD>.joblib``.
+
+    Args:
+        data_dir:   Directory containing parquet files from run_load_export().
+        models_dir: Directory for serialised model files.
+
+    Returns:
+        Dict mapping model name to the saved Path.
+
+    Raises:
+        FileNotFoundError: If no load training parquet files are found.
+    """
+    data_path = Path(data_dir)
+    x_files = sorted(data_path.glob("X_load_train_*.parquet"))
+    y_files = sorted(data_path.glob("y_load_train_*.parquet"))
+    if not x_files or not y_files:
+        raise FileNotFoundError(
+            f"No load training parquet files found in {data_dir!r}. "
+            "Run run_load_export() first."
+        )
+    X_train = pd.read_parquet(x_files[-1])
+    y_train = pd.read_parquet(y_files[-1])
+
+    model = train_load_model(X_train, y_train)
+    path = save_model(model, "model_load", models_dir)
+    print(f"Saved load model: {path}")
+    return {"model_load": path}
+
+
 # ── Orchestration ─────────────────────────────────────────────────────────────
 
 

@@ -6,7 +6,7 @@ HTTP is mocked – no real API calls are made.
 
 import json
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 

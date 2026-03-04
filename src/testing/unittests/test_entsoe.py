@@ -4,7 +4,6 @@ Unit tests for EntsoeCollector.
 HTTP is mocked – no real API calls are made.
 """
 
-import os
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 

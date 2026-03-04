@@ -47,13 +47,15 @@ _DB = {
 }
 
 _TABLES = {
-    "entsoe":   "entsoe_day_ahead_prices",
-    "weather":  "weather_hourly",
-    "ckw":      "ckw_tariffs_raw",
-    "groupe_e": "groupe_e_tariffs_raw",
-    "ekz":      "ekz_tariffs_raw",
-    "bafu":     "bafu_hydro",
-    "features": "training_features",
+    "entsoe":            "entsoe_day_ahead_prices",
+    "weather":           "weather_hourly",
+    "ckw":               "ckw_tariffs_raw",
+    "groupe_e":          "groupe_e_tariffs_raw",
+    "ekz":               "ekz_tariffs_raw",
+    "bafu":              "bafu_hydro",
+    "winterthur_load":   "winterthur_load",
+    "winterthur_pv":     "winterthur_pv",
+    "features":          "training_features",
 }
 
 _AIRFLOW_URL  = os.getenv("AIRFLOW_API_URL",     "http://airflow-webserver:8080")
@@ -209,35 +211,91 @@ def predict_price(
 @app.get("/api/forecast")
 def forecast():
     """
-    Return a price prediction for the most recent feature row in the DB.
+    Return price prediction with full tariff breakdown in Rp./kWh.
 
-    Converts EUR/MWh → Rp/kWh (approx.: × 0.095 using EUR≈0.95 CHF).
+    Combines:
+    - Model B (XGBoost EPEX): predicts day-ahead price in EUR/MWh
+    - Model A (load model): predicts net grid load in kWh
+    - Tariff formulas: converts both outputs to Rp./kWh tariff components
+
+    Falls back to energy-price-only estimate if Model A is not yet available.
     """
     from modelling.predict import predict_from_dict  # noqa: PLC0415
     from processing.export_pipeline import FEATURE_COLS  # noqa: PLC0415
+    from processing.tariff_formulas import compute_tariff  # noqa: PLC0415
     try:
         conn = _connect()
-        df = pd.read_sql(
+        df_epex = pd.read_sql(
             "SELECT * FROM training_features ORDER BY time DESC LIMIT 1",
             conn,
             parse_dates=["time"],
         )
+        # Try to fetch latest load feature row as well
+        try:
+            df_load = pd.read_sql(
+                "SELECT * FROM winterthur_net_load_features ORDER BY time DESC LIMIT 1",
+                conn,
+                parse_dates=["time"],
+            )
+        except Exception:
+            df_load = pd.DataFrame()
         conn.close()
-        if df.empty:
+
+        if df_epex.empty:
             return JSONResponse({"error": "No feature data available"}, status_code=503)
 
-        row = df.iloc[0]
+        row = df_epex.iloc[0]
         feature_dict = {
-            col: float(row[col]) for col in FEATURE_COLS if col in df.columns
+            col: float(row[col]) for col in FEATURE_COLS if col in df_epex.columns
         }
-        model = _get_model("xgb")
-        price = predict_from_dict(model, feature_dict)
-        level = "low" if price < 60 else ("high" if price > 100 else "medium")
+
+        # Model B: EPEX price prediction
+        model_epex = _get_model("xgb")
+        epex_price = predict_from_dict(model_epex, feature_dict)
+
+        # Model A: net load prediction (optional)
+        net_load: float | None = None
+        if not df_load.empty:
+            try:
+                load_model = _get_model("model_load")
+                from processing.export_pipeline import LOAD_FEATURE_COLS  # noqa: PLC0415
+                load_row = df_load.iloc[0]
+                load_features = {
+                    col: float(load_row[col])
+                    for col in LOAD_FEATURE_COLS
+                    if col in df_load.columns
+                }
+                net_load = predict_from_dict(load_model, load_features)
+            except (FileNotFoundError, Exception):
+                net_load = None
+
+        # Compute tariff breakdown
+        if net_load is not None:
+            tariff = compute_tariff(net_load=net_load, epex_eur_mwh=epex_price)
+        else:
+            # Fallback: energy-only estimate (no network component)
+            from processing.tariff_formulas import energiepreis, gesamttarif  # noqa: PLC0415
+            from processing.tariff_formulas import DEFAULT_NETZ_STANDARD  # noqa: PLC0415
+            energie = energiepreis(epex_price)
+            tariff = {
+                "netzpreis_rp_kwh":    round(DEFAULT_NETZ_STANDARD, 2),
+                "energiepreis_rp_kwh": round(energie, 2),
+                "gesamttarif_rp_kwh":  round(gesamttarif(DEFAULT_NETZ_STANDARD, energie), 2),
+            }
+
+        gesamt = tariff["gesamttarif_rp_kwh"]
+        # Traffic-light thresholds on gesamttarif (Rp./kWh)
+        level = "low" if gesamt < 15 else ("high" if gesamt > 22 else "medium")
+
         return {
-            "time": row["time"].isoformat(),
-            "predicted_price_eur_mwh": round(price, 2),
-            "price_level": level,
-            "price_rp_kwh": round(price * 0.095, 2),
+            "time":                   row["time"].isoformat(),
+            "predicted_price_eur_mwh": round(epex_price, 2),
+            "netzpreis_rp_kwh":       tariff["netzpreis_rp_kwh"],
+            "energiepreis_rp_kwh":    tariff["energiepreis_rp_kwh"],
+            "gesamttarif_rp_kwh":     gesamt,
+            "price_rp_kwh":           gesamt,   # backward-compat alias
+            "price_level":            level,
+            "net_load_available":     net_load is not None,
         }
     except FileNotFoundError:
         return JSONResponse({"error": "No trained model available"}, status_code=503)

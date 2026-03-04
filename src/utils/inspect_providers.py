@@ -79,7 +79,7 @@ def inspect_ckw(date: str, tariff_name: str = "home_dynamic") -> list[float]:
             print_summary(key, values)
             return values
 
-    print(f"  CKW: no values found in any component")
+    print("  CKW: no values found in any component")
     return []
 
 
@@ -139,15 +139,15 @@ def compare_providers(date: str) -> dict[str, float]:
 
     stdevs: dict[str, float] = {}
 
-    print(f"\n--- EKZ (dynamic) ---")
+    print("\n--- EKZ (dynamic) ---")
     ekz_vals = inspect_ekz(date, "dynamic")
     stdevs["EKZ/electricity"] = _stdev_or_zero(ekz_vals)
 
-    print(f"\n--- CKW (home_dynamic) ---")
+    print("\n--- CKW (home_dynamic) ---")
     ckw_vals = inspect_ckw(date, "home_dynamic")
     stdevs["CKW/grid_usage"] = _stdev_or_zero(ckw_vals)
 
-    print(f"\n--- Groupe E ---")
+    print("\n--- Groupe E ---")
     ge_results = inspect_groupe_e(date)
     for comp, vals in ge_results.items():
         stdevs[f"GroupeE/{comp}"] = _stdev_or_zero(vals)
