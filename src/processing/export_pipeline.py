@@ -39,6 +39,9 @@ FEATURE_COLS: list[str] = [
     # Rolling averages (price)
     "rolling_avg_24h",
     "rolling_avg_7d",
+    # req.md aliases for EPEX lags (same semantic horizon)
+    "epex_lag_1d",
+    "epex_lag_7d",
     # Calendar
     "hour_of_day",
     "day_of_week",
@@ -47,18 +50,28 @@ FEATURE_COLS: list[str] = [
     "is_peak_hour",
     # Weather
     "temperature_2m",
+    # req.md alias/proxy (CH avg not yet separately ingested)
+    "temp_ch_avg",
     "wind_speed_10m",
+    # req.md proxy aliases until dedicated ENTSO-E generation series are ingested
+    "wind_generation_eu",
     "shortwave_radiation",
+    "solar_generation_ch",
     "cloud_cover",
     "precipitation_mm",     # Niederschlag – req.md Phase 1
     "temp_rolling_avg_24h",
     # Hydro
     "discharge_m3s",
     "level_masl",
+    # req.md alias/proxy until dedicated reservoir feed is integrated
+    "hydro_reservoir",
     # Tariff signals (dynamic providers)
     "tariff_price_chf_kwh_avg",   # Groupe E 'integrated' – primary signal
     "ckw_price_chf_kwh_avg",      # CKW 'integrated'      – secondary signal
 ]
+
+# NOTE: req.md's "epex_t" maps to the target (price_eur_mwh) in this project.
+# It is intentionally excluded from FEATURE_COLS to prevent target leakage.
 
 # ─── Core functions ───────────────────────────────────────────────────────────
 
@@ -363,7 +376,9 @@ LOAD_FEATURE_COLS: list[str] = [
     "load_rolling_avg_24h",
     # Calendar
     "hour_of_day",
+    "hour",                 # req.md alias
     "day_of_week",
+    "weekday",              # req.md alias
     "month",
     "quarter",
     "is_weekend",
@@ -372,13 +387,18 @@ LOAD_FEATURE_COLS: list[str] = [
     "is_school_holiday",   # Schulferien Kanton Zürich
     # Weather
     "temperature_2m",
+    "temp_c",               # req.md alias
     "wind_speed_10m",
+    "wind_speed_ms",        # req.md alias
     "shortwave_radiation",
+    "ghi_wm2",              # req.md alias
     "cloud_cover",
+    "cloud_cover_pct",      # req.md alias
     "precipitation_mm",
     "temp_deviation",      # temperature_2m − daily mean (computed in Python)
     # PV feed-in (exogenous)
     "pv_feed_in_kwh",
+    "pv_feed_in",           # req.md alias
 ]
 
 
