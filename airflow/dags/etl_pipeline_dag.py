@@ -41,6 +41,30 @@ default_args = {
 # ─── Task functions ───────────────────────────────────────────────────────────
 
 
+def _is_historical_catchup_run(ctx: dict) -> bool:
+    """
+    Detect catchup-style historical runs robustly.
+
+    Airflow catchup runs are usually "scheduled" dag runs for older logical dates;
+    explicit backfill jobs use run_type "backfill".
+    """
+    dag_run = ctx.get("dag_run")
+    if dag_run is None:
+        return False
+
+    run_type = str(getattr(dag_run, "run_type", ""))
+    if run_type == "backfill":
+        return True
+
+    logical_date = ctx.get("logical_date")
+    if logical_date is None:
+        return False
+
+    logical_local = pendulum.instance(logical_date).in_timezone("Europe/Zurich").date()
+    today_local = pendulum.now("Europe/Zurich").date()
+    return run_type == "scheduled" and logical_local < today_local
+
+
 def _fetch_entsoe(**ctx) -> None:
     from data_collection.entsoe_collector import EntsoeCollector
     from db.timescale_client import upsert_entsoe
@@ -79,8 +103,7 @@ def _fetch_ekz(**ctx) -> None:
 
     exec_date = ctx["logical_date"]
     date_str = exec_date.strftime("%Y-%m-%d")
-    is_catchup = ctx.get("run_type") == "backfill"
-    if is_catchup:
+    if _is_historical_catchup_run(ctx):
         time.sleep(1)
 
     collector = EkzCollector(date=date_str)
@@ -95,8 +118,7 @@ def _fetch_ckw(**ctx) -> None:
 
     exec_date = ctx["logical_date"]
     date_str = exec_date.strftime("%Y-%m-%d")
-    is_catchup = ctx.get("run_type") == "backfill"
-    if is_catchup:
+    if _is_historical_catchup_run(ctx):
         time.sleep(1)
 
     collector = CKWCollector(date=date_str)
@@ -111,8 +133,7 @@ def _fetch_groupe_e(**ctx) -> None:
 
     exec_date = ctx["logical_date"]
     date_str = exec_date.strftime("%Y-%m-%d")
-    is_catchup = ctx.get("run_type") == "backfill"
-    if is_catchup:
+    if _is_historical_catchup_run(ctx):
         time.sleep(1)
 
     collector = GroupeECollector(date=date_str)

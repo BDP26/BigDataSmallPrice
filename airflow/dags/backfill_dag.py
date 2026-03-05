@@ -62,10 +62,22 @@ def _get_date_range(conf: dict) -> tuple[_date, _date]:
             "  Option 3: set Airflow Variables BDSP_BACKFILL_START and "
             "BDSP_BACKFILL_END before triggering."
         )
-    return _date.fromisoformat(start_str), _date.fromisoformat(end_str)
+    try:
+        start = _date.fromisoformat(start_str)
+        end = _date.fromisoformat(end_str)
+    except ValueError as exc:
+        raise ValueError(
+            "Invalid backfill date format. Expected YYYY-MM-DD for "
+            "backfill_start and backfill_end."
+        ) from exc
+    if end < start:
+        raise ValueError("Invalid backfill range: backfill_end must be >= backfill_start.")
+    return start, end
 
 
 def _date_range(start: _date, end: _date) -> list[str]:
+    if end < start:
+        raise ValueError("Invalid date range: end must be >= start.")
     days = (end - start).days + 1
     return [(start + timedelta(days=i)).isoformat() for i in range(days)]
 
