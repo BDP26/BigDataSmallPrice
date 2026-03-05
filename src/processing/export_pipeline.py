@@ -82,10 +82,12 @@ def validate_no_leakage(
     target_col: str = TARGET_COL,
 ) -> None:
     """
-    Raise ValueError if the target column appears in the feature column list.
+    Raise ValueError if the target column appears in the feature column list,
+    or if any api_call_log column appears in features (isolation guard).
 
-    This guards against accidentally including the prediction target as a
-    model input, which would constitute data leakage.
+    ISOLATION GUARANTEE: api_call_log is operational metadata only.
+    It MUST NEVER appear in training_features, winterthur_net_load_features,
+    FEATURE_COLS, or LOAD_FEATURE_COLS.
 
     Args:
         feature_cols: List of column names used as model inputs.
@@ -95,6 +97,16 @@ def validate_no_leakage(
         raise ValueError(
             f"Data leakage detected: target column '{target_col}' is present "
             "in feature_cols. Remove it before training."
+        )
+    # Guard: api_call_log columns must never appear in feature lists
+    _API_CALL_LOG_COLS = {"id", "source", "called_at", "status_code",
+                          "was_rate_limited", "response_ms", "date_fetched"}
+    leaked = _API_CALL_LOG_COLS & set(feature_cols)
+    if leaked:
+        raise ValueError(
+            f"Isolation violation: api_call_log column(s) {leaked} found in "
+            "feature_cols. api_call_log is operational metadata and must never "
+            "be used as an ML feature."
         )
 
 

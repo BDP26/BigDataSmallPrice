@@ -16,8 +16,9 @@ and /api/forecast endpoints on their next request (lazy model cache reload).
 import sys
 import os
 
-from datetime import datetime, timezone
+from datetime import datetime
 
+import pendulum
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
@@ -62,8 +63,8 @@ def _run_load_training(**ctx) -> None:
 with DAG(
     dag_id="bdsp_training_daily",
     description="Daily model retraining: naive + linear + XGBoost → /opt/airflow/models/",
-    schedule="0 8 * * *",          # 08:00 UTC, one hour after feature export
-    start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    schedule="0 8 * * *",
+    start_date=datetime(2026, 1, 1, tzinfo=pendulum.timezone("Europe/Zurich")),
     catchup=False,
     default_args=default_args,
     tags=["bdsp", "ml", "phase-3"],

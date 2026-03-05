@@ -28,13 +28,17 @@ class GroupeECollector(BaseCollector):
         date: Date string "YYYY-MM-DD". Defaults to today (UTC).
     """
 
+    _source_name = "groupe_e"
     COMPONENTS = ("grid", "integrated")
 
     def __init__(self, date: str | None = None) -> None:
         self.date = date or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
 
     def fetch(self) -> str:
-        response = self._fetch_with_retry(_API_URL, params={"date": self.date})
+        response = self._fetch_with_retry(
+            _API_URL, params={"date": self.date},
+            source=self._source_name, date_fetched=self.date,
+        )
         return response.text
 
     def parse(self, raw: bytes | str) -> list[dict]:

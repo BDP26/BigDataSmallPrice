@@ -257,6 +257,28 @@ WITH
 
 SELECT * FROM joined;
 
+-- ─── 10b. API Call Log (rate-limit tracking — ISOLATED from ML features) ─────
+-- WARNING: this table MUST NEVER be joined into training_features or
+-- winterthur_net_load_features. It is operational metadata only.
+CREATE TABLE IF NOT EXISTS api_call_log (
+    id               BIGSERIAL,
+    source           TEXT        NOT NULL,  -- 'entsoe'|'openmeteo'|'ekz'|'ckw'|'groupe_e'|'bafu'
+    called_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status_code      INT         NOT NULL,  -- actual HTTP status returned
+    was_rate_limited BOOLEAN     NOT NULL DEFAULT FALSE,  -- TRUE if status_code == 429
+    response_ms      INT,                   -- response time in milliseconds
+    date_fetched     TEXT,                  -- the data-date requested ("YYYY-MM-DD" or NULL)
+    CONSTRAINT api_call_log_pkey PRIMARY KEY (id, called_at)
+);
+
+SELECT create_hypertable(
+    'api_call_log', 'called_at',
+    chunk_time_interval => INTERVAL '7 days',
+    if_not_exists => TRUE
+);
+
+CREATE INDEX IF NOT EXISTS api_call_log_source_idx ON api_call_log (source, called_at DESC);
+
 -- ─── 11. Winterthur Load (OGD Bruttolastgang) ────────────────────────────────
 CREATE TABLE IF NOT EXISTS winterthur_load (
     time     TIMESTAMPTZ      NOT NULL,

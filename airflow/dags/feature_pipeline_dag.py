@@ -13,8 +13,9 @@ Task graph:
 import sys
 import os
 
-from datetime import datetime, timezone
+from datetime import datetime
 
+import pendulum
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
@@ -62,7 +63,7 @@ with DAG(
     dag_id="bdsp_feature_daily",
     description="Daily feature engineering & parquet export for ML training",
     schedule="0 7 * * *",
-    start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    start_date=datetime(2026, 1, 1, tzinfo=pendulum.timezone("Europe/Zurich")),
     catchup=False,
     default_args=default_args,
     tags=["bdsp", "features", "phase-2"],

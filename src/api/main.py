@@ -14,6 +14,8 @@ Serves:
   POST /auth/register                 → create a user account
   POST /auth/login                    → exchange credentials for JWT
   POST /api/predict                   → model inference (JWT required)
+  POST /api/backfill/trigger          → trigger bdsp_backfill Airflow DAG
+  GET  /api/backfill/status/{run_id}  → poll a specific backfill dag_run by run-id
 """
 
 from __future__ import annotations
@@ -77,6 +79,17 @@ _USERS: dict[str, str] = {}   # username → SHA-256 hashed password
 _model_cache: dict = {}        # prefix → loaded model object
 
 _bearer = HTTPBearer()
+
+# ── Known API rate limits ─────────────────────────────────────────────────────
+
+_KNOWN_LIMITS: dict[str, dict] = {
+    "entsoe":    {"daily": 400,   "source": "documented"},
+    "openmeteo": {"daily": 10000, "source": "documented"},
+    "ekz":       {"daily": None,  "source": "unknown"},
+    "ckw":       {"daily": None,  "source": "unknown"},
+    "groupe_e":  {"daily": None,  "source": "unknown"},
+    "bafu":      {"daily": None,  "source": "unknown"},
+}
 
 # ── Pydantic schemas ──────────────────────────────────────────────────────────
 
@@ -470,6 +483,246 @@ def airflow_dags():
                     "last_run":  last_run,
                 })
         return result
+    except httpx.ConnectError:
+        return JSONResponse({"error": "Airflow not reachable"}, status_code=503)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+# ── Rate Limit endpoints ──────────────────────────────────────────────────────
+
+
+@app.get("/api/rate-limits")
+def rate_limits():
+    """Current API usage summary: last 24h + last 7d per source."""
+    sql_24h = """
+        SELECT source,
+               COUNT(*)                                      AS calls_24h,
+               COUNT(*) FILTER (WHERE was_rate_limited)      AS rl_24h,
+               MAX(called_at) FILTER (WHERE was_rate_limited) AS last_429
+        FROM api_call_log
+        WHERE called_at >= NOW() - INTERVAL '24 hours'
+        GROUP BY source
+    """
+    sql_7d = """
+        SELECT source, COUNT(*) AS calls_7d
+        FROM api_call_log
+        WHERE called_at >= NOW() - INTERVAL '7 days'
+        GROUP BY source
+    """
+    try:
+        conn = _connect()
+        cur = conn.cursor()
+        cur.execute(sql_24h)
+        rows_24h = {r[0]: {"calls_last_24h": r[1], "rate_limited_last_24h": r[2],
+                            "last_429": r[3].isoformat() if r[3] else None}
+                    for r in cur.fetchall()}
+        cur.execute(sql_7d)
+        rows_7d = {r[0]: r[1] for r in cur.fetchall()}
+        cur.close()
+        conn.close()
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+    sources = {}
+    for src, limits in _KNOWN_LIMITS.items():
+        d24 = rows_24h.get(src, {"calls_last_24h": 0, "rate_limited_last_24h": 0, "last_429": None})
+        calls_24h = d24["calls_last_24h"]
+        daily_limit = limits["daily"]
+        usage_pct = round(calls_24h / daily_limit, 4) if daily_limit else None
+        sources[src] = {
+            "calls_last_24h":       calls_24h,
+            "calls_last_7d":        rows_7d.get(src, 0),
+            "rate_limited_last_24h": d24["rate_limited_last_24h"],
+            "last_429":             d24["last_429"],
+            "known_daily_limit":    daily_limit,
+            "limit_source":         limits["source"],
+            "usage_pct":            usage_pct,
+        }
+
+    return {
+        "sources":      sources,
+        "generated_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+    }
+
+
+@app.get("/api/rate-limits/history")
+def rate_limits_history():
+    """Hourly call counts per source for the last 7 days (for chart rendering)."""
+    sql = """
+        SELECT source,
+               time_bucket('1 hour', called_at) AS hour,
+               COUNT(*) AS calls
+        FROM api_call_log
+        WHERE called_at >= NOW() - INTERVAL '7 days'
+        GROUP BY source, hour
+        ORDER BY source, hour
+    """
+    try:
+        conn = _connect()
+        cur = conn.cursor()
+        cur.execute(sql)
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+    result: dict = {}
+    for src, hour, calls in rows:
+        result.setdefault(src, []).append({"hour": hour.isoformat(), "calls": calls})
+    return result
+
+
+# ── Backfill endpoints ────────────────────────────────────────────────────────
+
+
+class BackfillRequest(BaseModel):
+    start_date: str  # "YYYY-MM-DD"
+    end_date: str    # "YYYY-MM-DD"
+
+
+@app.post("/api/backfill/estimate")
+def backfill_estimate(req: BackfillRequest):
+    """
+    Estimate the work required to backfill the given date range.
+
+    Checks the DB for already-loaded data per source and returns
+    estimated API call counts and duration.
+    """
+    import datetime as _dt
+
+    try:
+        start = _dt.date.fromisoformat(req.start_date)
+        end = _dt.date.fromisoformat(req.end_date)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid date: {exc}") from exc
+    if end < start:
+        raise HTTPException(status_code=400, detail="end_date must be >= start_date")
+
+    total_days = (end - start).days + 1
+
+    # Table → (source_key, calls_per_day)
+    _SOURCE_TABLES = {
+        "entsoe":    ("entsoe_day_ahead_prices", 1),
+        "openmeteo": ("weather_hourly",          1),
+        "ekz":       ("ekz_tariffs_raw",         2),
+        "ckw":       ("ckw_tariffs_raw",         1),
+        "groupe_e":  ("groupe_e_tariffs_raw",    1),
+        "bafu":      ("bafu_hydro",              1),
+    }
+
+    sources = {}
+    total_calls = 0
+    try:
+        conn = _connect()
+        cur = conn.cursor()
+        for src, (table, cpd) in _SOURCE_TABLES.items():
+            cur.execute(
+                f"SELECT MIN(time)::date, MAX(time)::date FROM {table}"  # noqa: S608
+            )
+            db_min, db_max = cur.fetchone()
+            # Count days not yet in DB (simple heuristic: days outside DB range)
+            if db_min is None or db_max is None:
+                to_fetch = total_days
+            else:
+                already = sum(
+                    1 for i in range(total_days)
+                    if db_min <= (start + _dt.timedelta(days=i)) <= db_max
+                )
+                to_fetch = total_days - already
+            calls = to_fetch * cpd
+            total_calls += calls
+            sources[src] = {
+                "calls":        calls,
+                "already_in_db": total_days - to_fetch,
+                "to_fetch":     to_fetch,
+            }
+        cur.close()
+        conn.close()
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+    estimated_minutes = round(total_calls * 1.5 / 60, 1)
+    return {
+        "total_days":               total_days,
+        "estimated_api_calls":      total_calls,
+        "estimated_duration_minutes": estimated_minutes,
+        "sources":                  sources,
+    }
+
+
+@app.post("/api/backfill/trigger")
+def backfill_trigger(req: BackfillRequest):
+    """Trigger the bdsp_backfill Airflow DAG with the given date range."""
+    import datetime as _dt
+
+    try:
+        start = _dt.date.fromisoformat(req.start_date)
+        end = _dt.date.fromisoformat(req.end_date)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid date: {exc}") from exc
+    if end < start:
+        raise HTTPException(status_code=400, detail="end_date must be >= start_date")
+    today = _dt.date.today()
+    if start > today or end > today:
+        raise HTTPException(status_code=400, detail="Dates must not be in the future")
+
+    url = f"{_AIRFLOW_URL.rstrip('/')}/api/v1/dags/bdsp_backfill/dagRuns"
+    payload = {
+        "conf": {
+            "backfill_start": req.start_date,
+            "backfill_end":   req.end_date,
+        }
+    }
+    try:
+        with httpx.Client(timeout=10) as client:
+            resp = client.post(url, json=payload, auth=(_AIRFLOW_USER, _AIRFLOW_PASS))
+            if resp.status_code not in (200, 201):
+                return JSONResponse(
+                    {"error": f"Airflow returned {resp.status_code}: {resp.text}"},
+                    status_code=502,
+                )
+            data = resp.json()
+            return {
+                "dag_run_id": data.get("dag_run_id"),
+                "state":      data.get("state", "queued"),
+                "message":    "Backfill triggered.",
+            }
+    except httpx.ConnectError:
+        return JSONResponse({"error": "Airflow not reachable"}, status_code=503)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.get("/api/backfill/status/{dag_run_id}")
+def backfill_status(dag_run_id: str):
+    """
+    Poll the state of a specific bdsp_backfill DAG run.
+
+    Returns the run's state (queued / running / success / failed) so the
+    admin dashboard can track the *current* run rather than the last recorded
+    one (which may be a previous failed run and would mislead the UI).
+    """
+    url = (
+        f"{_AIRFLOW_URL.rstrip('/')}/api/v1"
+        f"/dags/bdsp_backfill/dagRuns/{dag_run_id}"
+    )
+    try:
+        with httpx.Client(timeout=10) as client:
+            resp = client.get(url, auth=(_AIRFLOW_USER, _AIRFLOW_PASS))
+            if resp.status_code == 404:
+                return JSONResponse(
+                    {"error": f"DAG run '{dag_run_id}' not found"}, status_code=404
+                )
+            resp.raise_for_status()
+            data = resp.json()
+            return {
+                "dag_run_id": data.get("dag_run_id"),
+                "state":      data.get("state"),
+                "start_date": data.get("start_date"),
+                "end_date":   data.get("end_date"),
+            }
     except httpx.ConnectError:
         return JSONResponse({"error": "Airflow not reachable"}, status_code=503)
     except Exception as exc:

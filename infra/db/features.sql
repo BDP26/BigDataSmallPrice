@@ -5,6 +5,28 @@
 -- Usage (against running DB on port 5433):
 --   psql -h localhost -p 5433 -U bdsp -d bdsp -f infra/db/features.sql
 
+-- ─── API Call Log (rate-limit tracking — ISOLATED from ML features) ───────────
+-- WARNING: this table MUST NEVER be joined into training_features or
+-- winterthur_net_load_features. It is operational metadata only.
+CREATE TABLE IF NOT EXISTS api_call_log (
+    id               BIGSERIAL,
+    source           TEXT        NOT NULL,
+    called_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status_code      INT         NOT NULL,
+    was_rate_limited BOOLEAN     NOT NULL DEFAULT FALSE,
+    response_ms      INT,
+    date_fetched     TEXT,
+    CONSTRAINT api_call_log_pkey PRIMARY KEY (id, called_at)
+);
+
+SELECT create_hypertable(
+    'api_call_log', 'called_at',
+    chunk_time_interval => INTERVAL '7 days',
+    if_not_exists => TRUE
+);
+
+CREATE INDEX IF NOT EXISTS api_call_log_source_idx ON api_call_log (source, called_at DESC);
+
 -- ─── CKW Tariffs (15-min raw) ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ckw_tariffs_raw (
     time          TIMESTAMPTZ      NOT NULL,

@@ -41,6 +41,8 @@ class EkzCollector(BaseCollector):
         date: Date string "YYYY-MM-DD". Defaults to today (UTC).
     """
 
+    _source_name = "ekz"
+
     def __init__(self, date: str | None = None) -> None:
         self.date = date or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
 
@@ -56,7 +58,10 @@ class EkzCollector(BaseCollector):
                 "start_timestamp":  start,
                 "end_timestamp":    end,
             }
-            resp = self._fetch_with_retry(_API_URL, params=params)
+            resp = self._fetch_with_retry(
+                _API_URL, params=params,
+                source=self._source_name, date_fetched=self.date,
+            )
             data = json.loads(resp.text)
             combined.extend(data.get("prices", []))
 
