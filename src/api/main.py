@@ -130,6 +130,34 @@ def _connect():
     return psycopg2.connect(**_DB)
 
 
+def _ensure_api_call_log_table(conn) -> None:
+    """
+    Ensure api_call_log exists so rate-limit endpoints don't fail on fresh DBs.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS api_call_log (
+                id BIGSERIAL,
+                called_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                source TEXT NOT NULL,
+                status_code INTEGER NOT NULL,
+                was_rate_limited BOOLEAN NOT NULL DEFAULT FALSE,
+                response_ms INTEGER,
+                date_fetched DATE,
+                CONSTRAINT api_call_log_pkey PRIMARY KEY (id, called_at)
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE INDEX IF NOT EXISTS api_call_log_source_idx
+            ON api_call_log (source, called_at DESC)
+            """
+        )
+    conn.commit()
+
+
 def _hash_pw(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -512,6 +540,7 @@ def rate_limits():
     """
     try:
         conn = _connect()
+        _ensure_api_call_log_table(conn)
         cur = conn.cursor()
         cur.execute(sql_24h)
         rows_24h = {r[0]: {"calls_last_24h": r[1], "rate_limited_last_24h": r[2],
@@ -560,6 +589,7 @@ def rate_limits_history():
     """
     try:
         conn = _connect()
+        _ensure_api_call_log_table(conn)
         cur = conn.cursor()
         cur.execute(sql)
         rows = cur.fetchall()

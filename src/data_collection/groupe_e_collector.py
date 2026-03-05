@@ -8,13 +8,15 @@ Returns 15-minute dynamic tariff intervals for 2 components:
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from .base_collector import BaseCollector
 
 _LOG = logging.getLogger(__name__)
 
 _API_URL = "https://api.tariffs.groupe-e.ch/v2/tariffs"
+_CH_TZ = ZoneInfo("Europe/Zurich")
 
 
 class GroupeECollector(BaseCollector):
@@ -35,8 +37,15 @@ class GroupeECollector(BaseCollector):
         self.date = date or datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
 
     def fetch(self) -> str:
+        # Groupe E v2 supports timestamp range params reliably for historical data.
+        day_start_local = datetime.fromisoformat(self.date).replace(tzinfo=_CH_TZ)
+        day_end_local = day_start_local + timedelta(days=1)
+        params = {
+            "start_timestamp": day_start_local.isoformat(timespec="seconds"),
+            "end_timestamp": day_end_local.isoformat(timespec="seconds"),
+        }
         response = self._fetch_with_retry(
-            _API_URL, params={"date": self.date},
+            _API_URL, params=params,
             source=self._source_name, date_fetched=self.date,
         )
         return response.text
