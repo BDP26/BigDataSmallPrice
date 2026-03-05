@@ -35,9 +35,11 @@ default_args = {
 def _run_feature_export(**ctx) -> None:
     from processing.export_pipeline import run_export
 
-    output_dir = os.environ.get("BDSP_EXPORT_DIR", "/opt/airflow/data/")
-    test_ratio = float(os.environ.get("BDSP_TEST_RATIO", "0.2"))
-    paths = run_export(output_dir=output_dir, test_ratio=test_ratio)
+    output_dir = os.environ.get(
+        "BDSP_ENERGY_EXPORT_DIR",
+        os.environ.get("BDSP_EXPORT_DIR", "/opt/airflow/data/energy/"),
+    )
+    paths = run_export(output_dir=output_dir)
     for name, path in paths.items():
         print(f"  {name}: {path}")
 
@@ -45,7 +47,10 @@ def _run_feature_export(**ctx) -> None:
 def _run_load_feature_export(**ctx) -> None:
     from processing.export_pipeline import run_load_export
 
-    output_dir = os.environ.get("BDSP_EXPORT_DIR", "/opt/airflow/data/")
+    output_dir = os.environ.get(
+        "BDSP_LOAD_EXPORT_DIR",
+        os.environ.get("BDSP_EXPORT_DIR", "/opt/airflow/data/load/"),
+    )
     paths = run_load_export(output_dir=output_dir)
     for name, path in paths.items():
         print(f"  {name}: {path}")
