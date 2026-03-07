@@ -50,3 +50,4 @@ airflow/airflow.db
 .pytest_cache/
 .coverage
 htmlcov/
+/.claude
