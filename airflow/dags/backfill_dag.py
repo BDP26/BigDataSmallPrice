@@ -13,11 +13,11 @@ Task dependency order:
   then [fetch_ekz, fetch_ckw, fetch_groupe_e] run sequentially (tariff APIs)
   fetch_winterthur_load, fetch_winterthur_pv run independently (CSV, no date param)
   finally: compute_eta_done logs completion row counts
+
+Task logic lives in src/etl/fetch_tasks.py (shared with etl_pipeline_dag).
 """
 
 import sys
-import time
-
 from datetime import datetime, timedelta, date as _date
 
 import pendulum
@@ -26,8 +26,6 @@ from airflow.models import Variable
 from airflow.operators.python import PythonOperator
 
 sys.path.insert(0, "/opt/airflow/src")
-
-# ─── Default args ─────────────────────────────────────────────────────────────
 
 default_args = {
     "owner": "bdsp",
@@ -39,17 +37,7 @@ default_args = {
 
 
 def _get_date_range(conf: dict) -> tuple[_date, _date]:
-    """Extract backfill_start / backfill_end from conf or Airflow Variables.
-
-    Priority:
-      1. dag_run.conf keys  "backfill_start" / "backfill_end"   (admin dashboard)
-      2. Airflow Variables  BDSP_BACKFILL_START / BDSP_BACKFILL_END
-
-    The recommended way to trigger this DAG is via the admin dashboard at /.
-    If you must trigger it manually from the Airflow UI, use
-    "Trigger DAG w/ config" and supply JSON like:
-        {"backfill_start": "2026-01-01", "backfill_end": "2026-01-31"}
-    """
+    """Extract backfill_start / backfill_end from conf or Airflow Variables."""
     start_str = conf.get("backfill_start") or Variable.get("BDSP_BACKFILL_START", default_var=None)
     end_str   = conf.get("backfill_end")   or Variable.get("BDSP_BACKFILL_END",   default_var=None)
     if not start_str or not end_str:
@@ -64,11 +52,10 @@ def _get_date_range(conf: dict) -> tuple[_date, _date]:
         )
     try:
         start = _date.fromisoformat(start_str)
-        end = _date.fromisoformat(end_str)
+        end   = _date.fromisoformat(end_str)
     except ValueError as exc:
         raise ValueError(
-            "Invalid backfill date format. Expected YYYY-MM-DD for "
-            "backfill_start and backfill_end."
+            "Invalid backfill date format. Expected YYYY-MM-DD."
         ) from exc
     if end < start:
         raise ValueError("Invalid backfill range: backfill_end must be >= backfill_start.")
@@ -76,151 +63,64 @@ def _get_date_range(conf: dict) -> tuple[_date, _date]:
 
 
 def _date_range(start: _date, end: _date) -> list[str]:
-    if end < start:
-        raise ValueError("Invalid date range: end must be >= start.")
     days = (end - start).days + 1
     return [(start + timedelta(days=i)).isoformat() for i in range(days)]
 
 
-# ─── Task functions ───────────────────────────────────────────────────────────
+# ─── Task callables ───────────────────────────────────────────────────────────
 
 
 def _backfill_entsoe(**ctx) -> None:
-    from data_collection.entsoe_collector import EntsoeCollector
-    from db.timescale_client import upsert_entsoe
-
+    from etl.fetch_tasks import fetch_entsoe
     start, end = _get_date_range(ctx["dag_run"].conf or {})
-    for date_str in _date_range(start, end):
-        period_start = datetime.fromisoformat(date_str).replace(tzinfo=pendulum.UTC)
-        period_end = period_start + timedelta(days=1)
-        collector = EntsoeCollector(period_start=period_start, period_end=period_end)
-        records = collector.run()
-        inserted = upsert_entsoe(records)
-        print(f"  ENTSO-E {date_str}: {len(records)} fetched, {inserted} inserted.")
-        time.sleep(1)
+    fetch_entsoe(_date_range(start, end), sleep_s=1)
 
 
 def _backfill_weather(**ctx) -> None:
-    from data_collection.openmeteo_collector import OpenMeteoCollector
-    from db.timescale_client import upsert_weather
-
+    from etl.fetch_tasks import fetch_weather
     start, end = _get_date_range(ctx["dag_run"].conf or {})
-    for date_str in _date_range(start, end):
-        collector = OpenMeteoCollector(date=date_str)
-        records = collector.run()
-        inserted = upsert_weather(records)
-        print(f"  Weather {date_str}: {len(records)} fetched, {inserted} inserted.")
-        time.sleep(1)
-
-
-def _backfill_bafu(**ctx) -> None:
-    from data_collection.bafu_collector import BafuCollector
-    from db.timescale_client import upsert_bafu
-
-    start, end = _get_date_range(ctx["dag_run"].conf or {})
-    for date_str in _date_range(start, end):
-        collector = BafuCollector(date=date_str)
-        records = collector.run()
-        inserted = upsert_bafu(records)
-        print(f"  BAFU {date_str}: {len(records)} fetched, {inserted} inserted.")
-        time.sleep(1)
+    fetch_weather(_date_range(start, end), sleep_s=1)
 
 
 def _backfill_ekz(**ctx) -> None:
-    from data_collection.ekz_collector import EkzCollector
-    from db.timescale_client import upsert_ekz
-
+    from etl.fetch_tasks import fetch_ekz
     start, end = _get_date_range(ctx["dag_run"].conf or {})
-    for date_str in _date_range(start, end):
-        collector = EkzCollector(date=date_str)
-        records = collector.run()
-        inserted = upsert_ekz(records)
-        print(f"  EKZ {date_str}: {len(records)} fetched, {inserted} inserted.")
-        time.sleep(1)
+    fetch_ekz(_date_range(start, end), sleep_s=1)
 
 
 def _backfill_ckw(**ctx) -> None:
-    from data_collection.ckw_collector import CKWCollector
-    from db.timescale_client import upsert_ckw
-
+    from etl.fetch_tasks import fetch_ckw
     start, end = _get_date_range(ctx["dag_run"].conf or {})
-    for date_str in _date_range(start, end):
-        collector = CKWCollector(date=date_str)
-        records = collector.run()
-        inserted = upsert_ckw(records)
-        print(f"  CKW {date_str}: {len(records)} fetched, {inserted} inserted.")
-        time.sleep(1)
+    fetch_ckw(_date_range(start, end), sleep_s=1)
 
 
 def _backfill_groupe_e(**ctx) -> None:
-    from data_collection.groupe_e_collector import GroupeECollector
-    from db.timescale_client import upsert_groupe_e
-
+    from etl.fetch_tasks import fetch_groupe_e
     start, end = _get_date_range(ctx["dag_run"].conf or {})
-    for date_str in _date_range(start, end):
-        collector = GroupeECollector(date=date_str)
-        records = collector.run()
-        inserted = upsert_groupe_e(records)
-        print(f"  Groupe E {date_str}: {len(records)} fetched, {inserted} inserted.")
-        time.sleep(1)
+    fetch_groupe_e(_date_range(start, end), sleep_s=1)
+
+
+def _backfill_bafu(**ctx) -> None:
+    from etl.fetch_tasks import fetch_bafu
+    start, end = _get_date_range(ctx["dag_run"].conf or {})
+    fetch_bafu(_date_range(start, end), sleep_s=1)
 
 
 def _backfill_winterthur_load(**ctx) -> None:
-    from data_collection.stadtwerk_winterthur_collector import BruttolastgangCollector
-    from db.timescale_client import upsert_winterthur_load
-
-    # CSV-based: one bulk fetch regardless of date range
-    collector = BruttolastgangCollector(all_files=True)
-    records = collector.run()
-    inserted = upsert_winterthur_load(records)
-    print(f"Winterthur Load (bulk): {len(records)} records, {inserted} inserted.")
+    from etl.fetch_tasks import fetch_winterthur_load
+    fetch_winterthur_load(all_files=True)
 
 
 def _backfill_winterthur_pv(**ctx) -> None:
-    from data_collection.stadtwerk_winterthur_collector import NetzEinspeisungCollector
-    from db.timescale_client import upsert_winterthur_pv
-
-    collector = NetzEinspeisungCollector()
-    records = collector.run()
-    inserted = upsert_winterthur_pv(records)
-    print(f"Winterthur PV (bulk): {len(records)} records, {inserted} inserted.")
+    from etl.fetch_tasks import fetch_winterthur_pv
+    fetch_winterthur_pv()
 
 
 def _compute_eta_done(**ctx) -> None:
-    import os
-    import psycopg2
-
-    _TABLES = [
-        "entsoe_day_ahead_prices",
-        "weather_hourly",
-        "bafu_hydro",
-        "ekz_tariffs_raw",
-        "ckw_tariffs_raw",
-        "groupe_e_tariffs_raw",
-        "winterthur_load",
-        "winterthur_pv",
-    ]
-    try:
-        conn = psycopg2.connect(
-            host=os.getenv("BDSP_DB_HOST", "timescaledb"),
-            port=int(os.getenv("BDSP_DB_PORT", 5432)),
-            dbname=os.getenv("BDSP_DB_NAME", "bdsp"),
-            user=os.getenv("BDSP_DB_USER", "bdsp"),
-            password=os.getenv("BDSP_DB_PASSWORD", ""),
-        )
-        total = 0
-        with conn.cursor() as cur:
-            for table in _TABLES:
-                cur.execute(f"SELECT COUNT(*) FROM {table}")  # noqa: S608
-                n = cur.fetchone()[0]
-                total += n
-                print(f"  {table}: {n} rows")
-        conn.close()
-        start, end = _get_date_range(ctx["dag_run"].conf or {})
-        print(f"Backfill complete: {total} rows across all tables "
-              f"({start.isoformat()} → {end.isoformat()}).")
-    except Exception as exc:  # noqa: BLE001
-        print(f"Row count failed (non-critical): {exc}")
+    from etl.fetch_tasks import log_row_counts
+    start, end = _get_date_range(ctx["dag_run"].conf or {})
+    print(f"Backfill complete: {start.isoformat()} → {end.isoformat()}")
+    log_row_counts()
 
 
 # ─── DAG definition ───────────────────────────────────────────────────────────
@@ -235,17 +135,15 @@ with DAG(
     tags=["bdsp", "backfill"],
 ) as dag:
 
-    t_entsoe = PythonOperator(task_id="fetch_entsoe",    python_callable=_backfill_entsoe)
-    t_weather = PythonOperator(task_id="fetch_weather",  python_callable=_backfill_weather)
-    t_bafu    = PythonOperator(task_id="fetch_bafu",     python_callable=_backfill_bafu)
-    t_ekz     = PythonOperator(task_id="fetch_ekz",      python_callable=_backfill_ekz)
-    t_ckw     = PythonOperator(task_id="fetch_ckw",      python_callable=_backfill_ckw)
-    t_groupe_e = PythonOperator(task_id="fetch_groupe_e", python_callable=_backfill_groupe_e)
+    t_entsoe   = PythonOperator(task_id="fetch_entsoe",          python_callable=_backfill_entsoe)
+    t_weather  = PythonOperator(task_id="fetch_weather",         python_callable=_backfill_weather)
+    t_bafu     = PythonOperator(task_id="fetch_bafu",            python_callable=_backfill_bafu)
+    t_ekz      = PythonOperator(task_id="fetch_ekz",             python_callable=_backfill_ekz)
+    t_ckw      = PythonOperator(task_id="fetch_ckw",             python_callable=_backfill_ckw)
+    t_groupe_e = PythonOperator(task_id="fetch_groupe_e",        python_callable=_backfill_groupe_e)
     t_wt_load  = PythonOperator(task_id="fetch_winterthur_load", python_callable=_backfill_winterthur_load)
     t_wt_pv    = PythonOperator(task_id="fetch_winterthur_pv",   python_callable=_backfill_winterthur_pv)
-    t_done     = PythonOperator(task_id="compute_eta_done",       python_callable=_compute_eta_done)
+    t_done     = PythonOperator(task_id="compute_eta_done",      python_callable=_compute_eta_done, trigger_rule="all_done")
 
-    # First wave: independent sources
-    # Second wave: tariff APIs (sequential to reduce API hammering)
     [t_entsoe, t_weather, t_bafu] >> t_ekz >> t_ckw >> t_groupe_e >> t_done
     [t_wt_load, t_wt_pv] >> t_done
