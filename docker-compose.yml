@@ -58,6 +58,19 @@ services:
       start_period: 10s
     restart: always
 
+  db-migrate:
+    image: timescale/timescaledb:latest-pg15
+    command: >
+      psql -h timescaledb -U bdsp -d bdsp -f /init.sql
+    environment:
+      PGPASSWORD: ${BDSP_DB_PASSWORD}
+    volumes:
+      - ./infra/db/init.sql:/init.sql
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    restart: "no"
+
   airflow-init:
     <<: *airflow-common
     entrypoint: /bin/bash
@@ -100,6 +113,7 @@ services:
 
   api:
     build: ./src/api
+    pull_policy: build
     ports:
       - "8001:8000"
     volumes:
@@ -121,6 +135,8 @@ services:
     depends_on:
       timescaledb:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
     restart: always
 
   airflow-scheduler:
