@@ -5,14 +5,12 @@ Daily ETL pipeline for BigDataSmallPrice.
 Runs at 06:00 Europe/Zurich – after ENTSO-E publishes next-day prices.
 
 Task graph:
-  fetch_entsoe          ─► (independent)
-  fetch_weather         ─► (independent)    (all fetch tasks run in parallel)
-  fetch_ekz             ─► (independent)
-  fetch_ckw             ─► (independent)
-  fetch_groupe_e        ─► (independent)
-  fetch_bafu            ─► (independent)
-  fetch_winterthur_load ─► (independent)
-  fetch_winterthur_pv   ─► (independent)
+  fetch_entsoe          ─┐
+  fetch_weather         ─┤
+  fetch_bafu            ─┤─► (parallel)  ─► log_summary
+  fetch_winterthur_load ─┤
+  fetch_winterthur_pv   ─┤
+  fetch_ekz ─► fetch_ckw ─► fetch_groupe_e ─┘  (tariff APIs sequential)
 
 catchup=True + max_active_runs=1 so missed runs are backfilled one-at-a-time.
 All task functions use ctx["logical_date"] to fetch the correct date's data.
@@ -184,7 +182,7 @@ with DAG(
     description="Daily ETL: ENTSO-E, Open-Meteo, CKW, Groupe E, BAFU → TimescaleDB",
     schedule="0 6 * * *",
     start_date=datetime(2026, 1, 1, tzinfo=pendulum.timezone("Europe/Zurich")),
-    catchup=True,
+    catchup=False,
     max_active_runs=1,
     default_args=default_args,
     tags=["bdsp", "etl", "phase-1"],
@@ -193,37 +191,31 @@ with DAG(
     fetch_entsoe = PythonOperator(
         task_id="fetch_entsoe",
         python_callable=_fetch_entsoe,
-        pool="entsoe_pool",
     )
 
     fetch_weather = PythonOperator(
         task_id="fetch_weather",
         python_callable=_fetch_weather,
-        pool="meteo_pool",
     )
 
     fetch_ekz = PythonOperator(
         task_id="fetch_ekz",
         python_callable=_fetch_ekz,
-        pool="tariff_pool",
     )
 
     fetch_ckw = PythonOperator(
         task_id="fetch_ckw",
         python_callable=_fetch_ckw,
-        pool="tariff_pool",
     )
 
     fetch_groupe_e = PythonOperator(
         task_id="fetch_groupe_e",
         python_callable=_fetch_groupe_e,
-        pool="tariff_pool",
     )
 
     fetch_bafu = PythonOperator(
         task_id="fetch_bafu",
         python_callable=_fetch_bafu,
-        pool="bafu_pool",
     )
 
     fetch_winterthur_load = PythonOperator(
@@ -236,5 +228,46 @@ with DAG(
         python_callable=_fetch_winterthur_pv,
     )
 
-    # All fetch tasks are independent – they run in parallel automatically
-    # when the LocalExecutor picks them up.
+    def _log_summary(**ctx) -> None:
+        from db.timescale_client import get_conn
+        date_str = ctx["logical_date"].strftime("%Y-%m-%d")
+        tables = [
+            "entsoe_day_ahead_prices",
+            "weather_hourly",
+            "ekz_tariffs",
+            "ckw_tariffs",
+            "groupe_e_tariffs",
+            "bafu_hydro",
+            "winterthur_load",
+            "winterthur_pv",
+        ]
+        lines = [f"ETL summary for {date_str}:"]
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                for table in tables:
+                    cur.execute(
+                        f"SELECT COUNT(*) FROM {table} WHERE time::date = %s",
+                        (date_str,),
+                    )
+                    count = cur.fetchone()[0]
+                    lines.append(f"  {table}: {count} rows")
+        print("\n".join(lines))
+
+    log_summary = PythonOperator(
+        task_id="log_summary",
+        python_callable=_log_summary,
+        trigger_rule="all_done",
+    )
+
+    # Tariff APIs run sequentially to avoid hammering the same endpoints.
+    # All other fetch tasks run in parallel.
+    fetch_ekz >> fetch_ckw >> fetch_groupe_e
+
+    [
+        fetch_entsoe,
+        fetch_weather,
+        fetch_bafu,
+        fetch_winterthur_load,
+        fetch_winterthur_pv,
+        fetch_groupe_e,
+    ] >> log_summary
