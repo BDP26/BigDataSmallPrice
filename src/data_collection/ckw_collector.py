@@ -32,6 +32,7 @@ class CKWCollector(BaseCollector):
         tariff_name: Tariff plan name. Defaults to "home_dynamic".
     """
 
+    _source_name = "ckw"
     COMPONENTS = ("grid_usage", "grid", "electricity", "integrated")
 
     def __init__(
@@ -50,7 +51,10 @@ class CKWCollector(BaseCollector):
             "start_timestamp": start,
             "end_timestamp": end,
         }
-        response = self._fetch_with_retry(_API_URL, params=params)
+        response = self._fetch_with_retry(
+            _API_URL, params=params,
+            source=self._source_name, date_fetched=self.date,
+        )
         return response.text
 
     def parse(self, raw: bytes | str) -> list[dict]:

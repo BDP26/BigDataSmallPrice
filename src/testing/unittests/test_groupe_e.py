@@ -99,7 +99,7 @@ class TestGroupeECollectorParse:
 
 
 class TestGroupeECollectorFetch:
-    def test_fetch_passes_date_param(self):
+    def test_fetch_passes_timestamp_range_params(self):
         mock_response = MagicMock()
         mock_response.text = '{"prices": []}'
         mock_response.status_code = 200
@@ -109,7 +109,8 @@ class TestGroupeECollectorFetch:
             collector = GroupeECollector(date="2026-02-28")
             collector.fetch()
             params = mock_get.call_args.kwargs.get("params", {})
-            assert params.get("date") == "2026-02-28"
+            assert params.get("start_timestamp") == "2026-02-28T00:00:00+01:00"
+            assert params.get("end_timestamp") == "2026-03-01T00:00:00+01:00"
 
     def test_default_date_is_today_utc(self):
         collector = GroupeECollector()

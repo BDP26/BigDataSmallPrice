@@ -13,8 +13,9 @@ Task graph:
 import sys
 import os
 
-from datetime import datetime, timezone
+from datetime import datetime
 
+import pendulum
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
@@ -35,9 +36,11 @@ default_args = {
 def _run_feature_export(**ctx) -> None:
     from processing.export_pipeline import run_export
 
-    output_dir = os.environ.get("BDSP_EXPORT_DIR", "/opt/airflow/data/")
-    test_ratio = float(os.environ.get("BDSP_TEST_RATIO", "0.2"))
-    paths = run_export(output_dir=output_dir, test_ratio=test_ratio)
+    output_dir = os.environ.get(
+        "BDSP_ENERGY_EXPORT_DIR",
+        os.environ.get("BDSP_EXPORT_DIR", "/opt/airflow/data/energy/"),
+    )
+    paths = run_export(output_dir=output_dir)
     for name, path in paths.items():
         print(f"  {name}: {path}")
 
@@ -45,7 +48,10 @@ def _run_feature_export(**ctx) -> None:
 def _run_load_feature_export(**ctx) -> None:
     from processing.export_pipeline import run_load_export
 
-    output_dir = os.environ.get("BDSP_EXPORT_DIR", "/opt/airflow/data/")
+    output_dir = os.environ.get(
+        "BDSP_LOAD_EXPORT_DIR",
+        os.environ.get("BDSP_EXPORT_DIR", "/opt/airflow/data/load/"),
+    )
     paths = run_load_export(output_dir=output_dir)
     for name, path in paths.items():
         print(f"  {name}: {path}")
@@ -57,7 +63,7 @@ with DAG(
     dag_id="bdsp_feature_daily",
     description="Daily feature engineering & parquet export for ML training",
     schedule="0 7 * * *",
-    start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    start_date=datetime(2026, 1, 1, tzinfo=pendulum.timezone("Europe/Zurich")),
     catchup=False,
     default_args=default_args,
     tags=["bdsp", "features", "phase-2"],

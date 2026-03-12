@@ -107,6 +107,7 @@ class BruttolastgangCollector(BaseCollector):
                    If False (default), fetch only the current file (2022–current).
     """
 
+    _source_name = "stadtwerk_wt"
     #: Column name containing the load value (kWh).
     _VALUE_COL = "bruttolastgang_kwh"
 
@@ -192,6 +193,7 @@ class NetzEinspeisungCollector(BaseCollector):
     Returns ``[{time, pv_kwh}]`` sorted ascending.
     """
 
+    _source_name = "stadtwerk_wt"
     _FILTER_TYPE = "photovoltaik"
 
     def fetch(self) -> str:

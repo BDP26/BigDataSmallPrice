@@ -474,6 +474,28 @@
                 </div>
             </div>
 
+            <!-- API Rate Limits -->
+            <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-200 dark:border-slate-800">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">speed</span>
+                            API Rate Limits
+                        </h3>
+                        <div class="flex items-center gap-3">
+                            <button onclick="loadRateLimits()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                                <span class="material-symbols-outlined text-sm">refresh</span>Refresh
+                            </button>
+                            <span class="text-xs text-slate-400">Auto-refresh every 60s</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="rate-limits-error" class="hidden mx-5 my-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400"></div>
+                <div id="rate-limits-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-0 divide-x divide-slate-100 dark:divide-slate-800">
+                    <div class="p-4 text-center text-slate-400 text-sm col-span-full">Loading…</div>
+                </div>
+            </div>
+
             <!-- Airflow Pipeline Status -->
             <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                 <div class="p-5 border-b border-slate-200 dark:border-slate-800">
@@ -627,6 +649,62 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+            <!-- Historical Data Backfill -->
+            <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-200 dark:border-slate-800">
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">history</span>
+                        Historical Data Backfill
+                    </h3>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Fetch missing historical data from all ETL sources for a date range.</p>
+                </div>
+                <div class="p-6 space-y-6">
+                    <!-- Date inputs + buttons -->
+                    <div class="flex flex-wrap items-end gap-4">
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Start Date</label>
+                            <input id="backfill-start" type="date"
+                                class="block border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary" />
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">End Date</label>
+                            <input id="backfill-end" type="date"
+                                class="block border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary" />
+                        </div>
+                        <button id="backfill-estimate-btn" onclick="backfillEstimate()"
+                            class="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                            <span class="material-symbols-outlined text-base">calculate</span>Estimate
+                        </button>
+                        <button id="backfill-trigger-btn" onclick="backfillTrigger()"
+                            class="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-white shadow shadow-primary/20 hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            disabled>
+                            <span class="material-symbols-outlined text-base">play_circle</span>Start Backfill
+                        </button>
+                    </div>
+
+                    <!-- Estimate result -->
+                    <div id="backfill-estimate-result" class="hidden rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-4 text-sm space-y-3">
+                        <div class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary text-base">info</span>
+                            <span id="backfill-estimate-summary"></span>
+                        </div>
+                        <div id="backfill-estimate-sources" class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-slate-600 dark:text-slate-400"></div>
+                    </div>
+
+                    <!-- Progress panel -->
+                    <div id="backfill-progress" class="hidden rounded-lg border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-semibold text-slate-700 dark:text-slate-200" id="backfill-status-text">Queued…</span>
+                            <span id="backfill-state-badge" class="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">—</span>
+                        </div>
+                        <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                            <div id="backfill-progress-bar" class="bg-primary h-full rounded-full w-0 transition-all duration-500"></div>
+                        </div>
+                        <div id="backfill-result-msg" class="text-sm hidden"></div>
+                        <button id="backfill-retry-btn" onclick="backfillTrigger()" class="hidden text-xs font-semibold text-primary underline">Retry</button>
+                    </div>
                 </div>
             </div>
         </main>
@@ -784,6 +862,8 @@
                 'groupe_e_tariffs_raw':    'Groupe E',
                 'ekz_tariffs_raw':         'EKZ',
                 'bafu_hydro':              'BAFU',
+                'winterthur_load':         'Load (OGD)',
+                'winterthur_pv':           'PV (OGD)',
                 'training_features':       'Features',
             };
             const TYPE_COLOR = {
@@ -932,14 +1012,222 @@
             };
         })();
 
+        // ── Rate Limits ───────────────────────────────────────────────────────
+        async function loadRateLimits() {
+            const grid = document.getElementById('rate-limits-grid');
+            const errBox = document.getElementById('rate-limits-error');
+            try {
+                const res = await fetch('/api/rate-limits');
+                const data = await res.json();
+                if (data.error) { throw new Error(data.error); }
+                errBox.classList.add('hidden');
+                const sources = data.sources || {};
+                const labels = {
+                    entsoe: 'ENTSO-E', openmeteo: 'Open-Meteo',
+                    ekz: 'EKZ', ckw: 'CKW', groupe_e: 'Groupe E', bafu: 'BAFU'
+                };
+                grid.innerHTML = Object.entries(sources).map(([src, info]) => {
+                    const pct = info.usage_pct != null ? info.usage_pct : null;
+                    const dotColor = info.rate_limited_last_24h > 0 ? 'bg-red-500'
+                        : pct == null ? 'bg-slate-400'
+                        : pct > 0.9 ? 'bg-red-500'
+                        : pct > 0.7 ? 'bg-amber-400' : 'bg-green-500';
+                    const limitText = info.known_daily_limit != null
+                        ? `${info.calls_last_24h} / ${info.known_daily_limit}`
+                        : `${info.calls_last_24h} (limit unknown)`;
+                    const barPct = pct != null ? Math.min(pct * 100, 100).toFixed(1) : 0;
+                    const barHtml = info.known_daily_limit != null
+                        ? `<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mt-2 overflow-hidden">
+                             <div class="bg-primary h-full rounded-full chart-bar" style="width:${barPct}%"></div>
+                           </div>` : '';
+                    const last429 = info.last_429
+                        ? `<div class="text-[10px] text-red-500 mt-1">Last 429: ${new Date(info.last_429).toLocaleString()}</div>` : '';
+                    return `<div class="p-4 space-y-1 border-b border-slate-100 dark:border-slate-800 last:border-b-0">
+                        <div class="flex items-center gap-1.5">
+                            <span class="h-2 w-2 rounded-full ${dotColor}"></span>
+                            <span class="text-xs font-bold text-slate-700 dark:text-slate-200">${labels[src] || src}</span>
+                        </div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">${limitText}</div>
+                        <div class="text-xs text-slate-400">${info.calls_last_7d} calls / 7d</div>
+                        ${barHtml}${last429}
+                    </div>`;
+                }).join('');
+            } catch(e) {
+                errBox.textContent = e.message || 'Failed to load rate limits';
+                errBox.classList.remove('hidden');
+                grid.innerHTML = '';
+            }
+        }
+
+        // ── Backfill ──────────────────────────────────────────────────────────
+        let _backfillPollTimer = null;
+
+        async function backfillEstimate() {
+            const start = document.getElementById('backfill-start').value;
+            const end   = document.getElementById('backfill-end').value;
+            if (!start || !end) { alert('Please select both dates.'); return; }
+            const resultDiv  = document.getElementById('backfill-estimate-result');
+            const summaryEl  = document.getElementById('backfill-estimate-summary');
+            const sourcesEl  = document.getElementById('backfill-estimate-sources');
+            const triggerBtn = document.getElementById('backfill-trigger-btn');
+            summaryEl.textContent = 'Calculating…';
+            resultDiv.classList.remove('hidden');
+            sourcesEl.innerHTML = '';
+            try {
+                const res = await fetch('/api/backfill/estimate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({start_date: start, end_date: end}),
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                summaryEl.textContent =
+                    `${data.total_days} days · ~${data.estimated_api_calls} API calls · ~${data.estimated_duration_minutes} min`;
+                sourcesEl.innerHTML = Object.entries(data.sources || {}).map(([src, s]) =>
+                    `<div class="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2">
+                        <div class="font-semibold text-slate-700 dark:text-slate-200 capitalize">${src}</div>
+                        <div class="text-slate-500">${s.to_fetch} to fetch · ${s.already_in_db} in DB</div>
+                    </div>`
+                ).join('');
+                triggerBtn.disabled = false;
+            } catch(e) {
+                summaryEl.textContent = 'Error: ' + (e.message || 'Unknown error');
+                triggerBtn.disabled = true;
+            }
+        }
+
+        async function backfillTrigger() {
+            const start = document.getElementById('backfill-start').value;
+            const end   = document.getElementById('backfill-end').value;
+            if (!start || !end) { alert('Please select both dates.'); return; }
+            const triggerBtn  = document.getElementById('backfill-trigger-btn');
+            const progressDiv = document.getElementById('backfill-progress');
+            const statusText  = document.getElementById('backfill-status-text');
+            const stateBadge  = document.getElementById('backfill-state-badge');
+            const resultMsg   = document.getElementById('backfill-result-msg');
+            const retryBtn    = document.getElementById('backfill-retry-btn');
+            const bar         = document.getElementById('backfill-progress-bar');
+
+            triggerBtn.disabled = true;
+            progressDiv.classList.remove('hidden');
+            resultMsg.classList.add('hidden');
+            retryBtn.classList.add('hidden');
+            bar.style.width = '5%';
+            statusText.textContent = 'Triggering backfill…';
+
+            try {
+                const res = await fetch('/api/backfill/trigger', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({start_date: start, end_date: end}),
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                statusText.textContent = 'Backfill triggered – monitoring…';
+                _pollBackfillState(start, end, data.dag_run_id);
+            } catch(e) {
+                statusText.textContent = 'Failed to trigger backfill';
+                stateBadge.textContent = 'error';
+                stateBadge.className = 'text-xs font-bold px-2 py-0.5 rounded bg-red-100 text-red-600';
+                resultMsg.textContent = e.message || 'Unknown error';
+                resultMsg.className = 'text-sm text-red-600';
+                resultMsg.classList.remove('hidden');
+                retryBtn.classList.remove('hidden');
+                triggerBtn.disabled = false;
+            }
+        }
+
+        function _pollBackfillState(start, end, dagRunId) {
+            if (_backfillPollTimer) clearInterval(_backfillPollTimer);
+            const bar        = document.getElementById('backfill-progress-bar');
+            const statusText = document.getElementById('backfill-status-text');
+            const stateBadge = document.getElementById('backfill-state-badge');
+            const resultMsg  = document.getElementById('backfill-result-msg');
+            const retryBtn   = document.getElementById('backfill-retry-btn');
+            const triggerBtn = document.getElementById('backfill-trigger-btn');
+
+            _backfillPollTimer = setInterval(async () => {
+                try {
+                    let state = 'unknown';
+                    if (dagRunId) {
+                        // Poll the *specific* run so a previous failed run
+                        // does not immediately mark the new run as failed.
+                        const res = await fetch(`/api/backfill/status/${encodeURIComponent(dagRunId)}`);
+                        const data = await res.json();
+                        if (data.error) return;   // transient – try again next tick
+                        state = data.state || 'unknown';
+                    } else {
+                        // Fallback (on-load check): use the generic DAG list.
+                        const res = await fetch('/api/airflow/dags');
+                        const dags = await res.json();
+                        if (!Array.isArray(dags)) return;
+                        const bf = dags.find(d => d.dag_id === 'bdsp_backfill');
+                        state = bf?.last_run?.state || 'unknown';
+                    }
+
+                    const badgeClass = state === 'success'
+                        ? 'bg-green-100 text-green-700'
+                        : state === 'failed' ? 'bg-red-100 text-red-600'
+                        : state === 'running' ? 'bg-blue-100 text-blue-700'
+                        : 'bg-slate-100 text-slate-500';
+                    stateBadge.textContent = state;
+                    stateBadge.className = `text-xs font-bold px-2 py-0.5 rounded ${badgeClass}`;
+
+                    if (state === 'running') {
+                        bar.style.width = '60%';
+                        statusText.textContent = 'Backfill running…';
+                    } else if (state === 'success') {
+                        bar.style.width = '100%';
+                        statusText.textContent = 'Backfill complete';
+                        resultMsg.textContent = `✓ Backfill complete — data available for ${start} to ${end}.`;
+                        resultMsg.className = 'text-sm text-green-600 font-semibold';
+                        resultMsg.classList.remove('hidden');
+                        clearInterval(_backfillPollTimer);
+                        triggerBtn.disabled = false;
+                    } else if (state === 'failed') {
+                        bar.style.width = '100%';
+                        bar.classList.add('bg-red-500');
+                        statusText.textContent = 'Backfill failed';
+                        resultMsg.textContent = 'Backfill run failed. Check Airflow logs.';
+                        resultMsg.className = 'text-sm text-red-600';
+                        resultMsg.classList.remove('hidden');
+                        retryBtn.classList.remove('hidden');
+                        clearInterval(_backfillPollTimer);
+                        triggerBtn.disabled = false;
+                    }
+                } catch { /* silently ignore poll errors */ }
+            }, 10000);
+        }
+
+        // On load: check if backfill is already running
+        async function checkBackfillState() {
+            try {
+                const res = await fetch('/api/airflow/dags');
+                const dags = await res.json();
+                if (!Array.isArray(dags)) return;
+                const bf = dags.find(d => d.dag_id === 'bdsp_backfill');
+                const state = bf?.last_run?.state;
+                if (state === 'running' || state === 'queued') {
+                    document.getElementById('backfill-trigger-btn').disabled = true;
+                    document.getElementById('backfill-progress').classList.remove('hidden');
+                    document.getElementById('backfill-status-text').textContent =
+                        state === 'running' ? 'Backfill running…' : 'Backfill queued…';
+                    _pollBackfillState('', '');
+                }
+            } catch { /* ignore */ }
+        }
+
         // ── Boot ─────────────────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', () => {
             loadDbStatus();
             loadFeatureStatus();
             loadAirflowStatus();
+            loadRateLimits();
+            checkBackfillState();
             setInterval(loadDbStatus, 60000);
             setInterval(loadFeatureStatus, 60000);
             setInterval(loadAirflowStatus, 60000);
+            setInterval(loadRateLimits, 60000);
             Explorer.init();
         });
     </script>

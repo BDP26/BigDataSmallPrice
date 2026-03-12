@@ -216,10 +216,15 @@ WITH
     SELECT
       pf.time,
       pf.price_eur_mwh,
+      -- req.md Option 1 (EPEX direkt)
+      pf.price_eur_mwh AS epex_t,
       pf.lag_1h,
       pf.lag_2h,
       pf.lag_24h,
       pf.lag_168h,
+      -- req.md Option 2 aliases
+      pf.lag_24h AS epex_lag_1d,
+      pf.lag_168h AS epex_lag_7d,
       pf.rolling_avg_24h,
       pf.rolling_avg_7d,
       pf.hour_of_day,
@@ -228,8 +233,14 @@ WITH
       pf.is_weekend,
       pf.is_peak_hour,
       w.temperature_2m,
+      -- Proxy until CH-wide temperature feed is added
+      w.temperature_2m AS temp_ch_avg,
       w.wind_speed_10m,
+      -- Proxy until ENTSO-E generation series are integrated
+      w.wind_speed_10m AS wind_generation_eu,
       w.shortwave_radiation,
+      -- Proxy until CH generation series are integrated
+      w.shortwave_radiation AS solar_generation_ch,
       w.cloud_cover,
       w.precipitation_mm,
       AVG(w.temperature_2m) OVER (
@@ -237,6 +248,9 @@ WITH
       ) AS temp_rolling_avg_24h,
       bh.discharge_m3s,
       bh.level_masl,
+      -- Proxy until explicit reservoir source is integrated
+      bh.level_masl AS hydro_reservoir,
+      CASE WHEN pf.is_weekend = 1 THEN 'weekend' ELSE 'workday' END AS day_type,
       ge.avg_chf_kwh  AS tariff_price_chf_kwh_avg,
       ck.avg_chf_kwh  AS ckw_price_chf_kwh_avg
     FROM price_features pf
@@ -256,6 +270,28 @@ WITH
   )
 
 SELECT * FROM joined;
+
+-- ─── 10b. API Call Log (rate-limit tracking — ISOLATED from ML features) ─────
+-- WARNING: this table MUST NEVER be joined into training_features or
+-- winterthur_net_load_features. It is operational metadata only.
+CREATE TABLE IF NOT EXISTS api_call_log (
+    id               BIGSERIAL,
+    source           TEXT        NOT NULL,  -- 'entsoe'|'openmeteo'|'ekz'|'ckw'|'groupe_e'|'bafu'
+    called_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status_code      INT         NOT NULL,  -- actual HTTP status returned
+    was_rate_limited BOOLEAN     NOT NULL DEFAULT FALSE,  -- TRUE if status_code == 429
+    response_ms      INT,                   -- response time in milliseconds
+    date_fetched     TEXT,                  -- the data-date requested ("YYYY-MM-DD" or NULL)
+    CONSTRAINT api_call_log_pkey PRIMARY KEY (id, called_at)
+);
+
+SELECT create_hypertable(
+    'api_call_log', 'called_at',
+    chunk_time_interval => INTERVAL '7 days',
+    if_not_exists => TRUE
+);
+
+CREATE INDEX IF NOT EXISTS api_call_log_source_idx ON api_call_log (source, called_at DESC);
 
 -- ─── 11. Winterthur Load (OGD Bruttolastgang) ────────────────────────────────
 CREATE TABLE IF NOT EXISTS winterthur_load (
@@ -292,7 +328,9 @@ SELECT
     w.time,
     w.load_kwh - COALESCE(p.pv_kwh, 0)               AS net_load_kwh,
     EXTRACT(HOUR    FROM w.time)::INT                 AS hour_of_day,
+    EXTRACT(HOUR    FROM w.time)::INT                 AS hour,
     EXTRACT(DOW     FROM w.time)::INT                 AS day_of_week,
+    EXTRACT(DOW     FROM w.time)::INT                 AS weekday,
     EXTRACT(MONTH   FROM w.time)::INT                 AS month,
     EXTRACT(QUARTER FROM w.time)::INT                 AS quarter,
     CASE WHEN EXTRACT(DOW FROM w.time) IN (0,6) THEN 1 ELSE 0 END AS is_weekend,
@@ -303,11 +341,16 @@ SELECT
         ORDER BY w.time ROWS BETWEEN 23 PRECEDING AND CURRENT ROW
     )                                                 AS load_rolling_avg_24h,
     wr.temperature_2m,
+    wr.temperature_2m                                 AS temp_c,
     wr.wind_speed_10m,
+    wr.wind_speed_10m                                 AS wind_speed_ms,
     wr.shortwave_radiation,
+    wr.shortwave_radiation                            AS ghi_wm2,
     wr.cloud_cover,
+    wr.cloud_cover                                    AS cloud_cover_pct,
     wr.precipitation_mm,
-    COALESCE(p.pv_kwh, 0)                            AS pv_feed_in_kwh
+    COALESCE(p.pv_kwh, 0)                            AS pv_feed_in_kwh,
+    COALESCE(p.pv_kwh, 0)                            AS pv_feed_in
 FROM winterthur_load w
 LEFT JOIN winterthur_pv p USING (time)
 LEFT JOIN weather_hourly wr

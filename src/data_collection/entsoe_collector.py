@@ -27,6 +27,8 @@ class EntsoeCollector(BaseCollector):
         period_end:   End datetime (UTC). Defaults to tomorrow 00:00 UTC.
     """
 
+    _source_name = "entsoe"
+
     def __init__(
         self,
         token: str | None = None,
@@ -47,7 +49,12 @@ class EntsoeCollector(BaseCollector):
             "periodStart": self.period_start.strftime("%Y%m%d%H%M"),
             "periodEnd": self.period_end.strftime("%Y%m%d%H%M"),
         }
-        response = self._fetch_with_retry(_API_URL, params=params)
+        response = self._fetch_with_retry(
+            _API_URL,
+            params=params,
+            source=self._source_name,
+            date_fetched=self.period_start.strftime("%Y-%m-%d"),
+        )
         return response.content
 
     def parse(self, raw: bytes | str) -> list[dict]:

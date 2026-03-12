@@ -25,20 +25,30 @@ class BafuCollector(BaseCollector):
     Args:
         station_id:  BAFU station ID. Defaults to Rhein-Rekingen (2018).
         days_back:   Number of days of history to fetch. Defaults to 2.
+        date:        Specific date string "YYYY-MM-DD". If given, fetches only
+                     that day (overrides days_back).
     """
+
+    _source_name = "bafu"
 
     def __init__(
         self,
         station_id: str = _STATION_ID,
         days_back: int = 2,
+        date: str | None = None,
     ) -> None:
         self.station_id = station_id
         self.days_back = days_back
+        self.date = date
 
     def fetch(self) -> str:
-        now_utc = datetime.now(tz=timezone.utc)
-        date_from = (now_utc - timedelta(days=self.days_back)).strftime("%Y-%m-%d")
-        date_to = now_utc.strftime("%Y-%m-%d")
+        if self.date is not None:
+            date_from = self.date
+            date_to = self.date
+        else:
+            now_utc = datetime.now(tz=timezone.utc)
+            date_from = (now_utc - timedelta(days=self.days_back)).strftime("%Y-%m-%d")
+            date_to = now_utc.strftime("%Y-%m-%d")
 
         params = {
             "locations": self.station_id,
@@ -48,7 +58,10 @@ class BafuCollector(BaseCollector):
             "app": "bdsp",
             "version": "0.1",
         }
-        response = self._fetch_with_retry(_BASE_URL, params=params)
+        response = self._fetch_with_retry(
+            _BASE_URL, params=params,
+            source=self._source_name, date_fetched=date_from,
+        )
         return response.text
 
     def parse(self, raw: bytes | str) -> list[dict]:

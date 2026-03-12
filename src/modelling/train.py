@@ -115,13 +115,13 @@ def train_load_model(X_train: pd.DataFrame, y_train: pd.DataFrame) -> XGBRegress
 
 
 def run_load_training(
-    data_dir: str = "data/",
+    data_dir: str = "data/load/",
     models_dir: str = "models/",
 ) -> dict[str, Path]:
     """
     End-to-end training pipeline for Model A (grid-load forecasting).
 
-    1. Locate the latest ``X_load_train_*.parquet`` and ``y_load_train_*.parquet``.
+    1. Read ``X_train.parquet`` and ``y_train.parquet`` from *data_dir*.
     2. Train the XGBoost load model.
     3. Serialize the model to *models_dir* as ``model_load_<YYYYMMDD>.joblib``.
 
@@ -133,18 +133,18 @@ def run_load_training(
         Dict mapping model name to the saved Path.
 
     Raises:
-        FileNotFoundError: If no load training parquet files are found.
+        FileNotFoundError: If the training parquet files are not found.
     """
     data_path = Path(data_dir)
-    x_files = sorted(data_path.glob("X_load_train_*.parquet"))
-    y_files = sorted(data_path.glob("y_load_train_*.parquet"))
-    if not x_files or not y_files:
+    x_path = data_path / "X_train.parquet"
+    y_path = data_path / "y_train.parquet"
+    if not x_path.exists() or not y_path.exists():
         raise FileNotFoundError(
-            f"No load training parquet files found in {data_dir!r}. "
+            f"Load training parquet files not found in {data_dir!r}. "
             "Run run_load_export() first."
         )
-    X_train = pd.read_parquet(x_files[-1])
-    y_train = pd.read_parquet(y_files[-1])
+    X_train = pd.read_parquet(x_path)
+    y_train = pd.read_parquet(y_path)
 
     model = train_load_model(X_train, y_train)
     path = save_model(model, "model_load", models_dir)
@@ -156,13 +156,13 @@ def run_load_training(
 
 
 def run_training(
-    data_dir: str = "data/",
+    data_dir: str = "data/energy/",
     models_dir: str = "models/",
 ) -> dict[str, Path]:
     """
     End-to-end training pipeline:
 
-    1. Locate the latest ``X_train_*.parquet`` and ``y_train_*.parquet``.
+    1. Read ``X_train.parquet`` and ``y_train.parquet`` from *data_dir*.
     2. Train naive, linear, and XGBoost models.
     3. Serialize each model to *models_dir*.
 
@@ -174,18 +174,18 @@ def run_training(
         Dict mapping model name to the saved Path.
 
     Raises:
-        FileNotFoundError: If no training parquet files are found in *data_dir*.
+        FileNotFoundError: If training parquet files are not found in *data_dir*.
     """
     data_path = Path(data_dir)
-    x_files = sorted(data_path.glob("X_train_*.parquet"))
-    y_files = sorted(data_path.glob("y_train_*.parquet"))
-    if not x_files or not y_files:
+    x_path = data_path / "X_train.parquet"
+    y_path = data_path / "y_train.parquet"
+    if not x_path.exists() or not y_path.exists():
         raise FileNotFoundError(
-            f"No training parquet files found in {data_dir!r}. "
+            f"Training parquet files not found in {data_dir!r}. "
             "Run the export pipeline first (src/processing/export_pipeline.py)."
         )
-    X_train = pd.read_parquet(x_files[-1])
-    y_train = pd.read_parquet(y_files[-1])
+    X_train = pd.read_parquet(x_path)
+    y_train = pd.read_parquet(y_path)
 
     paths: dict[str, Path] = {}
 
@@ -207,6 +207,6 @@ def run_training(
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    _data_dir = os.environ.get("BDSP_EXPORT_DIR", "data/")
+    _data_dir = os.environ.get("BDSP_ENERGY_EXPORT_DIR", "data/energy/")
     _models_dir = os.environ.get("BDSP_MODELS_DIR", "models/")
     run_training(data_dir=_data_dir, models_dir=_models_dir)
