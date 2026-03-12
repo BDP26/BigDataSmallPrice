@@ -141,6 +141,66 @@ def upsert_groupe_e(records: list[dict]) -> int:
     return _bulk_execute(sql, records)
 
 
+def upsert_entsoe_actual_load(records: list[dict]) -> int:
+    """
+    Insert ENTSO-E Actual Total Load records (A65).
+
+    Expected keys: time (UTC-aware datetime), domain, load_mwh
+    Returns: number of rows inserted (duplicates silently skipped).
+    """
+    sql = """
+        INSERT INTO entsoe_actual_load (time, domain, load_mwh)
+        VALUES (%(time)s, %(domain)s, %(load_mwh)s)
+        ON CONFLICT (time, domain) DO NOTHING
+    """
+    return _bulk_execute(sql, records)
+
+
+def upsert_entsoe_generation(records: list[dict]) -> int:
+    """
+    Insert ENTSO-E generation per type records (A75).
+
+    Expected keys: time (UTC-aware datetime), domain, psr_type, quantity_mwh
+    Returns: number of rows inserted (duplicates silently skipped).
+    """
+    sql = """
+        INSERT INTO entsoe_generation (time, domain, psr_type, quantity_mwh)
+        VALUES (%(time)s, %(domain)s, %(psr_type)s, %(quantity_mwh)s)
+        ON CONFLICT (time, domain, psr_type) DO NOTHING
+    """
+    return _bulk_execute(sql, records)
+
+
+def upsert_entsoe_crossborder_flows(records: list[dict]) -> int:
+    """
+    Insert ENTSO-E cross-border physical flow records (A11).
+
+    Expected keys: time (UTC-aware datetime), in_domain, out_domain, flow_mwh
+    Returns: number of rows inserted (duplicates silently skipped).
+    """
+    sql = """
+        INSERT INTO entsoe_crossborder_flows (time, in_domain, out_domain, flow_mwh)
+        VALUES (%(time)s, %(in_domain)s, %(out_domain)s, %(flow_mwh)s)
+        ON CONFLICT (time, in_domain, out_domain) DO NOTHING
+    """
+    return _bulk_execute(sql, records)
+
+
+def upsert_entsoe_load_forecast(records: list[dict]) -> int:
+    """
+    Insert ENTSO-E day-ahead load forecast records (A65/A01).
+
+    Expected keys: time (UTC-aware datetime), domain, load_mwh
+    Returns: number of rows inserted (duplicates silently skipped).
+    """
+    sql = """
+        INSERT INTO entsoe_load_forecast (time, domain, load_mwh)
+        VALUES (%(time)s, %(domain)s, %(load_mwh)s)
+        ON CONFLICT (time, domain) DO NOTHING
+    """
+    return _bulk_execute(sql, records)
+
+
 def upsert_winterthur_load(records: list[dict]) -> int:
     """
     Insert Winterthur grid load records (OGD Bruttolastgang).

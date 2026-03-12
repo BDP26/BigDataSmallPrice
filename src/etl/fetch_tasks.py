@@ -12,6 +12,10 @@ import pendulum
 
 _TABLES = [
     "entsoe_day_ahead_prices",
+    "entsoe_actual_load",
+    "entsoe_generation",
+    "entsoe_crossborder_flows",
+    "entsoe_load_forecast",
     "weather_hourly",
     "bafu_hydro",
     "ekz_tariffs_raw",
@@ -32,6 +36,59 @@ def fetch_entsoe(dates: list[str], sleep_s: float = 0) -> None:
         records = EntsoeCollector(period_start=period_start, period_end=period_end).run()
         inserted = upsert_entsoe(records)
         print(f"ENTSO-E {date_str}: {len(records)} fetched, {inserted} inserted.")
+        if sleep_s:
+            time.sleep(sleep_s)
+
+
+def fetch_entsoe_actual_load(dates: list[str], sleep_s: float = 0) -> None:
+    from data_collection.entsoe_collector import EntsoeActualLoadCollector
+    from db.timescale_client import upsert_entsoe_actual_load
+
+    for date_str in dates:
+        period_start = datetime.fromisoformat(date_str).replace(tzinfo=pendulum.UTC)
+        period_end = period_start + timedelta(days=1)
+        records = EntsoeActualLoadCollector(period_start=period_start, period_end=period_end).run()
+        inserted = upsert_entsoe_actual_load(records)
+        print(f"ENTSO-E ActualLoad {date_str}: {len(records)} fetched, {inserted} inserted.")
+        if sleep_s:
+            time.sleep(sleep_s)
+
+
+def fetch_entsoe_generation(dates: list[str], domain: str, psr_type: str, sleep_s: float = 0) -> None:
+    from data_collection.entsoe_collector import EntsoeGenerationCollector
+    from db.timescale_client import upsert_entsoe_generation
+    for date_str in dates:
+        period_start = datetime.fromisoformat(date_str).replace(tzinfo=pendulum.UTC)
+        period_end = period_start + timedelta(days=1)
+        records = EntsoeGenerationCollector(domain=domain, psr_type=psr_type, period_start=period_start, period_end=period_end).run()
+        inserted = upsert_entsoe_generation(records)
+        print(f"ENTSO-E Generation {domain}/{psr_type} {date_str}: {len(records)} fetched, {inserted} inserted.")
+        if sleep_s:
+            time.sleep(sleep_s)
+
+
+def fetch_entsoe_crossborder(dates: list[str], in_domain: str, out_domain: str, sleep_s: float = 0) -> None:
+    from data_collection.entsoe_collector import EntsoeCrossBorderFlowCollector
+    from db.timescale_client import upsert_entsoe_crossborder_flows
+    for date_str in dates:
+        period_start = datetime.fromisoformat(date_str).replace(tzinfo=pendulum.UTC)
+        period_end = period_start + timedelta(days=1)
+        records = EntsoeCrossBorderFlowCollector(in_domain=in_domain, out_domain=out_domain, period_start=period_start, period_end=period_end).run()
+        inserted = upsert_entsoe_crossborder_flows(records)
+        print(f"ENTSO-E CrossBorder {in_domain}→{out_domain} {date_str}: {len(records)} fetched, {inserted} inserted.")
+        if sleep_s:
+            time.sleep(sleep_s)
+
+
+def fetch_entsoe_load_forecast(dates: list[str], sleep_s: float = 0) -> None:
+    from data_collection.entsoe_collector import EntsoeLoadForecastCollector
+    from db.timescale_client import upsert_entsoe_load_forecast
+    for date_str in dates:
+        period_start = datetime.fromisoformat(date_str).replace(tzinfo=pendulum.UTC)
+        period_end = period_start + timedelta(days=1)
+        records = EntsoeLoadForecastCollector(period_start=period_start, period_end=period_end).run()
+        inserted = upsert_entsoe_load_forecast(records)
+        print(f"ENTSO-E LoadForecast CH {date_str}: {len(records)} fetched, {inserted} inserted.")
         if sleep_s:
             time.sleep(sleep_s)
 

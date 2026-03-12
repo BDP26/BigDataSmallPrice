@@ -15,6 +15,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
         rel="stylesheet" />
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
@@ -456,6 +457,66 @@
                             <div>To: <span id="db-newest-winterthur_pv" class="font-mono">—</span></div>
                         </div>
                     </div>
+                    <!-- ENTSO-E Actual Load -->
+                    <div class="p-6 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary text-lg">monitoring</span>
+                                <span class="text-sm font-bold text-slate-700 dark:text-slate-200">ENTSO-E Load</span>
+                            </div>
+                            <span id="db-status-entsoe_load" class="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">—</span>
+                        </div>
+                        <div class="text-3xl font-black text-slate-900 dark:text-white" id="db-count-entsoe_load">—</div>
+                        <div class="text-xs text-slate-400 space-y-0.5">
+                            <div>From: <span id="db-oldest-entsoe_load" class="font-mono">—</span></div>
+                            <div>To: <span id="db-newest-entsoe_load" class="font-mono">—</span></div>
+                        </div>
+                    </div>
+                    <!-- ENTSO-E Generation -->
+                    <div class="p-6 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary text-lg">energy</span>
+                                <span class="text-sm font-bold text-slate-700 dark:text-slate-200">ENTSO-E Gen</span>
+                            </div>
+                            <span id="db-status-entsoe_gen" class="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">—</span>
+                        </div>
+                        <div class="text-3xl font-black text-slate-900 dark:text-white" id="db-count-entsoe_gen">—</div>
+                        <div class="text-xs text-slate-400 space-y-0.5">
+                            <div>From: <span id="db-oldest-entsoe_gen" class="font-mono">—</span></div>
+                            <div>To: <span id="db-newest-entsoe_gen" class="font-mono">—</span></div>
+                        </div>
+                    </div>
+                    <!-- ENTSO-E Cross-Border Flows -->
+                    <div class="p-6 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary text-lg">swap_horiz</span>
+                                <span class="text-sm font-bold text-slate-700 dark:text-slate-200">CH Flows</span>
+                            </div>
+                            <span id="db-status-entsoe_flows" class="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">—</span>
+                        </div>
+                        <div class="text-3xl font-black text-slate-900 dark:text-white" id="db-count-entsoe_flows">—</div>
+                        <div class="text-xs text-slate-400 space-y-0.5">
+                            <div>From: <span id="db-oldest-entsoe_flows" class="font-mono">—</span></div>
+                            <div>To: <span id="db-newest-entsoe_flows" class="font-mono">—</span></div>
+                        </div>
+                    </div>
+                    <!-- ENTSO-E Load Forecast -->
+                    <div class="p-6 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary text-lg">query_stats</span>
+                                <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Load Forecast</span>
+                            </div>
+                            <span id="db-status-entsoe_forecast" class="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-400">—</span>
+                        </div>
+                        <div class="text-3xl font-black text-slate-900 dark:text-white" id="db-count-entsoe_forecast">—</div>
+                        <div class="text-xs text-slate-400 space-y-0.5">
+                            <div>From: <span id="db-oldest-entsoe_forecast" class="font-mono">—</span></div>
+                            <div>To: <span id="db-newest-entsoe_forecast" class="font-mono">—</span></div>
+                        </div>
+                    </div>
                     <!-- Feature DB -->
                     <div class="p-6 space-y-3 bg-indigo-50/40 dark:bg-indigo-950/20">
                         <div class="flex items-center justify-between">
@@ -585,6 +646,44 @@
                 </div>
                 <div id="explorer-error" class="hidden px-5 pb-4">
                     <p class="text-xs text-red-500 font-mono" id="explorer-error-msg"></p>
+                </div>
+            </div>
+
+            <!-- Time Series Explorer (collapsible, lazy-loaded) -->
+            <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden" id="ts-card">
+                <button onclick="TSChart.toggle()" class="w-full p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors text-left">
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">show_chart</span>
+                        Time Series Explorer
+                        <span class="text-xs font-normal text-slate-400 ml-1">— zeigt die aktuelle Explorer-Tabelle als Zeitreihe</span>
+                    </h3>
+                    <span id="ts-chevron" class="material-symbols-outlined text-slate-400 transition-transform duration-200">expand_more</span>
+                </button>
+                <div id="ts-panel" class="hidden">
+                    <!-- Controls -->
+                    <div class="px-5 pt-4 pb-3 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-3">
+                        <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                            <span class="text-xs text-slate-500 font-semibold px-2">Horizont:</span>
+                            <button onclick="TSChart.setHorizon('1d')" id="ts-btn-1d" class="ts-hz-btn px-3 py-1 text-xs font-bold rounded transition-colors text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700">1T</button>
+                            <button onclick="TSChart.setHorizon('1w')" id="ts-btn-1w" class="ts-hz-btn px-3 py-1 text-xs font-bold rounded transition-colors bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm">1W</button>
+                            <button onclick="TSChart.setHorizon('1m')" id="ts-btn-1m" class="ts-hz-btn px-3 py-1 text-xs font-bold rounded transition-colors text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700">1M</button>
+                            <button onclick="TSChart.setHorizon('1y')" id="ts-btn-1y" class="ts-hz-btn px-3 py-1 text-xs font-bold rounded transition-colors text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700">1J</button>
+                            <button onclick="TSChart.setHorizon('all')" id="ts-btn-all" class="ts-hz-btn px-3 py-1 text-xs font-bold rounded transition-colors text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700">Alle</button>
+                        </div>
+                        <span class="text-xs text-slate-400">Tabelle: <span id="ts-table-label" class="font-mono font-semibold text-slate-600 dark:text-slate-300">—</span></span>
+                        <span id="ts-point-count" class="text-xs text-slate-400 ml-auto"></span>
+                    </div>
+                    <!-- Loading state -->
+                    <div id="ts-loading" class="hidden p-8 text-center text-slate-400 text-sm">
+                        <span class="material-symbols-outlined text-primary text-2xl" style="animation:spin 1s linear infinite">refresh</span>
+                        <p class="mt-2">Lade Zeitreihendaten…</p>
+                    </div>
+                    <!-- Error state -->
+                    <div id="ts-error" class="hidden px-5 py-4">
+                        <p class="text-xs text-red-500 font-mono" id="ts-error-msg"></p>
+                    </div>
+                    <!-- Chart container -->
+                    <div id="ts-chart" style="width:100%;height:420px;"></div>
                 </div>
             </div>
 
@@ -760,7 +859,8 @@
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 if (data.error) throw new Error(data.error);
-                ['entsoe', 'weather', 'ckw', 'groupe_e', 'bafu', 'winterthur_load', 'winterthur_pv'].forEach(k => setSource(k, data[k] || {}));
+                ['entsoe', 'entsoe_load', 'entsoe_gen', 'entsoe_flows', 'entsoe_forecast',
+                 'weather', 'ckw', 'groupe_e', 'bafu', 'winterthur_load', 'winterthur_pv'].forEach(k => setSource(k, data[k] || {}));
                 document.getElementById('db-last-refreshed').textContent =
                     new Date().toLocaleTimeString('de-CH');
             } catch (e) {
@@ -856,15 +956,19 @@
         // ── DB Explorer ──────────────────────────────────────────────────────
         const Explorer = (() => {
             const TABLES = {
-                'entsoe_day_ahead_prices': 'ENTSO-E',
-                'weather_hourly':          'Weather',
-                'ckw_tariffs_raw':         'CKW',
-                'groupe_e_tariffs_raw':    'Groupe E',
-                'ekz_tariffs_raw':         'EKZ',
-                'bafu_hydro':              'BAFU',
-                'winterthur_load':         'Load (OGD)',
-                'winterthur_pv':           'PV (OGD)',
-                'training_features':       'Features',
+                'entsoe_day_ahead_prices':  'ENTSO-E',
+                'entsoe_actual_load':       'Load',
+                'entsoe_generation':        'Gen',
+                'entsoe_crossborder_flows': 'Flows',
+                'entsoe_load_forecast':     'Forecast',
+                'weather_hourly':           'Weather',
+                'ckw_tariffs_raw':          'CKW',
+                'groupe_e_tariffs_raw':     'Groupe E',
+                'ekz_tariffs_raw':          'EKZ',
+                'bafu_hydro':               'BAFU',
+                'winterthur_load':          'Load OGD',
+                'winterthur_pv':            'PV OGD',
+                'training_features':        'Features',
             };
             const TYPE_COLOR = {
                 'timestamp with time zone': 'bg-purple-100 text-purple-700',
@@ -883,6 +987,9 @@
             let offset       = 0;
             let limit        = 20;
             let schemaCache  = null;
+
+            // Expose current table for TSChart
+            function getCurrentTable() { return currentTable; }
 
             const $ = id => document.getElementById(id);
 
@@ -1000,6 +1107,7 @@
                 selectTable(t) {
                     currentTable = t; offset = 0;
                     refreshTabStyles(); this._load();
+                    TSChart.onTableChange(t);
                 },
                 setView(v) {
                     currentView = v;
@@ -1009,6 +1117,142 @@
                 prev()        { if (offset >= limit) { offset -= limit; fetchRows(); } },
                 next()        { offset += limit; fetchRows(); },
                 changeLimit() { offset = 0; fetchRows(); },
+                getTable() { return getCurrentTable(); },
+            };
+        })();
+
+        // ── Time Series Chart ─────────────────────────────────────────────────
+        const TSChart = (() => {
+            let isOpen    = false;
+            let horizon   = '1w';
+            let tableKey  = null;
+            let dataLoaded = false;
+
+            const ACTIVE_BTN   = 'ts-hz-btn px-3 py-1 text-xs font-bold rounded transition-colors bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm';
+            const INACTIVE_BTN = 'ts-hz-btn px-3 py-1 text-xs font-bold rounded transition-colors text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700';
+
+            function isDark() { return document.documentElement.classList.contains('dark'); }
+
+            function plotlyLayout(title) {
+                const bg   = isDark() ? '#0f172a' : '#ffffff';
+                const paper= isDark() ? '#0f172a' : '#ffffff';
+                const gridC= isDark() ? '#1e293b' : '#f1f5f9';
+                const fontC= isDark() ? '#94a3b8' : '#64748b';
+                return {
+                    title: { text: title, font: { size: 13, color: fontC }, x: 0.02 },
+                    paper_bgcolor: paper,
+                    plot_bgcolor:  bg,
+                    margin: { l: 60, r: 30, t: 40, b: 60 },
+                    font:   { family: 'Inter, sans-serif', size: 11, color: fontC },
+                    xaxis:  {
+                        type: 'date',
+                        gridcolor: gridC,
+                        linecolor: gridC,
+                        tickformat: '%d.%m %H:%M',
+                        tickfont: { size: 10 },
+                        rangeslider: { visible: false },
+                    },
+                    yaxis:  {
+                        gridcolor: gridC,
+                        linecolor: gridC,
+                        tickfont: { size: 10 },
+                        zeroline: true,
+                        zerolinecolor: isDark() ? '#334155' : '#e2e8f0',
+                    },
+                    legend: {
+                        bgcolor: 'rgba(0,0,0,0)',
+                        font: { size: 10 },
+                        itemclick: 'toggle',
+                        itemdoubleclick: 'toggleothers',
+                    },
+                    hoverlabel: { font: { size: 11 } },
+                    hovermode: 'x unified',
+                };
+            }
+
+            function plotlyConfig() {
+                return {
+                    responsive: true,
+                    displayModeBar: true,
+                    displaylogo: false,
+                    modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+                };
+            }
+
+            function setHorizonBtns(h) {
+                ['1d','1w','1m','1y','all'].forEach(x => {
+                    const el = document.getElementById('ts-btn-' + x);
+                    if (el) el.className = x === h ? ACTIVE_BTN : INACTIVE_BTN;
+                });
+            }
+
+            async function load() {
+                const table = Explorer.getTable();
+                tableKey = table;
+                document.getElementById('ts-table-label').textContent = table;
+                document.getElementById('ts-loading').classList.remove('hidden');
+                document.getElementById('ts-error').classList.add('hidden');
+                document.getElementById('ts-point-count').textContent = '';
+
+                try {
+                    const res  = await fetch(`/api/timeseries/${table}?horizon=${horizon}`);
+                    const data = await res.json();
+                    if (data.error) throw new Error(data.error);
+
+                    document.getElementById('ts-loading').classList.add('hidden');
+
+                    if (!data.traces || data.traces.length === 0) {
+                        document.getElementById('ts-error-msg').textContent =
+                            'Keine numerischen Daten für diesen Zeithorizont.';
+                        document.getElementById('ts-error').classList.remove('hidden');
+                        return;
+                    }
+
+                    // Build Plotly traces
+                    const plotTraces = data.traces.map(t => ({
+                        name: t.name,
+                        x: t.x,
+                        y: t.y,
+                        type: 'scatter',
+                        mode: 'lines',
+                        line: { width: 1.5 },
+                        connectgaps: false,
+                        hovertemplate: '%{y:.3f}<extra>%{fullData.name}</extra>',
+                    }));
+
+                    const totalPts = data.traces.reduce((s, t) => s + (t.y ? t.y.length : 0), 0);
+                    document.getElementById('ts-point-count').textContent =
+                        `${totalPts.toLocaleString()} Datenpunkte`;
+
+                    Plotly.react('ts-chart', plotTraces, plotlyLayout(table), plotlyConfig());
+                    dataLoaded = true;
+                } catch (e) {
+                    document.getElementById('ts-loading').classList.add('hidden');
+                    document.getElementById('ts-error-msg').textContent = 'Fehler: ' + e.message;
+                    document.getElementById('ts-error').classList.remove('hidden');
+                }
+            }
+
+            return {
+                toggle() {
+                    isOpen = !isOpen;
+                    document.getElementById('ts-panel').classList.toggle('hidden', !isOpen);
+                    const chev = document.getElementById('ts-chevron');
+                    if (chev) chev.style.transform = isOpen ? 'rotate(180deg)' : '';
+                    if (isOpen && !dataLoaded) load();
+                },
+                setHorizon(h) {
+                    horizon = h;
+                    setHorizonBtns(h);
+                    dataLoaded = false;
+                    if (isOpen) load();
+                },
+                onTableChange(t) {
+                    if (tableKey !== t) {
+                        dataLoaded = false;
+                        if (isOpen) load();
+                    }
+                },
             };
         })();
 

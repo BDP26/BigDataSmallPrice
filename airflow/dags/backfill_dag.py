@@ -9,8 +9,15 @@ Configuration (via dag_run.conf or Airflow Variables):
     backfill_end:   "YYYY-MM-DD"  (inclusive)
 
 Task dependency order:
-  [fetch_entsoe, fetch_weather, fetch_bafu] run in parallel (independent)
-  then [fetch_ekz, fetch_ckw, fetch_groupe_e] run sequentially (tariff APIs)
+  Parallel ENTSO-E tasks: fetch_entsoe, fetch_entsoe_actual_load,
+    fetch_entsoe_gen_ch_b12, fetch_entsoe_gen_ch_b16, fetch_entsoe_gen_de_b19,
+    fetch_entsoe_flow_ch_de, fetch_entsoe_flow_de_ch,
+    fetch_entsoe_flow_ch_it, fetch_entsoe_flow_it_ch,
+    fetch_entsoe_flow_ch_fr, fetch_entsoe_flow_fr_ch,
+    fetch_entsoe_flow_ch_at, fetch_entsoe_flow_at_ch,
+    fetch_entsoe_load_forecast
+  Plus parallel: fetch_weather, fetch_bafu
+  Then sequential: fetch_ekz >> fetch_ckw >> fetch_groupe_e
   fetch_winterthur_load, fetch_winterthur_pv run independently (CSV, no date param)
   finally: compute_eta_done logs completion row counts
 
@@ -106,6 +113,34 @@ def _backfill_bafu(**ctx) -> None:
     fetch_bafu(_date_range(start, end), sleep_s=1)
 
 
+def _backfill_entsoe_actual_load(**ctx) -> None:
+    from etl.fetch_tasks import fetch_entsoe_actual_load
+    start, end = _get_date_range(ctx["dag_run"].conf or {})
+    fetch_entsoe_actual_load(_date_range(start, end), sleep_s=1)
+
+
+def _make_gen_callable(domain: str, psr_type: str):
+    def _backfill(**ctx):
+        from etl.fetch_tasks import fetch_entsoe_generation
+        start, end = _get_date_range(ctx["dag_run"].conf or {})
+        fetch_entsoe_generation(_date_range(start, end), domain=domain, psr_type=psr_type, sleep_s=1)
+    return _backfill
+
+
+def _make_flow_callable(in_domain: str, out_domain: str):
+    def _backfill(**ctx):
+        from etl.fetch_tasks import fetch_entsoe_crossborder
+        start, end = _get_date_range(ctx["dag_run"].conf or {})
+        fetch_entsoe_crossborder(_date_range(start, end), in_domain=in_domain, out_domain=out_domain, sleep_s=1)
+    return _backfill
+
+
+def _backfill_entsoe_load_forecast(**ctx) -> None:
+    from etl.fetch_tasks import fetch_entsoe_load_forecast
+    start, end = _get_date_range(ctx["dag_run"].conf or {})
+    fetch_entsoe_load_forecast(_date_range(start, end), sleep_s=1)
+
+
 def _backfill_winterthur_load(**ctx) -> None:
     from etl.fetch_tasks import fetch_winterthur_load
     fetch_winterthur_load(all_files=True)
@@ -135,15 +170,56 @@ with DAG(
     tags=["bdsp", "backfill"],
 ) as dag:
 
-    t_entsoe   = PythonOperator(task_id="fetch_entsoe",          python_callable=_backfill_entsoe)
-    t_weather  = PythonOperator(task_id="fetch_weather",         python_callable=_backfill_weather)
-    t_bafu     = PythonOperator(task_id="fetch_bafu",            python_callable=_backfill_bafu)
-    t_ekz      = PythonOperator(task_id="fetch_ekz",             python_callable=_backfill_ekz)
-    t_ckw      = PythonOperator(task_id="fetch_ckw",             python_callable=_backfill_ckw)
-    t_groupe_e = PythonOperator(task_id="fetch_groupe_e",        python_callable=_backfill_groupe_e)
-    t_wt_load  = PythonOperator(task_id="fetch_winterthur_load", python_callable=_backfill_winterthur_load)
-    t_wt_pv    = PythonOperator(task_id="fetch_winterthur_pv",   python_callable=_backfill_winterthur_pv)
-    t_done     = PythonOperator(task_id="compute_eta_done",      python_callable=_compute_eta_done, trigger_rule="all_done")
+    _CH = "10YCH-SWISSGRIDZ"
+    _DE = "10Y1001A1001A83F"
+    _IT = "10YIT-GRTN-----B"
+    _FR = "10YFR-RTE------C"
+    _AT = "10YAT-APG------L"
 
-    [t_entsoe, t_weather, t_bafu] >> t_ekz >> t_ckw >> t_groupe_e >> t_done
-    [t_wt_load, t_wt_pv] >> t_done
+    t_entsoe        = PythonOperator(task_id="fetch_entsoe",               python_callable=_backfill_entsoe)
+    t_actual_load   = PythonOperator(task_id="fetch_entsoe_actual_load",   python_callable=_backfill_entsoe_actual_load)
+    t_load_fc       = PythonOperator(task_id="fetch_entsoe_load_forecast", python_callable=_backfill_entsoe_load_forecast)
+    t_gen_ch_b12    = PythonOperator(task_id="fetch_entsoe_gen_ch_b12",    python_callable=_make_gen_callable(_CH, "B12"))
+    t_gen_ch_b16    = PythonOperator(task_id="fetch_entsoe_gen_ch_b16",    python_callable=_make_gen_callable(_CH, "B16"))
+    t_gen_de_b19    = PythonOperator(task_id="fetch_entsoe_gen_de_b19",    python_callable=_make_gen_callable(_DE, "B19"))
+    t_flow_ch_de    = PythonOperator(task_id="fetch_entsoe_flow_ch_de",    python_callable=_make_flow_callable(_CH, _DE))
+    t_flow_de_ch    = PythonOperator(task_id="fetch_entsoe_flow_de_ch",    python_callable=_make_flow_callable(_DE, _CH))
+    t_flow_ch_it    = PythonOperator(task_id="fetch_entsoe_flow_ch_it",    python_callable=_make_flow_callable(_CH, _IT))
+    t_flow_it_ch    = PythonOperator(task_id="fetch_entsoe_flow_it_ch",    python_callable=_make_flow_callable(_IT, _CH))
+    t_flow_ch_fr    = PythonOperator(task_id="fetch_entsoe_flow_ch_fr",    python_callable=_make_flow_callable(_CH, _FR))
+    t_flow_fr_ch    = PythonOperator(task_id="fetch_entsoe_flow_fr_ch",    python_callable=_make_flow_callable(_FR, _CH))
+    t_flow_ch_at    = PythonOperator(task_id="fetch_entsoe_flow_ch_at",    python_callable=_make_flow_callable(_CH, _AT))
+    t_flow_at_ch    = PythonOperator(task_id="fetch_entsoe_flow_at_ch",    python_callable=_make_flow_callable(_AT, _CH))
+    t_weather       = PythonOperator(task_id="fetch_weather",              python_callable=_backfill_weather)
+    t_bafu          = PythonOperator(task_id="fetch_bafu",                 python_callable=_backfill_bafu)
+    t_ekz           = PythonOperator(task_id="fetch_ekz",                  python_callable=_backfill_ekz)
+    t_ckw           = PythonOperator(task_id="fetch_ckw",                  python_callable=_backfill_ckw)
+    t_groupe_e      = PythonOperator(task_id="fetch_groupe_e",             python_callable=_backfill_groupe_e)
+    t_wt_load       = PythonOperator(task_id="fetch_winterthur_load",      python_callable=_backfill_winterthur_load)
+    t_wt_pv         = PythonOperator(task_id="fetch_winterthur_pv",        python_callable=_backfill_winterthur_pv)
+    t_done          = PythonOperator(task_id="compute_eta_done",           python_callable=_compute_eta_done, trigger_rule="all_done")
+
+    # Tariff APIs sequential; all ENTSO-E + weather + BAFU parallel
+    t_ekz >> t_ckw >> t_groupe_e
+
+    [
+        t_entsoe,
+        t_actual_load,
+        t_load_fc,
+        t_gen_ch_b12,
+        t_gen_ch_b16,
+        t_gen_de_b19,
+        t_flow_ch_de,
+        t_flow_de_ch,
+        t_flow_ch_it,
+        t_flow_it_ch,
+        t_flow_ch_fr,
+        t_flow_fr_ch,
+        t_flow_ch_at,
+        t_flow_at_ch,
+        t_weather,
+        t_bafu,
+        t_groupe_e,
+        t_wt_load,
+        t_wt_pv,
+    ] >> t_done

@@ -49,15 +49,19 @@ _DB = {
 }
 
 _TABLES = {
-    "entsoe":            "entsoe_day_ahead_prices",
-    "weather":           "weather_hourly",
-    "ckw":               "ckw_tariffs_raw",
-    "groupe_e":          "groupe_e_tariffs_raw",
-    "ekz":               "ekz_tariffs_raw",
-    "bafu":              "bafu_hydro",
-    "winterthur_load":   "winterthur_load",
-    "winterthur_pv":     "winterthur_pv",
-    "features":          "training_features",
+    "entsoe":          "entsoe_day_ahead_prices",
+    "entsoe_load":     "entsoe_actual_load",
+    "entsoe_gen":      "entsoe_generation",
+    "entsoe_flows":    "entsoe_crossborder_flows",
+    "entsoe_forecast": "entsoe_load_forecast",
+    "weather":         "weather_hourly",
+    "ckw":             "ckw_tariffs_raw",
+    "groupe_e":        "groupe_e_tariffs_raw",
+    "ekz":             "ekz_tariffs_raw",
+    "bafu":            "bafu_hydro",
+    "winterthur_load": "winterthur_load",
+    "winterthur_pv":   "winterthur_pv",
+    "features":        "training_features",
 }
 
 _AIRFLOW_URL  = os.getenv("AIRFLOW_API_URL",     "http://airflow-webserver:8080")
@@ -442,6 +446,137 @@ def db_rows(
         cur.close()
         conn.close()
         return {"columns": cols, "rows": rows, "offset": offset, "limit": limit}
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.get("/api/timeseries/{table}")
+def timeseries(
+    table: str,
+    horizon: str = Query(default="1w"),
+):
+    """
+    Return Plotly-ready time series traces for a whitelisted table.
+
+    horizon: 1d | 1w | 1m | 1y | all
+    """
+    if table not in _ALLOWED_TABLES:
+        return JSONResponse({"error": f"Unknown table: {table!r}"}, status_code=400)
+
+    horizon_map = {
+        "1d": "1 day", "1w": "7 days", "1m": "30 days", "1y": "365 days",
+    }
+    where_extra = (
+        f"AND time >= NOW() - INTERVAL '{horizon_map[horizon]}'"
+        if horizon in horizon_map else ""
+    )
+
+    # Categorical grouping columns: pivot these into separate traces
+    _GROUP_COLS: dict[str, list[str]] = {
+        "entsoe_generation":        ["domain", "psr_type"],
+        "entsoe_crossborder_flows": ["in_domain", "out_domain"],
+        "ckw_tariffs_raw":          ["tariff_type"],
+        "groupe_e_tariffs_raw":     ["tariff_type"],
+        "ekz_tariffs_raw":          ["tariff_type"],
+        "bafu_hydro":               ["station_id"],
+        "entsoe_day_ahead_prices":  [],
+        "entsoe_actual_load":       [],
+        "entsoe_load_forecast":     [],
+        "weather_hourly":           [],
+        "winterthur_load":          [],
+        "winterthur_pv":            [],
+        "training_features":        [],
+    }
+
+    # Columns to skip even if numeric (coordinates, IDs)
+    _SKIP_COLS = {"latitude", "longitude", "id"}
+
+    try:
+        conn = _connect()
+        cur = conn.cursor()
+
+        # Fetch column metadata
+        cur.execute(
+            """
+            SELECT column_name, data_type
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = %s
+            ORDER BY ordinal_position
+            """,
+            (table,),
+        )
+        schema = cur.fetchall()
+
+        numeric_types = {"double precision", "numeric", "integer", "bigint", "real", "smallint"}
+        group_cols = _GROUP_COLS.get(table, [])
+        num_cols = [
+            c for c, t in schema
+            if t in numeric_types and c not in _SKIP_COLS
+        ]
+
+        if not num_cols:
+            cur.close(); conn.close()
+            return {"traces": []}
+
+        select_cols = ["time"] + group_cols + num_cols
+        # Use parameterized query for horizon but safe string interpolation for
+        # column/table names (already validated via whitelist)
+        sql = (
+            f"SELECT {', '.join(select_cols)} "  # noqa: S608
+            f"FROM {table} "
+            f"WHERE TRUE {where_extra} "
+            f"ORDER BY time ASC "
+            f"LIMIT 10000"
+        )
+        cur.execute(sql)
+        rows = cur.fetchall()
+        col_names = [desc[0] for desc in cur.description]
+        cur.close()
+        conn.close()
+
+        if not rows:
+            return {"traces": []}
+
+        col_idx = {c: i for i, c in enumerate(col_names)}
+
+        if group_cols:
+            # Pivot: one trace per unique combination of group columns
+            from collections import defaultdict
+            buckets: dict[str, dict] = defaultdict(lambda: {"x": [], "y_map": {}})
+
+            for row in rows:
+                t = row[col_idx["time"]].isoformat()
+                cat_key = " | ".join(str(row[col_idx[g]]) for g in group_cols)
+                bucket = buckets[cat_key]
+                bucket["x"].append(t)
+                for nc in num_cols:
+                    v = row[col_idx[nc]]
+                    bucket["y_map"].setdefault(nc, []).append(
+                        float(v) if v is not None else None
+                    )
+
+            traces = []
+            for cat_key, bucket in buckets.items():
+                for nc, ys in bucket["y_map"].items():
+                    name = f"{cat_key}" if len(num_cols) == 1 else f"{cat_key} · {nc}"
+                    traces.append({"name": name, "x": bucket["x"], "y": ys})
+        else:
+            # Simple: one trace per numeric column
+            times = [row[col_idx["time"]].isoformat() for row in rows]
+            traces = [
+                {
+                    "name": nc,
+                    "x": times,
+                    "y": [
+                        float(row[col_idx[nc]]) if row[col_idx[nc]] is not None else None
+                        for row in rows
+                    ],
+                }
+                for nc in num_cols
+            ]
+
+        return {"traces": traces}
+
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
 

@@ -175,7 +175,58 @@ SELECT add_continuous_aggregate_policy(
     if_not_exists     => TRUE
 );
 
--- ─── 10. Feature View: training_features (Phase 2) ────────────────────────────
+-- ─── 10. ENTSO-E Actual Total Load CH (A65) ──────────────────────────────────
+CREATE TABLE IF NOT EXISTS entsoe_actual_load (
+    time      TIMESTAMPTZ      NOT NULL,
+    domain    TEXT             NOT NULL,
+    load_mwh  DOUBLE PRECISION
+);
+
+SELECT create_hypertable(
+    'entsoe_actual_load', 'time',
+    chunk_time_interval => INTERVAL '7 days',
+    if_not_exists => TRUE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS entsoe_actual_load_time_domain_idx
+    ON entsoe_actual_load (time, domain);
+
+-- ─── 10b. ENTSO-E Generation Per Type (A75) ──────────────────────────────────
+CREATE TABLE IF NOT EXISTS entsoe_generation (
+    time          TIMESTAMPTZ      NOT NULL,
+    domain        TEXT             NOT NULL,
+    psr_type      TEXT             NOT NULL,
+    quantity_mwh  DOUBLE PRECISION
+);
+SELECT create_hypertable('entsoe_generation', 'time',
+    chunk_time_interval => INTERVAL '7 days', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS entsoe_generation_time_domain_psr_idx
+    ON entsoe_generation (time, domain, psr_type);
+
+-- ─── 10c. ENTSO-E Cross-Border Physical Flows (A11) ──────────────────────────
+CREATE TABLE IF NOT EXISTS entsoe_crossborder_flows (
+    time       TIMESTAMPTZ      NOT NULL,
+    in_domain  TEXT             NOT NULL,
+    out_domain TEXT             NOT NULL,
+    flow_mwh   DOUBLE PRECISION
+);
+SELECT create_hypertable('entsoe_crossborder_flows', 'time',
+    chunk_time_interval => INTERVAL '7 days', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS entsoe_crossborder_flows_time_domains_idx
+    ON entsoe_crossborder_flows (time, in_domain, out_domain);
+
+-- ─── 10d. ENTSO-E Day-Ahead Load Forecast (A65/A01) ──────────────────────────
+CREATE TABLE IF NOT EXISTS entsoe_load_forecast (
+    time     TIMESTAMPTZ      NOT NULL,
+    domain   TEXT             NOT NULL,
+    load_mwh DOUBLE PRECISION
+);
+SELECT create_hypertable('entsoe_load_forecast', 'time',
+    chunk_time_interval => INTERVAL '7 days', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS entsoe_load_forecast_time_domain_idx
+    ON entsoe_load_forecast (time, domain);
+
+-- ─── 10e. Feature View: training_features (Phase 2) ────────────────────────────
 -- Joins ENTSO-E, Weather, BAFU, Groupe E (primary) and CKW (secondary) into
 -- one hourly feature table. Includes lag features, rolling averages, and
 -- calendar features.
@@ -239,8 +290,8 @@ WITH
       -- Proxy until ENTSO-E generation series are integrated
       w.wind_speed_10m AS wind_generation_eu,
       w.shortwave_radiation,
-      -- Proxy until CH generation series are integrated
-      w.shortwave_radiation AS solar_generation_ch,
+      -- ENTSO-E A75/B16 CH solar generation (real data)
+      gen_b16.quantity_mwh AS solar_generation_ch,
       w.cloud_cover,
       w.precipitation_mm,
       AVG(w.temperature_2m) OVER (
@@ -252,7 +303,21 @@ WITH
       bh.level_masl AS hydro_reservoir,
       CASE WHEN pf.is_weekend = 1 THEN 'weekend' ELSE 'workday' END AS day_type,
       ge.avg_chf_kwh  AS tariff_price_chf_kwh_avg,
-      ck.avg_chf_kwh  AS ckw_price_chf_kwh_avg
+      ck.avg_chf_kwh  AS ckw_price_chf_kwh_avg,
+      gen_b12.quantity_mwh  AS hydro_run_of_river_ch,
+      gen_de_b19.quantity_mwh AS wind_generation_de,
+      f_ch_de.flow_mwh      AS flow_ch_de,
+      f_ch_it.flow_mwh      AS flow_ch_it,
+      f_ch_fr.flow_mwh      AS flow_ch_fr,
+      f_ch_at.flow_mwh      AS flow_ch_at,
+      -- Net position: all 4 CH borders (DE, IT, FR, AT)
+      (COALESCE(f_de_ch.flow_mwh, 0) + COALESCE(f_it_ch.flow_mwh, 0)
+         + COALESCE(f_fr_ch.flow_mwh, 0) + COALESCE(f_at_ch.flow_mwh, 0))
+        - (COALESCE(f_ch_de.flow_mwh, 0) + COALESCE(f_ch_it.flow_mwh, 0)
+         + COALESCE(f_ch_fr.flow_mwh, 0) + COALESCE(f_ch_at.flow_mwh, 0))
+                              AS net_position_ch,
+      lf.load_mwh           AS load_forecast_ch,
+      al.load_mwh     AS actual_load_ch_mwh
     FROM price_features pf
     LEFT JOIN weather_hourly w
       ON  w.time      = pf.time
@@ -267,11 +332,61 @@ WITH
     LEFT JOIN ckw_tariffs_hourly ck
       ON  ck.hour        = pf.time
       AND ck.tariff_type = 'integrated'
+    LEFT JOIN entsoe_generation gen_b12
+      ON  gen_b12.time     = pf.time
+      AND gen_b12.domain   = '10YCH-SWISSGRIDZ'
+      AND gen_b12.psr_type = 'B12'
+    LEFT JOIN entsoe_generation gen_b16
+      ON  gen_b16.time     = pf.time
+      AND gen_b16.domain   = '10YCH-SWISSGRIDZ'
+      AND gen_b16.psr_type = 'B16'
+    LEFT JOIN entsoe_generation gen_de_b19
+      ON  gen_de_b19.time     = pf.time
+      AND gen_de_b19.domain   = '10Y1001A1001A83F'
+      AND gen_de_b19.psr_type = 'B19'
+    LEFT JOIN entsoe_crossborder_flows f_ch_de
+      ON  f_ch_de.time      = pf.time
+      AND f_ch_de.in_domain  = '10YCH-SWISSGRIDZ'
+      AND f_ch_de.out_domain = '10Y1001A1001A83F'
+    LEFT JOIN entsoe_crossborder_flows f_de_ch
+      ON  f_de_ch.time      = pf.time
+      AND f_de_ch.in_domain  = '10Y1001A1001A83F'
+      AND f_de_ch.out_domain = '10YCH-SWISSGRIDZ'
+    LEFT JOIN entsoe_crossborder_flows f_ch_it
+      ON  f_ch_it.time      = pf.time
+      AND f_ch_it.in_domain  = '10YCH-SWISSGRIDZ'
+      AND f_ch_it.out_domain = '10YIT-GRTN-----B'
+    LEFT JOIN entsoe_crossborder_flows f_it_ch
+      ON  f_it_ch.time      = pf.time
+      AND f_it_ch.in_domain  = '10YIT-GRTN-----B'
+      AND f_it_ch.out_domain = '10YCH-SWISSGRIDZ'
+    LEFT JOIN entsoe_crossborder_flows f_ch_fr
+      ON  f_ch_fr.time      = pf.time
+      AND f_ch_fr.in_domain  = '10YCH-SWISSGRIDZ'
+      AND f_ch_fr.out_domain = '10YFR-RTE------C'
+    LEFT JOIN entsoe_crossborder_flows f_fr_ch
+      ON  f_fr_ch.time      = pf.time
+      AND f_fr_ch.in_domain  = '10YFR-RTE------C'
+      AND f_fr_ch.out_domain = '10YCH-SWISSGRIDZ'
+    LEFT JOIN entsoe_crossborder_flows f_ch_at
+      ON  f_ch_at.time      = pf.time
+      AND f_ch_at.in_domain  = '10YCH-SWISSGRIDZ'
+      AND f_ch_at.out_domain = '10YAT-APG------L'
+    LEFT JOIN entsoe_crossborder_flows f_at_ch
+      ON  f_at_ch.time      = pf.time
+      AND f_at_ch.in_domain  = '10YAT-APG------L'
+      AND f_at_ch.out_domain = '10YCH-SWISSGRIDZ'
+    LEFT JOIN entsoe_load_forecast lf
+      ON  lf.time   = pf.time
+      AND lf.domain = '10YCH-SWISSGRIDZ'
+    LEFT JOIN entsoe_actual_load al
+      ON  al.time   = pf.time
+      AND al.domain = '10YCH-SWISSGRIDZ'
   )
 
 SELECT * FROM joined;
 
--- ─── 10b. API Call Log (rate-limit tracking — ISOLATED from ML features) ─────
+-- ─── 10f. API Call Log (rate-limit tracking — ISOLATED from ML features) ─────
 -- WARNING: this table MUST NEVER be joined into training_features or
 -- winterthur_net_load_features. It is operational metadata only.
 CREATE TABLE IF NOT EXISTS api_call_log (

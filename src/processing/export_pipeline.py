@@ -53,9 +53,10 @@ FEATURE_COLS: list[str] = [
     # req.md alias/proxy (CH avg not yet separately ingested)
     "temp_ch_avg",
     "wind_speed_10m",
-    # req.md proxy aliases until dedicated ENTSO-E generation series are ingested
+    # req.md proxy alias (wind_speed proxy for EU wind generation)
     "wind_generation_eu",
     "shortwave_radiation",
+    # ENTSO-E A75/B16 CH solar generation (real data)
     "solar_generation_ch",
     "cloud_cover",
     "precipitation_mm",     # Niederschlag – req.md Phase 1
@@ -65,6 +66,17 @@ FEATURE_COLS: list[str] = [
     "level_masl",
     # req.md alias/proxy until dedicated reservoir feed is integrated
     "hydro_reservoir",
+    # ENTSO-E market data (generation, flows, forecast)
+    "hydro_run_of_river_ch",     # ENTSO-E A75/B12 CH hydro run-of-river
+    "wind_generation_de",        # ENTSO-E A75/B19 DE wind (EU proxy)
+    "flow_ch_de",                # ENTSO-E A11 physical flow CH→DE (MWh)
+    "flow_ch_it",                # ENTSO-E A11 physical flow CH→IT (MWh)
+    "flow_ch_fr",                # ENTSO-E A11 physical flow CH→FR (MWh)
+    "flow_ch_at",                # ENTSO-E A11 physical flow CH→AT (MWh)
+    "net_position_ch",           # CH net position all 4 borders (DE+IT+FR+AT)
+    "load_forecast_ch",          # ENTSO-E A65/A01 day-ahead load forecast CH
+    # ENTSO-E Actual Total Load CH (A65) – market context for Model B
+    "actual_load_ch_mwh",
     # Tariff signals (dynamic providers)
     "tariff_price_chf_kwh_avg",   # Groupe E 'integrated' – primary signal
     "ckw_price_chf_kwh_avg",      # CKW 'integrated'      – secondary signal
