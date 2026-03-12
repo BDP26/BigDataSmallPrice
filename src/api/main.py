@@ -515,7 +515,8 @@ def timeseries(
         ]
 
         if not num_cols:
-            cur.close(); conn.close()
+            cur.close()
+            conn.close()
             return {"traces": []}
 
         select_cols = ["time"] + group_cols + num_cols
