@@ -1,5 +1,7 @@
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.9.3
+  build:
+    context: .
+    dockerfile: airflow/Dockerfile
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@postgres/airflow
@@ -120,6 +122,7 @@ services:
       - ./src/frontend/static:/app/static:ro
       - ./src:/app/src:ro
       - ./models:/app/models:ro
+      - ./data:/app/data:ro
     environment:
       BDSP_DB_HOST: timescaledb
       BDSP_DB_PORT: 5432
@@ -129,6 +132,8 @@ services:
       BDSP_JWT_SECRET: ${BDSP_JWT_SECRET}
       BDSP_STATIC_DIR: /app/static
       BDSP_MODELS_DIR: /app/models
+      BDSP_ENERGY_EXPORT_DIR: /app/data/energy
+      BDSP_LOAD_EXPORT_DIR: /app/data/load
       AIRFLOW_API_URL:      http://airflow-webserver:8080
       AIRFLOW_API_USER:     ${AIRFLOW_ADMIN_USER}
       AIRFLOW_API_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}

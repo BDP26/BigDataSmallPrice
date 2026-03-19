@@ -592,6 +592,142 @@
                 </div>
             </div>
 
+            <!-- Model Registry -->
+            <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-200 dark:border-slate-800">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary">model_training</span>
+                                Model Registry
+                            </h3>
+                            <p class="text-slate-500 dark:text-slate-400 text-xs mt-0.5">Trainierte Modelle &amp; Evaluation auf dem Test-Set</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button onclick="loadModelsStatus()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                                <span class="material-symbols-outlined text-sm">refresh</span>Refresh
+                            </button>
+                            <button id="train-trigger-btn" onclick="trainingTrigger()"
+                                class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold shadow shadow-primary/20 hover:bg-primary/90 transition-colors">
+                                <span class="material-symbols-outlined text-base">play_circle</span>
+                                Train Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Training status panel -->
+                <div id="training-progress" class="hidden border-b border-slate-100 dark:border-slate-800">
+                    <!-- Header bar -->
+                    <div class="px-5 py-3 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span id="training-spinner" class="material-symbols-outlined text-primary text-base hidden" style="animation:spin 1s linear infinite">refresh</span>
+                            <span class="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate" id="training-status-text">Training wird gestartet…</span>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span id="training-state-badge" class="text-xs font-bold px-2 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700">queued</span>
+                            <a id="training-airflow-link" href="http://localhost:8080" target="_blank"
+                               class="flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+                                <span class="material-symbols-outlined text-sm">open_in_new</span>Airflow
+                            </a>
+                        </div>
+                    </div>
+                    <!-- Progress bar -->
+                    <div class="px-5 pb-1">
+                        <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                            <div id="training-progress-bar" class="bg-primary h-full rounded-full transition-all duration-500 w-0"></div>
+                        </div>
+                    </div>
+                    <!-- Per-task status cards -->
+                    <div class="px-5 py-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div id="task-card-run_training"
+                            class="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
+                            <div class="bg-primary/10 p-1.5 rounded text-primary shrink-0">
+                                <span class="material-symbols-outlined text-base">bolt</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between gap-1">
+                                    <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Model B – EPEX</span>
+                                    <span id="task-badge-run_training" class="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-400">—</span>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-0.5 font-mono truncate" id="task-info-run_training">Warte auf Start…</p>
+                            </div>
+                        </div>
+                        <div id="task-card-train_load_model"
+                            class="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
+                            <div class="bg-primary/10 p-1.5 rounded text-primary shrink-0">
+                                <span class="material-symbols-outlined text-base">electric_meter</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between gap-1">
+                                    <span class="text-xs font-bold text-slate-700 dark:text-slate-200">Model A – Netzlast</span>
+                                    <span id="task-badge-train_load_model" class="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-400">—</span>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-0.5 font-mono truncate" id="task-info-train_load_model">Warte auf Start…</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Result message -->
+                    <p id="training-result-msg" class="hidden px-5 pb-3 text-xs font-semibold"></p>
+                </div>
+
+                <!-- Model cards grid -->
+                <div id="models-error" class="hidden mx-5 my-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400"></div>
+                <div id="models-grid" class="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-100 dark:divide-slate-800">
+                    <div class="p-5 text-center text-slate-400 text-sm col-span-full">Loading…</div>
+                </div>
+            </div>
+
+            <!-- Validierungskurven (collapsible) -->
+            <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden" id="val-card">
+                <button onclick="ValChart.toggle()" class="w-full p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors text-left">
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">analytics</span>
+                        Validierungskurven
+                        <span class="text-xs font-normal text-slate-400 ml-1">— Vorhersage vs. Actual &amp; Training-Loss auf dem Val-Set</span>
+                    </h3>
+                    <span id="val-chevron" class="material-symbols-outlined text-slate-400 transition-transform duration-200">expand_more</span>
+                </button>
+                <div id="val-panel" class="hidden">
+                    <!-- Controls -->
+                    <div class="px-5 pt-4 pb-3 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-3">
+                        <label class="text-xs font-semibold text-slate-600 dark:text-slate-400">Modell:</label>
+                        <select id="val-model-select" class="bg-slate-100 dark:bg-slate-800 border-none rounded text-xs font-bold py-1.5 px-3 cursor-pointer text-slate-700 dark:text-slate-200">
+                            <optgroup label="Model B – EPEX Preis">
+                                <option value="xgb">XGBoost (Energie)</option>
+                                <option value="linear">Linear (Energie)</option>
+                                <option value="naive">Naive / Baseline (Energie)</option>
+                            </optgroup>
+                            <optgroup label="Model A – Netzlast">
+                                <option value="model_load">XGBoost (Netzlast)</option>
+                                <option value="linear_load">Linear (Netzlast)</option>
+                                <option value="naive_load">Naive / Baseline (Netzlast)</option>
+                            </optgroup>
+                        </select>
+                        <button onclick="ValChart.load()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors">
+                            <span class="material-symbols-outlined text-sm">show_chart</span>Anzeigen
+                        </button>
+                    </div>
+                    <!-- Error / Loading -->
+                    <div id="val-error" class="hidden mx-5 my-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400"></div>
+                    <div id="val-loading" class="hidden p-8 text-center text-slate-400 text-sm">
+                        <span class="material-symbols-outlined text-primary text-2xl" style="animation:spin 1s linear infinite">refresh</span>
+                        <p class="mt-2">Lade Validierungsdaten…</p>
+                    </div>
+                    <!-- Charts -->
+                    <div id="val-charts" class="p-5 space-y-6">
+                        <div id="val-pred-chart" style="min-height:320px"></div>
+                        <div id="val-loss-container" class="hidden">
+                            <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-sm">trending_down</span>
+                                Training-Loss (XGBoost Early Stopping)
+                            </div>
+                            <div id="val-loss-chart" style="min-height:240px"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- DB Explorer -->
             <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                 <!-- Header + tabs -->
@@ -1461,12 +1597,399 @@
             } catch { /* ignore */ }
         }
 
+        // ── Model Registry ────────────────────────────────────────────────────
+        let _trainingPollTimer = null;
+
+        function fmtDate(yyyymmdd) {
+            if (!yyyymmdd || yyyymmdd.length !== 8) return '—';
+            return `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`;
+        }
+
+        function metricBadge(val, unit = '') {
+            if (val == null || isNaN(val)) return '<span class="text-slate-400">—</span>';
+            return `<span class="font-mono font-semibold text-slate-800 dark:text-slate-100">${val.toFixed(2)}${unit}</span>`;
+        }
+
+        function mapeBadge(mape, threshold) {
+            if (mape == null || isNaN(mape)) return '<span class="text-slate-400">—</span>';
+            const val = mape.toFixed(2) + '%';
+            if (threshold == null) {
+                // No quality gate defined – just show the number without a verdict badge
+                return `<span class="font-mono font-semibold text-slate-700 dark:text-slate-200">${val}</span>`;
+            }
+            const ok  = mape <= threshold;
+            const cls = ok
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
+            return `<span class="text-xs font-bold px-1.5 py-0.5 rounded ${cls}">${ok ? '✓' : '⚠'} ${val}</span>`;
+        }
+
+        function renderModelCard(title, icon, info) {
+            const date = info.latest_date ? fmtDate(info.latest_date) : null;
+            const dateBadge = date
+                ? `<span class="text-xs font-mono text-slate-500 dark:text-slate-400">Stand: ${date}</span>`
+                : `<span class="text-xs font-semibold text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded">Kein Modell gefunden</span>`;
+
+            const metrics = info.metrics || {};
+            const threshold = info.mape_threshold ?? null;
+
+            // Row order: primary model first, then baselines
+            const MODEL_LABELS = {
+                'xgb':          { label: 'XGBoost',  primary: true },
+                'model_load':   { label: 'XGBoost',  primary: true },
+                'linear':       { label: 'Linear',   primary: false },
+                'linear_load':  { label: 'Linear',   primary: false },
+                'naive':        { label: 'Naive',    primary: false },
+                'naive_load':   { label: 'Naive',    primary: false },
+            };
+            const ordered = ['xgb', 'model_load', 'linear', 'linear_load', 'naive', 'naive_load']
+                .filter(k => metrics[k]);
+
+            const tableRows = ordered.map(k => {
+                const m = metrics[k];
+                const cfg = MODEL_LABELS[k] || { label: k, primary: false };
+                const rowBg = cfg.primary
+                    ? 'bg-primary/5 dark:bg-primary/10'
+                    : '';
+                const labelEl = cfg.primary
+                    ? `<span class="font-bold text-slate-900 dark:text-white">${cfg.label}</span>`
+                    : `<span class="text-slate-500 dark:text-slate-400">${cfg.label}</span>`;
+                return `<tr class="${rowBg} border-b border-slate-100 dark:border-slate-800 last:border-b-0">
+                    <td class="px-4 py-2.5 text-sm">${labelEl}</td>
+                    <td class="px-4 py-2.5 text-sm text-right">${metricBadge(m.mae)}</td>
+                    <td class="px-4 py-2.5 text-sm text-right">${metricBadge(m.rmse)}</td>
+                    <td class="px-4 py-2.5 text-sm text-right">${mapeBadge(m.mape, cfg.primary ? threshold : null)}</td>
+                </tr>`;
+            }).join('');
+
+            const tableHtml = ordered.length > 0 ? `
+                <table class="w-full text-xs mt-4">
+                    <thead>
+                        <tr class="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase tracking-wide text-[10px]">
+                            <th class="px-4 py-2 text-left font-semibold">Modell</th>
+                            <th class="px-4 py-2 text-right font-semibold">MAE</th>
+                            <th class="px-4 py-2 text-right font-semibold">RMSE</th>
+                            <th class="px-4 py-2 text-right font-semibold">MAPE</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tableRows}</tbody>
+                </table>
+                ${threshold != null ? `<p class="text-[10px] text-slate-400 mt-2 px-4">Qualitätsziel: MAPE &lt; ${threshold}% (req.md)</p>` : ''}
+            ` : `<p class="text-sm text-slate-400 mt-4 px-1">Noch keine Metriken vorhanden – Modell trainieren.</p>`;
+
+            return `<div class="p-5">
+                <div class="flex items-start justify-between mb-1">
+                    <div class="flex items-center gap-2">
+                        <div class="bg-primary/10 p-1.5 rounded-lg text-primary">
+                            <span class="material-symbols-outlined text-lg">${icon}</span>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-bold text-slate-900 dark:text-white">${title}</h4>
+                            <p class="text-xs text-slate-400">${info.description || ''}</p>
+                        </div>
+                    </div>
+                    ${dateBadge}
+                </div>
+                ${tableHtml}
+            </div>`;
+        }
+
+        async function loadModelsStatus() {
+            const grid   = document.getElementById('models-grid');
+            const errBox = document.getElementById('models-error');
+            try {
+                const res  = await fetch('/api/models/status');
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || 'Fehler beim Laden');
+                errBox.classList.add('hidden');
+                grid.innerHTML =
+                    renderModelCard('Model B – EPEX Energiepreis', 'bolt',       data.model_b || {}) +
+                    renderModelCard('Model A – Winterthur Netzlast', 'electric_meter', data.model_a || {});
+            } catch(e) {
+                errBox.textContent = e.message || 'Modell-Status konnte nicht geladen werden';
+                errBox.classList.remove('hidden');
+                grid.innerHTML = '';
+            }
+        }
+
+        const _TASK_BADGE_CFG = {
+            success:  { cls: 'bg-green-100 dark:bg-green-900/30 text-green-700',   label: '✓ success'  },
+            failed:   { cls: 'bg-red-100   dark:bg-red-900/30   text-red-700',     label: '✕ failed'   },
+            running:  { cls: 'bg-blue-100  dark:bg-blue-900/30  text-blue-700',    label: '● running'  },
+            queued:   { cls: 'bg-slate-100 dark:bg-slate-700    text-slate-500',   label: '◌ queued'   },
+            up_for_retry: { cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700', label: '↺ retry'  },
+        };
+        const _RUN_BADGE_CFG = {
+            success: 'bg-green-100 dark:bg-green-900/30 text-green-700',
+            failed:  'bg-red-100   dark:bg-red-900/30   text-red-700',
+            running: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700',
+            queued:  'bg-slate-100  dark:bg-slate-800     text-slate-500',
+        };
+
+        function _setRunBadge(state) {
+            const badge = document.getElementById('training-state-badge');
+            badge.textContent = state || '—';
+            badge.className   = `text-xs font-bold px-2 py-0.5 rounded ${_RUN_BADGE_CFG[state] || _RUN_BADGE_CFG.queued}`;
+        }
+
+        function _setTaskBadge(taskId, state) {
+            const badge = document.getElementById('task-badge-' + taskId);
+            if (!badge) return;
+            const cfg = _TASK_BADGE_CFG[state] || { cls: 'bg-slate-100 dark:bg-slate-700 text-slate-400', label: state || '—' };
+            badge.textContent = cfg.label;
+            badge.className   = `text-[10px] font-black px-1.5 py-0.5 rounded ${cfg.cls}`;
+            // card border highlight
+            const card = document.getElementById('task-card-' + taskId);
+            if (card) {
+                card.className = card.className
+                    .replace(/border-\S+/g, '')
+                    .trim()
+                    + (state === 'success' ? ' border border-green-200 dark:border-green-800'
+                     : state === 'failed'  ? ' border border-red-200 dark:border-red-800'
+                     : state === 'running' ? ' border border-blue-200 dark:border-blue-800'
+                     : ' border border-slate-100 dark:border-slate-800');
+            }
+        }
+
+        function _setTaskInfo(taskId, ti) {
+            const el = document.getElementById('task-info-' + taskId);
+            if (!el) return;
+            if (!ti) { el.textContent = 'Warte auf Start…'; return; }
+            if (ti.duration != null) {
+                el.textContent = `Dauer: ${ti.duration.toFixed(1)}s`;
+            } else if (ti.start_date) {
+                const elapsed = ((Date.now() - new Date(ti.start_date)) / 1000).toFixed(0);
+                el.textContent = `Gestartet vor ${elapsed}s`;
+            } else {
+                el.textContent = ti.state || '—';
+            }
+        }
+
+        async function trainingTrigger() {
+            const btn         = document.getElementById('train-trigger-btn');
+            const progressDiv = document.getElementById('training-progress');
+            const statusText  = document.getElementById('training-status-text');
+            const resultMsg   = document.getElementById('training-result-msg');
+            const bar         = document.getElementById('training-progress-bar');
+            const spinner     = document.getElementById('training-spinner');
+
+            btn.disabled = true;
+            progressDiv.classList.remove('hidden');
+            resultMsg.classList.add('hidden');
+            bar.className = 'bg-primary h-full rounded-full transition-all duration-500';
+            bar.style.width = '5%';
+            statusText.textContent = 'Training wird gestartet…';
+            spinner.classList.remove('hidden');
+            _setRunBadge('queued');
+            ['run_training', 'train_load_model'].forEach(t => {
+                _setTaskBadge(t, 'queued');
+                _setTaskInfo(t, null);
+            });
+
+            try {
+                const res  = await fetch('/api/training/trigger', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || data.detail || `HTTP ${res.status}`);
+                if (!data.dag_run_id) throw new Error('Kein dag_run_id erhalten – Airflow nicht erreichbar?');
+                statusText.textContent = 'Training gestartet – überwache Fortschritt…';
+                // Link to Airflow UI
+                const runId = encodeURIComponent(data.dag_run_id);
+                document.getElementById('training-airflow-link').href =
+                    `http://localhost:8080/dags/bdsp_training_daily/grid?dag_run_id=${runId}`;
+                _pollTrainingState(data.dag_run_id);
+            } catch(e) {
+                spinner.classList.add('hidden');
+                _setRunBadge('failed');
+                statusText.textContent = 'Fehler beim Starten';
+                resultMsg.textContent = e.message || 'Unbekannter Fehler';
+                resultMsg.className = 'px-5 pb-3 text-xs font-semibold text-red-600';
+                resultMsg.classList.remove('hidden');
+                btn.disabled = false;
+            }
+        }
+
+        function _pollTrainingState(dagRunId) {
+            if (_trainingPollTimer) clearInterval(_trainingPollTimer);
+            const bar        = document.getElementById('training-progress-bar');
+            const statusText = document.getElementById('training-status-text');
+            const resultMsg  = document.getElementById('training-result-msg');
+            const btn        = document.getElementById('train-trigger-btn');
+            const spinner    = document.getElementById('training-spinner');
+
+            async function poll() {
+                try {
+                    const res  = await fetch(`/api/training/tasks/${encodeURIComponent(dagRunId)}`);
+                    const data = await res.json();
+                    if (data.error) return;
+
+                    const state = data.run_state || 'unknown';
+                    _setRunBadge(state);
+
+                    // Update per-task cards
+                    const tasks = data.tasks || {};
+                    Object.entries(tasks).forEach(([taskId, ti]) => {
+                        _setTaskBadge(taskId, ti.state);
+                        _setTaskInfo(taskId, ti);
+                    });
+
+                    // Count task states for progress
+                    const taskList = Object.values(tasks);
+                    const done     = taskList.filter(t => t.state === 'success').length;
+                    const running  = taskList.filter(t => t.state === 'running').length;
+                    const total    = 2;
+                    const pct = running > 0
+                        ? Math.max(20, Math.round((done / total) * 80 + 20))
+                        : Math.round((done / total) * 100);
+                    bar.style.width = pct + '%';
+
+                    if (state === 'running' || state === 'queued') {
+                        statusText.textContent = running > 0
+                            ? `Training läuft… (${done}/${total} Tasks fertig)`
+                            : 'Training gestartet, Tasks werden initialisiert…';
+                    } else if (state === 'success') {
+                        bar.style.width = '100%';
+                        spinner.classList.add('hidden');
+                        statusText.textContent = 'Training erfolgreich abgeschlossen';
+                        resultMsg.textContent = '✓ Modelle gespeichert – Metriken werden aktualisiert.';
+                        resultMsg.className = 'px-5 pb-3 text-xs font-semibold text-green-600';
+                        resultMsg.classList.remove('hidden');
+                        clearInterval(_trainingPollTimer);
+                        btn.disabled = false;
+                        loadModelsStatus();
+                    } else if (state === 'failed') {
+                        bar.className = 'bg-red-500 h-full rounded-full transition-all duration-500';
+                        bar.style.width = '100%';
+                        spinner.classList.add('hidden');
+                        statusText.textContent = 'Training fehlgeschlagen';
+                        const failedTask = Object.entries(tasks).find(([, ti]) => ti.state === 'failed');
+                        const hint = failedTask
+                            ? `Task "${failedTask[0]}" fehlgeschlagen – Logs in Airflow prüfen.`
+                            : 'DAG fehlgeschlagen – Logs in Airflow prüfen.';
+                        resultMsg.textContent = hint;
+                        resultMsg.className = 'px-5 pb-3 text-xs font-semibold text-red-600';
+                        resultMsg.classList.remove('hidden');
+                        clearInterval(_trainingPollTimer);
+                        btn.disabled = false;
+                    }
+                } catch { /* ignore transient poll errors */ }
+            }
+
+            poll(); // immediate first poll
+            _trainingPollTimer = setInterval(poll, 8000);
+        }
+
+        // ── Validierungskurven ────────────────────────────────────────────────
+        const ValChart = (() => {
+            let _open = false;
+
+            function toggle() {
+                _open = !_open;
+                document.getElementById('val-panel').classList.toggle('hidden', !_open);
+                document.getElementById('val-chevron').style.transform = _open ? 'rotate(180deg)' : '';
+            }
+
+            async function load() {
+                const modelName = document.getElementById('val-model-select').value;
+                const errEl     = document.getElementById('val-error');
+                const loadingEl = document.getElementById('val-loading');
+                const chartsEl  = document.getElementById('val-charts');
+
+                errEl.classList.add('hidden');
+                loadingEl.classList.remove('hidden');
+                chartsEl.classList.add('hidden');
+
+                try {
+                    const res  = await fetch(`/api/models/validation/${modelName}`);
+                    const data = await res.json();
+                    if (!res.ok || data.error) throw new Error(data.error || 'Fehler beim Laden');
+                    loadingEl.classList.add('hidden');
+                    chartsEl.classList.remove('hidden');
+                    _render(data);
+                } catch (e) {
+                    loadingEl.classList.add('hidden');
+                    errEl.textContent = e.message;
+                    errEl.classList.remove('hidden');
+                }
+            }
+
+            function _render(data) {
+                const isDark = document.documentElement.classList.contains('dark');
+                const gridColor = isDark ? '#1e293b' : '#e2e8f0';
+                const fontColor = isDark ? '#94a3b8' : '#64748b';
+                const baseLayout = {
+                    paper_bgcolor: 'transparent',
+                    plot_bgcolor:  'transparent',
+                    font:   { color: fontColor, size: 11, family: 'Inter, sans-serif' },
+                    xaxis:  { gridcolor: gridColor, linecolor: gridColor, zerolinecolor: gridColor },
+                    yaxis:  { gridcolor: gridColor, linecolor: gridColor, zerolinecolor: gridColor },
+                    margin: { t: 40, r: 16, l: 60, b: 64 },
+                    legend: { orientation: 'h', y: -0.22, font: { size: 11 } },
+                    hovermode: 'x unified',
+                };
+                const cfg = { responsive: true, displayModeBar: false };
+
+                const isLoad = data.model_name.includes('load');
+                const yLabel = isLoad ? 'Netzlast (kWh)' : 'Preis (EUR/MWh)';
+
+                // Chart 1: Vorhersage vs. Actual
+                Plotly.react('val-pred-chart', [
+                    {
+                        x: data.timestamps, y: data.y_true,
+                        type: 'scatter', mode: 'lines', name: 'Actual',
+                        line: { color: '#137fec', width: 1.5 },
+                    },
+                    {
+                        x: data.timestamps, y: data.y_pred,
+                        type: 'scatter', mode: 'lines', name: 'Predicted',
+                        line: { color: '#f59e0b', width: 1.5, dash: 'dot' },
+                    },
+                ], {
+                    ...baseLayout,
+                    title: { text: `${data.model_name} — Val-Set: Vorhersage vs. Actual (${data.n_points} Punkte)`, font: { size: 13 } },
+                    yaxis: { ...baseLayout.yaxis, title: { text: yLabel, standoff: 8 } },
+                    xaxis: { ...baseLayout.xaxis, title: { text: 'Zeit', standoff: 8 } },
+                }, cfg);
+
+                // Chart 2: Training-Loss (nur XGBoost mit early stopping)
+                const lossContainer = document.getElementById('val-loss-container');
+                if (data.loss_history && Object.keys(data.loss_history).length > 0) {
+                    const palette = ['#137fec', '#f59e0b', '#10b981', '#ef4444'];
+                    let colorIdx  = 0;
+                    const lossTraces = [];
+                    for (const [evalSet, metrics] of Object.entries(data.loss_history)) {
+                        for (const [metricName, values] of Object.entries(metrics)) {
+                            lossTraces.push({
+                                x:    Array.from({ length: values.length }, (_, i) => i + 1),
+                                y:    values,
+                                type: 'scatter', mode: 'lines',
+                                name: `${evalSet} – ${metricName}`,
+                                line: { color: palette[colorIdx++ % palette.length], width: 1.5 },
+                            });
+                        }
+                    }
+                    lossContainer.classList.remove('hidden');
+                    Plotly.react('val-loss-chart', lossTraces, {
+                        ...baseLayout,
+                        title: { text: 'Training-Loss – RMSE pro Boosting-Runde', font: { size: 13 } },
+                        xaxis: { ...baseLayout.xaxis, title: { text: 'Runde', standoff: 8 } },
+                        yaxis: { ...baseLayout.yaxis, title: { text: 'RMSE', standoff: 8 } },
+                        margin: { ...baseLayout.margin, b: 48 },
+                    }, cfg);
+                } else {
+                    lossContainer.classList.add('hidden');
+                }
+            }
+
+            return { toggle, load };
+        })();
+
         // ── Boot ─────────────────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', () => {
             loadDbStatus();
             loadFeatureStatus();
             loadAirflowStatus();
             loadRateLimits();
+            loadModelsStatus();
             checkBackfillState();
             setInterval(loadDbStatus, 60000);
             setInterval(loadFeatureStatus, 60000);
