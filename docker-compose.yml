@@ -86,7 +86,11 @@ services:
           --lastname User \
           --role Admin \
           --email "$$AIRFLOW_ADMIN_EMAIL" \
-          --password "$$AIRFLOW_ADMIN_PASSWORD"
+          --password "$$AIRFLOW_ADMIN_PASSWORD" &&
+        airflow pools set entsoe_pool 1 "Max 1 concurrent ENTSO-E task (token block protection)" &&
+        airflow pools set tariff_pool 2 "Max 2 concurrent tariff API tasks" &&
+        airflow pools set meteo_pool  3 "Max 3 concurrent Open-Meteo tasks" &&
+        airflow pools set bafu_pool   1 "Max 1 concurrent BAFU task"
     environment:
       <<: *airflow-common-env
       _AIRFLOW_DB_MIGRATE: "true"
