@@ -75,8 +75,8 @@ class TestLagFeaturesCorrect:
         assert pd.isna(df["lag_24h"].iloc[0])
 
     def test_all_lag_columns_present(self):
-        """All four lag columns must be declared in FEATURE_COLS."""
-        for col in ("lag_1h", "lag_2h", "lag_24h", "lag_168h"):
+        """All three lag columns must be declared in FEATURE_COLS."""
+        for col in ("lag_1h", "lag_24h", "lag_168h"):
             assert col in FEATURE_COLS, f"Missing lag column: {col}"
 
 
@@ -200,7 +200,7 @@ class TestNoNullsInKeyColumns:
     def test_clean_feature_df_has_no_nulls_in_lag_cols(self):
         """A fully populated DataFrame must have zero NaN values in lag columns."""
         df = _make_feature_df(50)
-        lag_cols = ["lag_1h", "lag_2h", "lag_24h", "lag_168h"]
+        lag_cols = ["lag_1h", "lag_24h", "lag_168h"]
         for col in lag_cols:
             assert df[col].isna().sum() == 0, f"Unexpected NaN in '{col}'"
 
