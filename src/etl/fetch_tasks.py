@@ -93,14 +93,28 @@ def fetch_entsoe_load_forecast(dates: list[str], sleep_s: float = 0) -> None:
             time.sleep(sleep_s)
 
 
+# Weather locations: CH baseline + DE proxies for Model B (EPEX price drivers)
+_WEATHER_LOCATIONS = [
+    {"latitude": 47.5001, "longitude": 8.7502, "label": "CH-Winterthur"},
+    {"latitude": 53.5,    "longitude": 10.0,   "label": "DE-Nord"},   # Hamburg – DE wind proxy
+    {"latitude": 48.5,    "longitude": 9.0,    "label": "DE-Sued"},   # Stuttgart – DE solar proxy
+]
+
+
 def fetch_weather(dates: list[str], sleep_s: float = 0) -> None:
     from data_collection.openmeteo_collector import OpenMeteoCollector
     from db.timescale_client import upsert_weather
 
     for date_str in dates:
-        records = OpenMeteoCollector(date=date_str).run()
-        inserted = upsert_weather(records)
-        print(f"Weather {date_str}: {len(records)} fetched, {inserted} inserted.")
+        total_inserted = 0
+        for loc in _WEATHER_LOCATIONS:
+            records = OpenMeteoCollector(
+                latitude=loc["latitude"],
+                longitude=loc["longitude"],
+                date=date_str,
+            ).run()
+            total_inserted += upsert_weather(records)
+        print(f"Weather {date_str}: {total_inserted} inserted ({len(_WEATHER_LOCATIONS)} locations).")
         if sleep_s:
             time.sleep(sleep_s)
 

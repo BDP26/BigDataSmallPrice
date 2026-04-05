@@ -105,7 +105,7 @@
                     <h1 class="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Model Health: Dynamic
                         Price Predictor</h1>
                     <p class="text-slate-500 dark:text-slate-400 mt-1">Real-time monitoring of ENTSO-E &amp;
-                        MeteoSchweiz data pipeline.</p>
+                        Open-Meteo data pipeline.</p>
                 </div>
                 <div class="flex gap-3">
                     <button
@@ -118,56 +118,46 @@
                     </button>
                 </div>
             </div>
-            <!-- Metric Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div
-                    class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <!-- Metric Grid (dynamic – loaded from /api/models/status) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="kpi-grid">
+                <!-- Model B MAE -->
+                <div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                     <div class="flex justify-between items-start mb-2">
-                        <span
-                            class="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">MAE</span>
-                        <span
-                            class="text-red-500 text-xs font-bold bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded">-2.1%
-                            Δ</span>
+                        <span class="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">MAE – Model B</span>
+                        <span class="material-symbols-outlined text-primary text-xl">bolt</span>
                     </div>
-                    <div class="text-3xl font-black text-slate-900 dark:text-white">0.142</div>
-                    <p class="text-slate-400 text-xs mt-1">Mean Absolute Error (Target: &lt;0.150)</p>
+                    <div class="text-3xl font-black text-slate-900 dark:text-white" id="kpi-mae-b">—</div>
+                    <p class="text-slate-400 text-xs mt-1">EPEX XGBoost · EUR/MWh</p>
                 </div>
-                <div
-                    class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <!-- Model B MAPE -->
+                <div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                     <div class="flex justify-between items-start mb-2">
-                        <span
-                            class="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">MAPE</span>
-                        <span
-                            class="text-green-500 text-xs font-bold bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">+0.5%
-                            Δ</span>
+                        <span class="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">MAPE – Model B</span>
+                        <span class="material-symbols-outlined text-primary text-xl">percent</span>
                     </div>
-                    <div class="text-3xl font-black text-slate-900 dark:text-white">4.2%</div>
-                    <p class="text-slate-400 text-xs mt-1">Percentage error on validation set</p>
+                    <div class="text-3xl font-black text-slate-900 dark:text-white" id="kpi-mape-b">—</div>
+                    <p class="text-slate-400 text-xs mt-1">EPEX XGBoost · Validation set</p>
                 </div>
-                <div
-                    class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <!-- Model A MAE -->
+                <div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                     <div class="flex justify-between items-start mb-2">
-                        <span
-                            class="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">Model
-                            Latency</span>
-                        <span
-                            class="text-slate-500 text-xs font-bold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">Stable</span>
+                        <span class="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">MAE – Model A</span>
+                        <span class="material-symbols-outlined text-primary text-xl">electric_meter</span>
                     </div>
-                    <div class="text-3xl font-black text-slate-900 dark:text-white">45<span
-                            class="text-lg font-medium ml-1">ms</span></div>
-                    <p class="text-slate-400 text-xs mt-1">P95 Inference response time</p>
+                    <div class="text-3xl font-black text-slate-900 dark:text-white" id="kpi-mae-a">—</div>
+                    <p class="text-slate-400 text-xs mt-1">Netzlast XGBoost · kWh</p>
                 </div>
-                <div
-                    class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <!-- Model dates -->
+                <div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                     <div class="flex justify-between items-start mb-2">
-                        <span
-                            class="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">Last
-                            Training</span>
+                        <span class="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider">Letzte Trainings</span>
                         <span class="material-symbols-outlined text-primary text-xl">history</span>
                     </div>
-                    <div class="text-3xl font-black text-slate-900 dark:text-white">2h <span
-                            class="text-lg font-medium">ago</span></div>
-                    <p class="text-slate-400 text-xs mt-1">Full epoch recalibration completed</p>
+                    <div class="text-sm font-bold text-slate-900 dark:text-white mt-1 space-y-1">
+                        <div>B: <span id="kpi-date-b" class="font-mono text-slate-500">—</span></div>
+                        <div>A: <span id="kpi-date-a" class="font-mono text-slate-500">—</span></div>
+                    </div>
+                    <p class="text-slate-400 text-xs mt-2">Stand der gespeicherten Modelle</p>
                 </div>
             </div>
             <!-- Main Dashboard Content -->
@@ -186,50 +176,60 @@
                             <option>Feature Permutation</option>
                         </select>
                     </div>
+                    <p class="text-xs text-slate-400 -mt-4 mb-4">Zeigt die Featuregruppen von Model B (EPEX). Gewichtung indikativ – trainiere das Modell für echte SHAP-Werte.</p>
                     <div class="space-y-6">
                         <div class="space-y-2">
                             <div class="flex justify-between text-sm font-medium">
-                                <span>Solar Forecast (MeteoSchweiz)</span>
-                                <span class="text-primary">85%</span>
+                                <span>EPEX Preis-Lags <span class="text-xs text-slate-400 font-normal">(lag_1h / lag_24h / lag_168h)</span></span>
+                                <span class="text-primary">~80%</span>
                             </div>
                             <div class="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
-                                <div class="bg-primary h-full rounded-full w-[88%]" style="width: 85%"></div>
+                                <div class="bg-primary h-full rounded-full" style="width: 80%"></div>
                             </div>
                         </div>
                         <div class="space-y-2">
                             <div class="flex justify-between text-sm font-medium">
-                                <span>Day-Ahead Price (ENTSO-E)</span>
-                                <span class="text-primary">78%</span>
+                                <span>ENTSO-E Erzeugung-Lags <span class="text-xs text-slate-400 font-normal">(Hydro CH, Solar CH, Wind DE)</span></span>
+                                <span class="text-primary">~60%</span>
                             </div>
                             <div class="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
-                                <div class="bg-primary h-full rounded-full w-[74%]" style="width: 78%"></div>
+                                <div class="bg-primary h-full rounded-full" style="width: 60%"></div>
                             </div>
                         </div>
                         <div class="space-y-2">
                             <div class="flex justify-between text-sm font-medium">
-                                <span>Wind Generation</span>
-                                <span class="text-primary">55%</span>
+                                <span>Wetter DE <span class="text-xs text-slate-400 font-normal">(wind_de_nord / solar_de_sued)</span></span>
+                                <span class="text-primary">~50%</span>
                             </div>
                             <div class="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
-                                <div class="bg-primary h-full rounded-full w-[62%]" style="width: 55%"></div>
+                                <div class="bg-primary h-full rounded-full" style="width: 50%"></div>
                             </div>
                         </div>
                         <div class="space-y-2">
                             <div class="flex justify-between text-sm font-medium">
-                                <span>Temperature (Meteo)</span>
-                                <span class="text-primary">42%</span>
+                                <span>Wetter CH <span class="text-xs text-slate-400 font-normal">(temperature / wind / strahlung / niederschlag)</span></span>
+                                <span class="text-primary">~40%</span>
                             </div>
                             <div class="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
-                                <div class="bg-primary h-full rounded-full w-[45%]" style="width: 42%"></div>
+                                <div class="bg-primary h-full rounded-full" style="width: 40%"></div>
                             </div>
                         </div>
                         <div class="space-y-2">
                             <div class="flex justify-between text-sm font-medium">
-                                <span>Weekday/Peak-Hour</span>
-                                <span class="text-primary">35%</span>
+                                <span>Kalender <span class="text-xs text-slate-400 font-normal">(is_peak_hour / is_weekend / month)</span></span>
+                                <span class="text-primary">~30%</span>
                             </div>
                             <div class="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
-                                <div class="bg-primary h-full rounded-full w-[31%]" style="width: 35%"></div>
+                                <div class="bg-primary h-full rounded-full" style="width: 30%"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm font-medium">
+                                <span>ENTSO-E Nettolast-Lags &amp; Load Forecast <span class="text-xs text-slate-400 font-normal">(actual_load / net_position / load_forecast_ch)</span></span>
+                                <span class="text-primary">~25%</span>
+                            </div>
+                            <div class="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
+                                <div class="bg-primary h-full rounded-full" style="width: 25%"></div>
                             </div>
                         </div>
                     </div>
@@ -308,12 +308,11 @@
                                 </div>
                                 <div class="flex-1">
                                     <div class="flex justify-between items-center">
-                                        <p class="text-sm font-bold text-slate-700 dark:text-slate-200">MeteoSchweiz API
-                                        </p>
+                                        <p class="text-sm font-bold text-slate-700 dark:text-slate-200">Open-Meteo API</p>
                                         <span
                                             class="text-[10px] font-black px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-600">ONLINE</span>
                                     </div>
-                                    <p class="text-xs text-slate-500">150 KB/min • 8s lag</p>
+                                    <p class="text-xs text-slate-500">3 Standorte: CH · DE-Nord · DE-Süd</p>
                                 </div>
                             </div>
                             <!-- Flow Animation Mock -->
@@ -330,7 +329,7 @@
                                 </div>
                                 <div class="flex-1">
                                     <p class="text-sm font-bold text-primary">Inference Engine</p>
-                                    <p class="text-xs text-primary/70">XGBoost-Regressor_v12</p>
+                                    <p class="text-xs text-primary/70" id="pipeline-model-label">Model B – XGBoost (EPEX)</p>
                                 </div>
                             </div>
                         </div>
@@ -956,7 +955,7 @@
                     <div
                         class="flex items-center gap-2 grayscale opacity-50 hover:opacity-100 transition-opacity cursor-pointer">
                         <span class="material-symbols-outlined text-xl">thermostat</span>
-                        <span class="text-xs font-bold tracking-widest uppercase">MeteoSchweiz</span>
+                        <span class="text-xs font-bold tracking-widest uppercase">Open-Meteo</span>
                     </div>
                 </div>
                 <p class="text-slate-400 text-xs">© 2023 Advanced Model Analytics Platform. Secure High-Performance
@@ -968,6 +967,50 @@
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
     <script>
+        // ── KPI Cards ─────────────────────────────────────────────────────────
+        async function loadKPIs() {
+            try {
+                const res = await fetch('/api/models/status');
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.error) return;
+
+                // Model B (EPEX XGBoost)
+                const mbMetrics = data.model_b?.metrics?.xgb;
+                if (mbMetrics) {
+                    document.getElementById('kpi-mae-b').textContent =
+                        mbMetrics.mae != null ? mbMetrics.mae.toFixed(2) : '—';
+                    const mape = mbMetrics.mape;
+                    document.getElementById('kpi-mape-b').textContent =
+                        mape != null ? mape.toFixed(2) + '%' : '—';
+                }
+                const dateB = data.model_b?.latest_date;
+                if (dateB && dateB.length === 8) {
+                    document.getElementById('kpi-date-b').textContent =
+                        `${dateB.slice(0,4)}-${dateB.slice(4,6)}-${dateB.slice(6,8)}`;
+                }
+
+                // Model A (load XGBoost)
+                const maMetrics = data.model_a?.metrics?.model_load;
+                if (maMetrics) {
+                    document.getElementById('kpi-mae-a').textContent =
+                        maMetrics.mae != null ? maMetrics.mae.toFixed(0) : '—';
+                }
+                const dateA = data.model_a?.latest_date;
+                if (dateA && dateA.length === 8) {
+                    document.getElementById('kpi-date-a').textContent =
+                        `${dateA.slice(0,4)}-${dateA.slice(4,6)}-${dateA.slice(6,8)}`;
+                }
+
+                // Update pipeline model label with training date
+                if (dateB) {
+                    const label = document.getElementById('pipeline-model-label');
+                    if (label) label.textContent =
+                        `Model B – XGBoost (EPEX) · Stand ${dateB.slice(0,4)}-${dateB.slice(4,6)}-${dateB.slice(6,8)}`;
+                }
+            } catch { /* non-critical */ }
+        }
+
         // ── DB Status ────────────────────────────────────────────────────────
         function fmt(iso) {
             if (!iso) return '—';
@@ -1856,6 +1899,7 @@
                         clearInterval(_trainingPollTimer);
                         btn.disabled = false;
                         loadModelsStatus();
+                        loadKPIs();
                     } else if (state === 'failed') {
                         bar.className = 'bg-red-500 h-full rounded-full transition-all duration-500';
                         bar.style.width = '100%';
@@ -1985,12 +2029,14 @@
 
         // ── Boot ─────────────────────────────────────────────────────────────
         document.addEventListener('DOMContentLoaded', () => {
+            loadKPIs();
             loadDbStatus();
             loadFeatureStatus();
             loadAirflowStatus();
             loadRateLimits();
             loadModelsStatus();
             checkBackfillState();
+            setInterval(loadKPIs, 60000);
             setInterval(loadDbStatus, 60000);
             setInterval(loadFeatureStatus, 60000);
             setInterval(loadAirflowStatus, 60000);

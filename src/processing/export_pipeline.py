@@ -31,55 +31,46 @@ _LOG = logging.getLogger(__name__)
 TARGET_COL = "price_eur_mwh"
 
 FEATURE_COLS: list[str] = [
-    # Lag features
+    # EPEX price lags (leakage-safe: always past values)
     "lag_1h",
-    "lag_2h",
     "lag_24h",
     "lag_168h",
     # Rolling averages (price)
     "rolling_avg_24h",
     "rolling_avg_7d",
-    # req.md aliases for EPEX lags (same semantic horizon)
-    "epex_lag_1d",
-    "epex_lag_7d",
     # Calendar
     "hour_of_day",
     "day_of_week",
     "month",
     "is_weekend",
     "is_peak_hour",
-    # Weather
+    # Weather – CH (Winterthur)
     "temperature_2m",
-    # req.md alias/proxy (CH avg not yet separately ingested)
-    "temp_ch_avg",
     "wind_speed_10m",
-    # req.md proxy alias (wind_speed proxy for EU wind generation)
-    "wind_generation_eu",
     "shortwave_radiation",
-    # ENTSO-E A75/B16 CH solar generation (real data)
-    "solar_generation_ch",
     "cloud_cover",
-    "precipitation_mm",     # Niederschlag – req.md Phase 1
+    "precipitation_mm",
     "temp_rolling_avg_24h",
-    # Hydro
-    "discharge_m3s",
-    "level_masl",
-    # req.md alias/proxy until dedicated reservoir feed is integrated
-    "hydro_reservoir",
-    # ENTSO-E market data (generation, flows, forecast)
-    "hydro_run_of_river_ch",     # ENTSO-E A75/B12 CH hydro run-of-river
-    "wind_generation_de",        # ENTSO-E A75/B19 DE wind (EU proxy)
-    "flow_ch_de",                # ENTSO-E A11 physical flow CH→DE (MWh)
-    "flow_ch_it",                # ENTSO-E A11 physical flow CH→IT (MWh)
-    "flow_ch_fr",                # ENTSO-E A11 physical flow CH→FR (MWh)
-    "flow_ch_at",                # ENTSO-E A11 physical flow CH→AT (MWh)
-    "net_position_ch",           # CH net position all 4 borders (DE+IT+FR+AT)
-    "load_forecast_ch",          # ENTSO-E A65/A01 day-ahead load forecast CH
-    # ENTSO-E Actual Total Load CH (A65) – market context for Model B
-    "actual_load_ch_mwh",
-    # Tariff signals (dynamic providers)
-    "tariff_price_chf_kwh_avg",   # Groupe E 'integrated' – primary signal
-    "ckw_price_chf_kwh_avg",      # CKW 'integrated'      – secondary signal
+    # Weather – DE proxies (EPEX price drivers)
+    "wind_speed_de_nord",        # Hamburg – DE wind proxy
+    "solar_de_nord",
+    "solar_de_sued",             # Stuttgart – DE solar proxy
+    "wind_speed_de_sued",
+    # ENTSO-E generation lags (B12 hydro RoR, B16 solar CH, B19 wind DE)
+    "hydro_ror_ch_lag_24h",
+    "hydro_ror_ch_lag_168h",
+    "solar_gen_ch_lag_24h",
+    "solar_gen_ch_lag_168h",
+    "wind_gen_de_lag_24h",
+    "wind_gen_de_lag_168h",
+    # ENTSO-E actual load lags
+    "actual_load_ch_lag_24h",
+    "actual_load_ch_lag_168h",
+    # ENTSO-E net position lags (all 4 borders: DE+IT+FR+AT)
+    "net_position_ch_lag_24h",
+    "net_position_ch_lag_168h",
+    # ENTSO-E A65/A01 day-ahead load forecast (published D-1, leakage-safe for D+1)
+    "load_forecast_ch",
 ]
 
 # NOTE: req.md's "epex_t" maps to the target (price_eur_mwh) in this project.
