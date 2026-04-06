@@ -14,6 +14,155 @@ Aufbau eines datengetriebenen Systems zur Prognose und Berechnung **zweier dynam
 
 ---
 
+## 1a. Verfeinerte Modellziele (Stand April 2026)
+
+### Modell A – Dynamischer Netzpreis Winterthur
+
+**Zweistufiger Ansatz:**
+
+**Stufe 1 – Synthetisches Label (deterministisch):**
+Die EKZ-Netzpreisformel wird auf den historischen Winterthur-Bruttolastgang (OGD, seit 2013)
+angewendet. So entsteht ein synthetisches Netzpreis-Label für 13 Jahre — ohne Abhängigkeit
+von einer Tarif-API. Das Label ist physikalisch korrekt: keine Schätzung, sondern eine exakte
+Rückrechnung auf Messdaten.
+
+```python
+# Synthetisches Label: für jeden historischen Zeitpunkt t
+netzlast_norm = (netzlast_t - netzlast_min_year) / (netzlast_max_year - netzlast_min_year)
+netzpreis_t   = clip(alpha × netzlast_norm², lower=std−5, upper=std+15)
+```
+
+**Stufe 2 – Wochenprognose (ML-Modell):**
+Ziel ist eine 7-Tage-Vorschau des Netzpreises in 15-Minuten-Auflösung. Das Modell kann nur
+Features verwenden, die bei Prognose-Zeitpunkt t₀ tatsächlich bekannt sind:
+
+| Feature | Verfügbarkeit bei t₀ | Begründung |
+|---|---|---|
+| `load_lag_168h` | ✅ immer | Last vor exakt 7 Tagen (stärkster Prädiktor) |
+| `load_lag_336h` | ✅ immer | Last vor exakt 14 Tagen |
+| `load_rolling_avg_7d` | ✅ immer | Gleitender Ø letzte Woche |
+| `temperature_forecast` | ✅ Open-Meteo 7-Tage | Wetterdienst-Prognose |
+| `shortwave_radiation_forecast` | ✅ Open-Meteo 7-Tage | PV-Proxy (Solarstrahlung) |
+| `wind_speed_forecast` | ✅ Open-Meteo 7-Tage | Wetterdienst-Prognose |
+| `cloud_cover_forecast` | ✅ Open-Meteo 7-Tage | Wetterdienst-Prognose |
+| `hour`, `weekday`, `month` | ✅ deterministisch | Kalender |
+| `is_holiday_zh` | ✅ deterministisch | Schweizer Feiertage bekannt |
+| `is_school_holiday` | ✅ deterministisch | Schulferienplan bekannt |
+| `load_lag_1h` | ❌ nicht verfügbar | Liegt in der Zukunft |
+| `pv_feed_in` (aktuell) | ❌ nicht verfügbar | Liegt in der Zukunft |
+
+**Trainingslogik:** Das Modell wird auf historischen Daten trainiert, wobei Features und Target
+so aufgebaut werden, wie sie bei einer echten 7-Tage-Prognose vorliegen würden (kein Look-Ahead).
+`load_lag_168h` ist dabei der Anker: Der Wochenrhythmus der Netzlast ist der stärkste
+strukturelle Prädiktor und bleibt bei 7-Tage-Horizont immer verfügbar.
+
+**Qualitätsziele Modell A:**
+- MAPE Netzlast < 8 % (kurzfristig, bereits erreicht)
+- MAPE Netzlast 7-Tage-Horizont < 15 %
+- MAE Netzpreis < 0.5 Rp./kWh
+
+---
+
+### Modell B – Dynamischer Energiepreis (EPEX Day-Ahead CH)
+
+**Ziel:** `price_eur_mwh` direkt prognostizieren — kein Groupe-E / CKW als Feature
+(diese sind selbst EPEX-Transformationen und würden den Trainingshorizont auf ~3 Monate
+beschränken). Mit reinen ENTSO-E + Wetter-Features: 2+ Jahre nach Backfill.
+
+**Zwei Prognosehorizonte:**
+
+#### B.1 – Day-Ahead (D+1, höchste Genauigkeit)
+
+Entspricht dem realen EPEX-Publikationszyklus: Preis wird um ~13:00 für den Folgetag
+publiziert. Features sind alles, was bis ~12:00 bekannt ist.
+
+**Verfügbarkeitslogik ENTSO-E:**
+- *Actual*-Daten (A75, A65/A16, A11): nur als Lag verfügbar (Vergangenheit)
+- *Forecast*-Daten (A65/A01 Load, A69/A01 Generation): für D+1 publiziert ✅
+
+| Feature | Quelle | Verfügbar D+1 | Begründung |
+|---|---|---|---|
+| `epex_lag_24h` | ENTSO-E A44 | ✅ | Preis gleiche Stunde gestern |
+| `epex_lag_168h` | ENTSO-E A44 | ✅ | Wochenrhythmus-Anker |
+| `rolling_avg_24h / 7d` | berechnet | ✅ | aktuelles Preisniveau |
+| `temperature_forecast` | Open-Meteo D+1 | ✅ | Heiz-/Kühlnachfrage CH |
+| `shortwave_radiation_forecast` | Open-Meteo D+1 | ✅ | Solar CH |
+| `wind_speed_forecast_ch` | Open-Meteo D+1 (47.5N, 8.75E) | ✅ | Wind CH |
+| **`wind_speed_forecast_de_nord`** | **Open-Meteo D+1 (53.5N, 10.0E)** | ✅ | **DE Windproduktion — stärkster Preistreiber** |
+| **`wind_speed_forecast_de_sued`** | **Open-Meteo D+1 (48.5N, 9.0E)** | ✅ | **Solar-Proxy DE** |
+| `cloud_cover_forecast` | Open-Meteo D+1 | ✅ | Solar-Dämpfung |
+| `load_forecast_ch` | ENTSO-E A65/A01 | ✅ | Lastprognose CH morgen (bereits gesammelt) |
+| `actual_load_ch_lag_24h` | ENTSO-E A65/A16 | ✅ | Actual Load gestern (Lag) |
+| `hydro_ror_ch_lag_24h` | ENTSO-E A75/B12 | ✅ | CH Laufwasser gestern (Lag) |
+| `solar_gen_ch_lag_24h` | ENTSO-E A75/B16 | ✅ | CH Solar-Produktion gestern (Lag) |
+| `wind_gen_de_lag_24h` | ENTSO-E A75/B19 | ✅ | DE Windproduktion gestern (Lag) |
+| `flow_ch_de_lag_24h` | ENTSO-E A11 | ✅ | Exportfluss CH→DE gestern (Lag) |
+| `net_position_ch_lag_24h` | ENTSO-E A11 (4 Grenzen) | ✅ | CH Netto-Import/-Export gestern |
+| `discharge_m3s`, `level_masl` | BAFU | ✅ | Hydro-Speicher CH (langsam veränderlich) |
+| `hour_of_day`, `day_of_week`, `month` | deterministisch | ✅ | Tages-/Wochenmuster |
+| `is_weekend`, `is_holiday_zh` | deterministisch | ✅ | Nachfragestruktur |
+| Generation Forecast Wind/Solar (A69) | ENTSO-E A69/A01 | ⚠️ | Noch nicht gesammelt — ETL-Erweiterung möglich |
+
+#### B.2 – Woche-Ahead (D+7, Planungshorizont)
+
+Keine ENTSO-E-Echtzeit-Forecasts verfügbar — rein lag- und wetterbasiert.
+Gleiche Logik wie Modell A: `epex_lag_168h` als Wochenanker.
+Die ENTSO-E Actual-Daten (Generation, Load, Flows) fliessen als `lag_168h` ein.
+
+| Feature | D+7 verfügbar? | Anmerkung |
+|---|---|---|
+| `epex_lag_168h` | ✅ | Preis vor exakt 7 Tagen |
+| `epex_lag_336h` | ✅ | Preis vor 14 Tagen |
+| `rolling_avg_7d / 30d` | ✅ | aktuelles Preisniveau |
+| Wetterprognose CH (Temp, Solar, Wind, Cloud) | ✅ | Open-Meteo 7-Tage |
+| **Wetterprognose DE-Nord** (Wind) | ✅ | wichtigster externer Treiber |
+| **Wetterprognose DE-Süd** (Solar) | ✅ | Solar-Einspeisung DE |
+| `actual_load_ch_lag_168h` | ✅ | Last gleiche Stunde letzte Woche |
+| `hydro_ror_ch_lag_168h` | ✅ | CH Laufwasser letzte Woche |
+| `solar_gen_ch_lag_168h` | ✅ | CH Solar letzte Woche |
+| `wind_gen_de_lag_168h` | ✅ | DE Wind letzte Woche |
+| `net_position_ch_lag_168h` | ✅ | CH Netto-Position letzte Woche |
+| `discharge_m3s`, `level_masl` | ✅ | BAFU, langsam veränderlich |
+| `is_weekend`, `is_holiday_zh`, Kalender | ✅ | deterministisch |
+| `load_forecast_ch` | ❌ | nur D+1 von ENTSO-E |
+| ENTSO-E Generation Forecast (A69) | ❌ | nur D+1 |
+
+**Warum Wetterdaten aus Norddeutschland?**
+Der Schweizer EPEX-Preis ist Teil des zentraleuropäischen Markts. Wenn es in Norddeutschland
+(Hamburg-Region) stürmt, fluten Hunderte GWh Windstrom ins Netz → Preise fallen
+CE-weit, auch in CH. Open-Meteo liefert historische und Forecast-Daten für beliebige
+Koordinaten — die DE-Nord-Wetterdaten sind daher der wichtigste noch nicht genutzte Hebel.
+
+**Neue Datenquellen (ETL-Erweiterung nötig):**
+- `open_meteo_de_nord`: lat=53.5, lon=10.0 (Hamburg-Region, Windproxy)
+- `open_meteo_de_sued`: lat=48.5, lon=9.0 (Stuttgart-Region, Solar-DE-Proxy)
+
+**Training:**
+- Target: `price_eur_mwh` (ENTSO-E A44, verfügbar seit 2015)
+- Feature-Set für D+1: ~15 Features (Tabelle B.1 oben)
+- Feature-Set für D+7: ~12 Features (Tabelle B.2, ohne ENTSO-E-Echtzeit)
+- Split: train 2024–Jan 2026 / val Feb–März 2026 / test Apr 2026+
+- Keine Groupe-E / CKW Features (sind EPEX-Transformationen → Near-Leakage)
+
+**Qualitätsziele Modell B:**
+- MAPE D+1 < 15 % (EPEX ist volatiler als Last)
+- MAPE D+7 < 25 %
+- Korrelation mit EKZ Energietarif (sobald Jahresdaten vorhanden) > 0.85
+
+**Erweiterung ab Jan 2027:**
+Ein volles Jahr EKZ-Energietarif-Daten liegt vor. Dann: `k_pe` und `k_le` der EKZ-Formel
+via SCIP kalibrieren (Preisparität-Bedingung), sodass `pred_epex → EKZ-Energiepreis [Rp./kWh]`
+direkt ausgegeben werden kann.
+
+```python
+# Zukünftige Kalibrierung (Jan 2027):
+ekz_energie_t = clip(k_pe * epex_pred_t + k_le,
+                     lower=standardtarif - 5,
+                     upper=standardtarif + 5)   # Rp./kWh
+```
+
+---
+
 ## 2. Architektur-Übersicht & Tech-Stack
 
 | Komponente | Technologie |

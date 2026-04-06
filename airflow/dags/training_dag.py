@@ -1,15 +1,19 @@
 """
 DAG: bdsp_training_daily
 
-Daily model retraining pipeline for BigDataSmallPrice.
-Runs at 08:00 UTC – one hour after the feature export DAG (bdsp_feature_daily
-at 07:00 UTC) to ensure fresh parquet files are available.
+On-demand model retraining pipeline for BigDataSmallPrice.
+Schedule is None – the DAG is triggered manually via the Airflow UI or the
+admin dashboard POST /api/training/trigger endpoint.
 
 Task graph:
-  run_training → single task: train naive + linear + XGBoost on latest parquet
-                 and save to /opt/airflow/models/
+  run_training      → train naive + linear + XGBoost (Model B, EPEX price)
+  train_load_model  → train naive + linear + XGBoost (Model A, net load)
 
-The trained XGBoost model is automatically picked up by the FastAPI /api/predict
+Both tasks run in parallel (independent datasets) and save:
+  - <name>_<YYYYMMDD>.joblib  model files
+  - metrics_<YYYYMMDD>.json   evaluation metrics
+
+The trained models are automatically picked up by the FastAPI /api/predict
 and /api/forecast endpoints on their next request (lazy model cache reload).
 """
 
@@ -39,7 +43,10 @@ default_args = {
 def _run_training(**ctx) -> None:
     from modelling.train import run_training
 
-    data_dir   = os.environ.get("BDSP_EXPORT_DIR",  "/opt/airflow/data/")
+    data_dir   = os.environ.get(
+        "BDSP_ENERGY_EXPORT_DIR",
+        os.environ.get("BDSP_EXPORT_DIR", "/opt/airflow/data/energy/"),
+    )
     models_dir = os.environ.get("BDSP_MODELS_DIR",  "/opt/airflow/models/")
 
     paths = run_training(data_dir=data_dir, models_dir=models_dir)
@@ -50,7 +57,10 @@ def _run_training(**ctx) -> None:
 def _run_load_training(**ctx) -> None:
     from modelling.train import run_load_training
 
-    data_dir   = os.environ.get("BDSP_EXPORT_DIR",  "/opt/airflow/data/")
+    data_dir   = os.environ.get(
+        "BDSP_LOAD_EXPORT_DIR",
+        os.environ.get("BDSP_EXPORT_DIR", "/opt/airflow/data/load/"),
+    )
     models_dir = os.environ.get("BDSP_MODELS_DIR",  "/opt/airflow/models/")
 
     paths = run_load_training(data_dir=data_dir, models_dir=models_dir)
@@ -62,8 +72,8 @@ def _run_load_training(**ctx) -> None:
 
 with DAG(
     dag_id="bdsp_training_daily",
-    description="Daily model retraining: naive + linear + XGBoost → /opt/airflow/models/",
-    schedule="0 8 * * *",
+    description="On-demand model retraining: naive + linear + XGBoost → /opt/airflow/models/",
+    schedule=None,
     start_date=datetime(2026, 1, 1, tzinfo=pendulum.timezone("Europe/Zurich")),
     catchup=False,
     default_args=default_args,

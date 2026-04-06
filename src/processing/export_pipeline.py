@@ -31,43 +31,46 @@ _LOG = logging.getLogger(__name__)
 TARGET_COL = "price_eur_mwh"
 
 FEATURE_COLS: list[str] = [
-    # Lag features
+    # EPEX price lags (leakage-safe: always past values)
     "lag_1h",
-    "lag_2h",
     "lag_24h",
     "lag_168h",
     # Rolling averages (price)
     "rolling_avg_24h",
     "rolling_avg_7d",
-    # req.md aliases for EPEX lags (same semantic horizon)
-    "epex_lag_1d",
-    "epex_lag_7d",
     # Calendar
     "hour_of_day",
     "day_of_week",
     "month",
     "is_weekend",
     "is_peak_hour",
-    # Weather
+    # Weather – CH (Winterthur)
     "temperature_2m",
-    # req.md alias/proxy (CH avg not yet separately ingested)
-    "temp_ch_avg",
     "wind_speed_10m",
-    # req.md proxy aliases until dedicated ENTSO-E generation series are ingested
-    "wind_generation_eu",
     "shortwave_radiation",
-    "solar_generation_ch",
     "cloud_cover",
-    "precipitation_mm",     # Niederschlag – req.md Phase 1
+    "precipitation_mm",
     "temp_rolling_avg_24h",
-    # Hydro
-    "discharge_m3s",
-    "level_masl",
-    # req.md alias/proxy until dedicated reservoir feed is integrated
-    "hydro_reservoir",
-    # Tariff signals (dynamic providers)
-    "tariff_price_chf_kwh_avg",   # Groupe E 'integrated' – primary signal
-    "ckw_price_chf_kwh_avg",      # CKW 'integrated'      – secondary signal
+    # Weather – DE proxies (EPEX price drivers)
+    "wind_speed_de_nord",        # Hamburg – DE wind proxy
+    "solar_de_nord",
+    "solar_de_sued",             # Stuttgart – DE solar proxy
+    "wind_speed_de_sued",
+    # ENTSO-E generation lags (B12 hydro RoR, B16 solar CH, B19 wind DE)
+    "hydro_ror_ch_lag_24h",
+    "hydro_ror_ch_lag_168h",
+    "solar_gen_ch_lag_24h",
+    "solar_gen_ch_lag_168h",
+    "wind_gen_de_lag_24h",
+    "wind_gen_de_lag_168h",
+    # ENTSO-E actual load lags
+    "actual_load_ch_lag_24h",
+    "actual_load_ch_lag_168h",
+    # ENTSO-E net position lags (all 4 borders: DE+IT+FR+AT)
+    "net_position_ch_lag_24h",
+    "net_position_ch_lag_168h",
+    # ENTSO-E A65/A01 day-ahead load forecast (published D-1, leakage-safe for D+1)
+    "load_forecast_ch",
 ]
 
 # NOTE: req.md's "epex_t" maps to the target (price_eur_mwh) in this project.
@@ -348,11 +351,13 @@ def run_export(
     X_test = test_df[available]
     y_test = test_df[[TARGET_COL]]
 
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
     paths = save_parquet(
         X_train, X_test, y_train, y_test, output_dir,
-        X_val=X_val, y_val=y_val, versioned=True, timestamp=ts,
+        X_val=X_val, y_val=y_val,
     )
+
+    # Save timestamps for the validation set (used by the dashboard validation chart)
+    val_df[["time"]].to_parquet(Path(output_dir) / "timestamps_val.parquet", index=False)
 
     print(
         f"Export complete – {len(train_df)} train, "
@@ -375,30 +380,23 @@ LOAD_FEATURE_COLS: list[str] = [
     "load_lag_7d",
     "load_rolling_avg_24h",
     # Calendar
-    "hour_of_day",
-    "hour",                 # req.md alias
-    "day_of_week",
-    "weekday",              # req.md alias
+    "hour",
+    "weekday",
     "month",
     "quarter",
     "is_weekend",
     # Holiday / school calendar (computed in Python, not in SQL)
     "is_holiday_zh",
-    "is_school_holiday",   # Schulferien Kanton Zürich
+    "is_school_holiday",
     # Weather
-    "temperature_2m",
-    "temp_c",               # req.md alias
-    "wind_speed_10m",
-    "wind_speed_ms",        # req.md alias
-    "shortwave_radiation",
-    "ghi_wm2",              # req.md alias
-    "cloud_cover",
-    "cloud_cover_pct",      # req.md alias
+    "temp_c",
+    "wind_speed_ms",
+    "ghi_wm2",
+    "cloud_cover_pct",
     "precipitation_mm",
-    "temp_deviation",      # temperature_2m − daily mean (computed in Python)
+    "temp_deviation",
     # PV feed-in (exogenous)
-    "pv_feed_in_kwh",
-    "pv_feed_in",           # req.md alias
+    "pv_feed_in",
 ]
 
 
@@ -564,8 +562,10 @@ def split_by_dates(
 
 def run_load_export(
     output_dir: str = "data/load/",
-    train_end: str = "2022-12-31",
-    val_end:   str = "2023-12-31",
+    train_end: str | None = None,
+    val_end: str | None = None,
+    val_days: int = 14,
+    test_days: int = 7,
 ) -> dict[str, "Path"]:
     """
     End-to-end feature export for Model A (grid-load forecasting):
@@ -573,17 +573,30 @@ def run_load_export(
     1. Validate no target leakage in LOAD_FEATURE_COLS.
     2. Query the ``winterthur_net_load_features`` view from TimescaleDB.
     3. Compute ``is_holiday_zh`` flag.
-    4. Date-based train/val/test split (train≤2022, val=2023, test≥2024).
-    5. Save parquet files: X_train, X_val, X_test, y_train, y_val, y_test.
+    4. Rolling date split anchored to the latest available data:
+         test  = last ``test_days`` days  (default 7)
+         val   = ``val_days`` before test  (default 14)
+         train = everything before val
+       This ensures val/test always sit in the most recent period where
+       weather and ENTSO-E features are available.
+       Pass explicit ``train_end`` / ``val_end`` strings to override.
+    5. Save parquet files: X_train, X_val, X_test, y_train, y_val, y_test
+       plus timestamps_val.parquet and timestamps_test.parquet.
 
     Args:
-        output_dir: Directory for parquet files (default ``data/``).
-        train_end:  Last date of training set (YYYY-MM-DD).
-        val_end:    Last date of validation set (YYYY-MM-DD).
+        output_dir: Directory for parquet files (default ``data/load/``).
+        train_end:  Last date of training set (YYYY-MM-DD). If None, computed
+                    from the data as max_date − test_days − val_days.
+        val_end:    Last date of validation set (YYYY-MM-DD). If None, computed
+                    as max_date − test_days.
+        val_days:   Days to hold out for validation (default 14).
+        test_days:  Days to hold out for test (default 7).
 
     Returns:
         Dict mapping split name to written Path.
     """
+    from datetime import timedelta  # noqa: PLC0415
+
     from db.timescale_client import get_conn  # noqa: PLC0415
 
     validate_no_leakage(LOAD_FEATURE_COLS, LOAD_TARGET_COL)
@@ -597,16 +610,34 @@ def run_load_export(
             "Ensure the ETL pipeline has loaded Winterthur OGD data."
         )
 
-    _check_data_freshness(df)
+    # OGD Bruttolastgang (Kanton ZH) has a ~1–2 day publication lag,
+    # so we allow up to 72h before raising a freshness error.
+    _check_data_freshness(df, max_age_hours=72)
 
     df = _add_holiday_flags(df)
 
-    # Fix 3: compute temp_deviation (temperature_2m − daily mean)
+    # Compute temp_deviation (temperature_2m − daily mean)
     daily_avg = df.groupby(df["time"].dt.date)["temperature_2m"].transform("mean")
     df["temp_deviation"] = df["temperature_2m"] - daily_avg
 
     # Drop rows where target is NaN
     df = df.dropna(subset=[LOAD_TARGET_COL])
+
+    # Compute dynamic split dates if not explicitly provided
+    if train_end is None or val_end is None:
+        max_date = df["time"].max().date()
+        _val_end   = max_date - timedelta(days=test_days)
+        _train_end = _val_end  - timedelta(days=val_days)
+        if val_end   is None:
+            val_end   = str(_val_end)
+        if train_end is None:
+            train_end = str(_train_end)
+
+    print(
+        f"Load export split: train ≤ {train_end}, "
+        f"val = {train_end}+1 … {val_end}, "
+        f"test = {val_end}+1 … latest"
+    )
 
     train_df, val_df, test_df = split_by_dates(df, train_end, val_end)
 
@@ -623,15 +654,18 @@ def run_load_export(
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
     paths: dict[str, Path] = {}
     for split_name, split_df in [("train", train_df), ("val", val_df), ("test", test_df)]:
-        x_path = out / f"X_{split_name}_{ts}.parquet"
-        y_path = out / f"y_{split_name}_{ts}.parquet"
+        x_path = out / f"X_{split_name}.parquet"
+        y_path = out / f"y_{split_name}.parquet"
         split_df[available].to_parquet(x_path, index=False)
         split_df[[LOAD_TARGET_COL]].to_parquet(y_path, index=False)
         paths[f"X_{split_name}"] = x_path
         paths[f"y_{split_name}"] = y_path
+
+    # Save timestamps for val/test (used by the dashboard validation chart)
+    val_df[["time"]].to_parquet(out / "timestamps_val.parquet", index=False)
+    test_df[["time"]].to_parquet(out / "timestamps_test.parquet", index=False)
 
     total = len(train_df) + len(val_df) + len(test_df)
     print(

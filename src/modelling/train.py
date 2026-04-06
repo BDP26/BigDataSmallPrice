@@ -41,25 +41,57 @@ def train_naive(X_train: pd.DataFrame, y_train: pd.DataFrame) -> DummyRegressor:
 
 
 def train_linear(X_train: pd.DataFrame, y_train: pd.DataFrame) -> LinearRegression:
-    """Linear regression baseline (NaN → median imputation)."""
+    """Linear regression baseline (NaN → median imputation, then 0 fallback)."""
     model = LinearRegression()
-    model.fit(X_train.fillna(X_train.median(numeric_only=True)), y_train.values.ravel())
+    X_filled = X_train.fillna(X_train.median(numeric_only=True)).fillna(0)
+    model.fit(X_filled, y_train.values.ravel())
     return model
 
 
-def train_xgboost(X_train: pd.DataFrame, y_train: pd.DataFrame) -> XGBRegressor:
-    """XGBoost regressor (handles NaN natively)."""
+def train_xgboost(
+    X_train: pd.DataFrame,
+    y_train: pd.DataFrame,
+    X_val: pd.DataFrame | None = None,
+    y_val: pd.DataFrame | None = None,
+) -> XGBRegressor:
+    """XGBoost regressor (handles NaN natively).
+
+    When *X_val* / *y_val* are provided, early stopping with
+    ``early_stopping_rounds=20`` is activated on the validation set.
+
+    Regularisation notes:
+    - ``max_depth=5`` (down from 6): shallower trees generalise better to
+      unseen price regimes (e.g. post-energy-crisis normalisation).
+    - ``reg_lambda=2.0``: L2 weight penalty reduces sensitivity to extreme
+      lag-price features during low/negative price hours.
+    - ``min_child_weight=5``: requires at least 5 samples per leaf, preventing
+      the model from over-specialising on rare price spikes.
+    """
+    use_early_stopping = X_val is not None and y_val is not None
     model = XGBRegressor(
         n_estimators=200,
         learning_rate=0.05,
-        max_depth=6,
+        max_depth=5,
         subsample=0.8,
         colsample_bytree=0.8,
+        min_child_weight=5,
+        reg_lambda=2.0,
+        reg_alpha=0.1,
         random_state=42,
         n_jobs=-1,
         verbosity=0,
+        early_stopping_rounds=20 if use_early_stopping else None,
     )
-    model.fit(X_train, y_train.values.ravel())
+    if use_early_stopping:
+        X_val_filled = X_val.fillna(X_val.median(numeric_only=True))
+        model.fit(
+            X_train,
+            y_train.values.ravel(),
+            eval_set=[(X_val_filled, y_val.values.ravel())],
+            verbose=False,
+        )
+    else:
+        model.fit(X_train, y_train.values.ravel())
     return model
 
 
@@ -89,7 +121,12 @@ def save_model(model: Any, name: str, models_dir: str = "models/") -> Path:
 # ── Model A: Load forecasting ─────────────────────────────────────────────────
 
 
-def train_load_model(X_train: pd.DataFrame, y_train: pd.DataFrame) -> XGBRegressor:
+def train_load_model(
+    X_train: pd.DataFrame,
+    y_train: pd.DataFrame,
+    X_val: pd.DataFrame | None = None,
+    y_val: pd.DataFrame | None = None,
+) -> XGBRegressor:
     """
     Train XGBoost model for grid-load forecasting (Model A).
 
@@ -98,7 +135,11 @@ def train_load_model(X_train: pd.DataFrame, y_train: pd.DataFrame) -> XGBRegress
 
     Target: ``net_load_kwh`` (= bruttolastgang − PV feed-in, kWh)
     Quality goal: MAPE < 8 % on the test set (req.md).
+
+    When *X_val* / *y_val* are provided, early stopping with
+    ``early_stopping_rounds=20`` is activated on the validation set.
     """
+    use_early_stopping = X_val is not None and y_val is not None
     model = XGBRegressor(
         n_estimators=300,
         learning_rate=0.05,
@@ -109,8 +150,18 @@ def train_load_model(X_train: pd.DataFrame, y_train: pd.DataFrame) -> XGBRegress
         random_state=42,
         n_jobs=-1,
         verbosity=0,
+        early_stopping_rounds=20 if use_early_stopping else None,
     )
-    model.fit(X_train, y_train.values.ravel())
+    if use_early_stopping:
+        X_val_filled = X_val.fillna(X_val.median(numeric_only=True))
+        model.fit(
+            X_train,
+            y_train.values.ravel(),
+            eval_set=[(X_val_filled, y_val.values.ravel())],
+            verbose=False,
+        )
+    else:
+        model.fit(X_train, y_train.values.ravel())
     return model
 
 
@@ -121,9 +172,12 @@ def run_load_training(
     """
     End-to-end training pipeline for Model A (grid-load forecasting).
 
-    1. Read ``X_train.parquet`` and ``y_train.parquet`` from *data_dir*.
-    2. Train the XGBoost load model.
-    3. Serialize the model to *models_dir* as ``model_load_<YYYYMMDD>.joblib``.
+    1. Read ``X_train.parquet``, ``y_train.parquet`` (+ optional val/test)
+       from *data_dir*.
+    2. Train Naive + Linear baselines and the XGBoost load model.
+    3. Evaluate all models on the test set (if available) and save metrics.
+    4. Emit a UserWarning when XGBoost test MAPE exceeds 8% (req.md).
+    5. Serialize all models to *models_dir*.
 
     Args:
         data_dir:   Directory containing parquet files from run_load_export().
@@ -135,6 +189,8 @@ def run_load_training(
     Raises:
         FileNotFoundError: If the training parquet files are not found.
     """
+    from modelling.evaluate import check_load_quality, evaluate_all, save_metrics
+
     data_path = Path(data_dir)
     x_path = data_path / "X_train.parquet"
     y_path = data_path / "y_train.parquet"
@@ -146,10 +202,48 @@ def run_load_training(
     X_train = pd.read_parquet(x_path)
     y_train = pd.read_parquet(y_path)
 
-    model = train_load_model(X_train, y_train)
-    path = save_model(model, "model_load", models_dir)
-    print(f"Saved load model: {path}")
-    return {"model_load": path}
+    # Optional validation + test splits
+    xv_path = data_path / "X_val.parquet"
+    yv_path = data_path / "y_val.parquet"
+    xt_path = data_path / "X_test.parquet"
+    yt_path = data_path / "y_test.parquet"
+    X_val = pd.read_parquet(xv_path) if xv_path.exists() else None
+    y_val = pd.read_parquet(yv_path) if yv_path.exists() else None
+    X_test = pd.read_parquet(xt_path) if xt_path.exists() else None
+    y_test = pd.read_parquet(yt_path) if yt_path.exists() else None
+
+    # Train all models
+    naive = train_naive(X_train, y_train)
+    linear = train_linear(X_train, y_train)
+    load_model = train_load_model(X_train, y_train, X_val=X_val, y_val=y_val)
+
+    paths: dict[str, Path] = {}
+    paths["naive_load"] = save_model(naive, "naive_load", models_dir)
+    paths["linear_load"] = save_model(linear, "linear_load", models_dir)
+    paths["model_load"] = save_model(load_model, "model_load", models_dir)
+    print(f"Saved naive_load:   {paths['naive_load']}")
+    print(f"Saved linear_load:  {paths['linear_load']}")
+    print(f"Saved model_load:   {paths['model_load']}")
+    if X_val is not None and getattr(load_model, "evals_result_", None):
+        import json as _json
+        ts_loss = datetime.now(timezone.utc).strftime("%Y%m%d")
+        loss_path = Path(models_dir) / f"model_load_loss_{ts_loss}.json"
+        with loss_path.open("w") as _fh:
+            _json.dump(load_model.evals_result_, _fh, indent=2)
+        print(f"Saved load model loss history: {loss_path}")
+
+    # Evaluate on test set when available
+    if X_test is not None and y_test is not None:
+        print("\n── Load model evaluation on test set ──")
+        metrics = evaluate_all(
+            {"naive_load": naive, "linear_load": linear, "model_load": load_model},
+            X_test,
+            y_test,
+        )
+        save_metrics(metrics, "metrics_load", models_dir)
+        check_load_quality(metrics)
+
+    return paths
 
 
 # ── Orchestration ─────────────────────────────────────────────────────────────
@@ -160,11 +254,14 @@ def run_training(
     models_dir: str = "models/",
 ) -> dict[str, Path]:
     """
-    End-to-end training pipeline:
+    End-to-end training pipeline for Model B (EPEX energy price forecasting).
 
-    1. Read ``X_train.parquet`` and ``y_train.parquet`` from *data_dir*.
+    1. Read ``X_train.parquet``, ``y_train.parquet`` (+ optional val/test)
+       from *data_dir*.
     2. Train naive, linear, and XGBoost models.
-    3. Serialize each model to *models_dir*.
+       XGBoost uses early stopping when a validation set is available.
+    3. Evaluate all models on the test set (if available) and save metrics.
+    4. Serialize each model to *models_dir*.
 
     Args:
         data_dir:   Directory containing parquet files from the export pipeline.
@@ -176,6 +273,8 @@ def run_training(
     Raises:
         FileNotFoundError: If training parquet files are not found in *data_dir*.
     """
+    from modelling.evaluate import evaluate_all, save_metrics
+
     data_path = Path(data_dir)
     x_path = data_path / "X_train.parquet"
     y_path = data_path / "y_train.parquet"
@@ -187,6 +286,16 @@ def run_training(
     X_train = pd.read_parquet(x_path)
     y_train = pd.read_parquet(y_path)
 
+    # Optional validation + test splits
+    xv_path = data_path / "X_val.parquet"
+    yv_path = data_path / "y_val.parquet"
+    xt_path = data_path / "X_test.parquet"
+    yt_path = data_path / "y_test.parquet"
+    X_val = pd.read_parquet(xv_path) if xv_path.exists() else None
+    y_val = pd.read_parquet(yv_path) if yv_path.exists() else None
+    X_test = pd.read_parquet(xt_path) if xt_path.exists() else None
+    y_test = pd.read_parquet(yt_path) if yt_path.exists() else None
+
     paths: dict[str, Path] = {}
 
     naive = train_naive(X_train, y_train)
@@ -197,9 +306,26 @@ def run_training(
     paths["linear"] = save_model(linear, "linear", models_dir)
     print(f"Saved linear model:  {paths['linear']}")
 
-    xgb = train_xgboost(X_train, y_train)
+    xgb = train_xgboost(X_train, y_train, X_val=X_val, y_val=y_val)
     paths["xgb"] = save_model(xgb, "xgb", models_dir)
     print(f"Saved XGBoost model: {paths['xgb']}")
+    if X_val is not None and getattr(xgb, "evals_result_", None):
+        import json as _json
+        ts_loss = datetime.now(timezone.utc).strftime("%Y%m%d")
+        loss_path = Path(models_dir) / f"xgb_loss_{ts_loss}.json"
+        with loss_path.open("w") as _fh:
+            _json.dump(xgb.evals_result_, _fh, indent=2)
+        print(f"Saved XGBoost loss history: {loss_path}")
+
+    # Evaluate on test set when available
+    if X_test is not None and y_test is not None:
+        print("\n── Energy model evaluation on test set ──")
+        metrics = evaluate_all(
+            {"naive": naive, "linear": linear, "xgb": xgb},
+            X_test,
+            y_test,
+        )
+        save_metrics(metrics, "metrics", models_dir)
 
     return paths
 

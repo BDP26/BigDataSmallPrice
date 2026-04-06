@@ -20,6 +20,7 @@ data/clean/
 data/processed/
 src/utils/ekz_tariffs_*.json
 
+
 # Exported feature splits
 data/energy/*.parquet
 data/load/*.parquet
@@ -51,3 +52,8 @@ airflow/airflow.db
 .coverage
 htmlcov/
 /.claude
+
+# DB
+postgres-data/
+infra/db/features.sql
+

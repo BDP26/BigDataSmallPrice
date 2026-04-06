@@ -175,29 +175,76 @@ SELECT add_continuous_aggregate_policy(
     if_not_exists     => TRUE
 );
 
--- ─── 10. Feature View: training_features (Phase 2) ────────────────────────────
--- Joins ENTSO-E, Weather, BAFU, Groupe E (primary) and CKW (secondary) into
--- one hourly feature table. Includes lag features, rolling averages, and
--- calendar features.
---
--- Primary tariff signal:  Groupe E 'integrated' (stdev≈0.076, highest variability)
--- Secondary tariff signal: CKW 'integrated' (regional price differential)
+-- ─── 10. ENTSO-E Actual Total Load CH (A65) ──────────────────────────────────
+CREATE TABLE IF NOT EXISTS entsoe_actual_load (
+    time      TIMESTAMPTZ      NOT NULL,
+    domain    TEXT             NOT NULL,
+    load_mwh  DOUBLE PRECISION
+);
 
--- DROP first: CREATE OR REPLACE VIEW cannot rename existing columns.
+SELECT create_hypertable(
+    'entsoe_actual_load', 'time',
+    chunk_time_interval => INTERVAL '7 days',
+    if_not_exists => TRUE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS entsoe_actual_load_time_domain_idx
+    ON entsoe_actual_load (time, domain);
+
+-- ─── 10b. ENTSO-E Generation Per Type (A75) ──────────────────────────────────
+CREATE TABLE IF NOT EXISTS entsoe_generation (
+    time          TIMESTAMPTZ      NOT NULL,
+    domain        TEXT             NOT NULL,
+    psr_type      TEXT             NOT NULL,
+    quantity_mwh  DOUBLE PRECISION
+);
+SELECT create_hypertable('entsoe_generation', 'time',
+    chunk_time_interval => INTERVAL '7 days', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS entsoe_generation_time_domain_psr_idx
+    ON entsoe_generation (time, domain, psr_type);
+
+-- ─── 10c. ENTSO-E Cross-Border Physical Flows (A11) ──────────────────────────
+CREATE TABLE IF NOT EXISTS entsoe_crossborder_flows (
+    time       TIMESTAMPTZ      NOT NULL,
+    in_domain  TEXT             NOT NULL,
+    out_domain TEXT             NOT NULL,
+    flow_mwh   DOUBLE PRECISION
+);
+SELECT create_hypertable('entsoe_crossborder_flows', 'time',
+    chunk_time_interval => INTERVAL '7 days', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS entsoe_crossborder_flows_time_domains_idx
+    ON entsoe_crossborder_flows (time, in_domain, out_domain);
+
+-- ─── 10d. ENTSO-E Day-Ahead Load Forecast (A65/A01) ──────────────────────────
+CREATE TABLE IF NOT EXISTS entsoe_load_forecast (
+    time     TIMESTAMPTZ      NOT NULL,
+    domain   TEXT             NOT NULL,
+    load_mwh DOUBLE PRECISION
+);
+SELECT create_hypertable('entsoe_load_forecast', 'time',
+    chunk_time_interval => INTERVAL '7 days', if_not_exists => TRUE);
+CREATE UNIQUE INDEX IF NOT EXISTS entsoe_load_forecast_time_domain_idx
+    ON entsoe_load_forecast (time, domain);
+
+-- ─── 10e. Feature View: training_features (Model B – EPEX Day-Ahead) ──────────
+-- Target: price_eur_mwh
+-- Design decisions:
+--   - No Groupe E / CKW: EPEX transformations → near-leakage + limit window to 3 months.
+--   - No BAFU: single river gauge, negligible signal for EU-wide market pricing.
+--   - ENTSO-E actual data used ONLY as lag features (lag_24h / lag_168h).
+--   - Weather from 3 locations: CH, DE-Nord (wind proxy), DE-Süd (solar proxy).
 DROP VIEW IF EXISTS training_features CASCADE;
 CREATE VIEW training_features AS
 WITH
-  -- ENTSO-E prices with lag and rolling window features
   price_features AS (
     SELECT
       time,
       price_eur_mwh,
       LAG(price_eur_mwh, 1)   OVER (ORDER BY time) AS lag_1h,
-      LAG(price_eur_mwh, 2)   OVER (ORDER BY time) AS lag_2h,
       LAG(price_eur_mwh, 24)  OVER (ORDER BY time) AS lag_24h,
       LAG(price_eur_mwh, 168) OVER (ORDER BY time) AS lag_168h,
       AVG(price_eur_mwh) OVER (
-        ORDER BY time ROWS BETWEEN 23 PRECEDING AND CURRENT ROW
+        ORDER BY time ROWS BETWEEN 23  PRECEDING AND CURRENT ROW
       ) AS rolling_avg_24h,
       AVG(price_eur_mwh) OVER (
         ORDER BY time ROWS BETWEEN 167 PRECEDING AND CURRENT ROW
@@ -205,73 +252,122 @@ WITH
       EXTRACT(hour  FROM time)::INT                                          AS hour_of_day,
       EXTRACT(dow   FROM time)::INT                                          AS day_of_week,
       EXTRACT(month FROM time)::INT                                          AS month,
-      CASE WHEN EXTRACT(dow  FROM time) IN (0, 6)       THEN 1 ELSE 0 END   AS is_weekend,
+      CASE WHEN EXTRACT(dow  FROM time) IN (0, 6)        THEN 1 ELSE 0 END  AS is_weekend,
       CASE WHEN EXTRACT(hour FROM time) BETWEEN 7 AND 22 THEN 1 ELSE 0 END  AS is_peak_hour
     FROM entsoe_day_ahead_prices
     WHERE domain = '10YCH-SWISSGRIDZ'
   ),
-
-  -- Join weather, BAFU, Groupe E, CKW; add temperature rolling average
-  joined AS (
+  gen_b12 AS (
+    SELECT time,
+      LAG(quantity_mwh, 24)  OVER (ORDER BY time) AS hydro_ror_ch_lag_24h,
+      LAG(quantity_mwh, 168) OVER (ORDER BY time) AS hydro_ror_ch_lag_168h
+    FROM entsoe_generation
+    WHERE domain = '10YCH-SWISSGRIDZ' AND psr_type = 'B12'
+  ),
+  gen_b16 AS (
+    SELECT time,
+      LAG(quantity_mwh, 24)  OVER (ORDER BY time) AS solar_gen_ch_lag_24h,
+      LAG(quantity_mwh, 168) OVER (ORDER BY time) AS solar_gen_ch_lag_168h
+    FROM entsoe_generation
+    WHERE domain = '10YCH-SWISSGRIDZ' AND psr_type = 'B16'
+  ),
+  gen_de_b19 AS (
+    SELECT time,
+      LAG(quantity_mwh, 24)  OVER (ORDER BY time) AS wind_gen_de_lag_24h,
+      LAG(quantity_mwh, 168) OVER (ORDER BY time) AS wind_gen_de_lag_168h
+    FROM entsoe_generation
+    WHERE domain = '10Y1001A1001A83F' AND psr_type = 'B19'
+  ),
+  actual_load AS (
+    SELECT time,
+      LAG(load_mwh, 24)  OVER (ORDER BY time) AS actual_load_ch_lag_24h,
+      LAG(load_mwh, 168) OVER (ORDER BY time) AS actual_load_ch_lag_168h
+    FROM entsoe_actual_load
+    WHERE domain = '10YCH-SWISSGRIDZ'
+  ),
+  net_pos_raw AS (
     SELECT
-      pf.time,
-      pf.price_eur_mwh,
-      -- req.md Option 1 (EPEX direkt)
-      pf.price_eur_mwh AS epex_t,
-      pf.lag_1h,
-      pf.lag_2h,
-      pf.lag_24h,
-      pf.lag_168h,
-      -- req.md Option 2 aliases
-      pf.lag_24h AS epex_lag_1d,
-      pf.lag_168h AS epex_lag_7d,
-      pf.rolling_avg_24h,
-      pf.rolling_avg_7d,
-      pf.hour_of_day,
-      pf.day_of_week,
-      pf.month,
-      pf.is_weekend,
-      pf.is_peak_hour,
-      w.temperature_2m,
-      -- Proxy until CH-wide temperature feed is added
-      w.temperature_2m AS temp_ch_avg,
-      w.wind_speed_10m,
-      -- Proxy until ENTSO-E generation series are integrated
-      w.wind_speed_10m AS wind_generation_eu,
-      w.shortwave_radiation,
-      -- Proxy until CH generation series are integrated
-      w.shortwave_radiation AS solar_generation_ch,
-      w.cloud_cover,
-      w.precipitation_mm,
-      AVG(w.temperature_2m) OVER (
-        ORDER BY pf.time ROWS BETWEEN 23 PRECEDING AND CURRENT ROW
-      ) AS temp_rolling_avg_24h,
-      bh.discharge_m3s,
-      bh.level_masl,
-      -- Proxy until explicit reservoir source is integrated
-      bh.level_masl AS hydro_reservoir,
-      CASE WHEN pf.is_weekend = 1 THEN 'weekend' ELSE 'workday' END AS day_type,
-      ge.avg_chf_kwh  AS tariff_price_chf_kwh_avg,
-      ck.avg_chf_kwh  AS ckw_price_chf_kwh_avg
-    FROM price_features pf
-    LEFT JOIN weather_hourly w
-      ON  w.time      = pf.time
-      AND w.latitude  = 47.5001
-      AND w.longitude = 8.7502
-    LEFT JOIN bafu_hydro bh
-      ON  bh.time       = pf.time
-      AND bh.station_id = '2018'
-    LEFT JOIN groupe_e_tariffs_hourly ge
-      ON  ge.hour        = pf.time
-      AND ge.tariff_type = 'integrated'
-    LEFT JOIN ckw_tariffs_hourly ck
-      ON  ck.hour        = pf.time
-      AND ck.tariff_type = 'integrated'
+      time,
+      SUM(CASE WHEN out_domain = '10YCH-SWISSGRIDZ' THEN  flow_mwh ELSE 0 END)
+    - SUM(CASE WHEN in_domain  = '10YCH-SWISSGRIDZ' THEN  flow_mwh ELSE 0 END)
+        AS net_position_ch
+    FROM entsoe_crossborder_flows
+    WHERE in_domain = '10YCH-SWISSGRIDZ' OR out_domain = '10YCH-SWISSGRIDZ'
+    GROUP BY time
+  ),
+  net_pos AS (
+    SELECT time,
+      LAG(net_position_ch, 24)  OVER (ORDER BY time) AS net_position_ch_lag_24h,
+      LAG(net_position_ch, 168) OVER (ORDER BY time) AS net_position_ch_lag_168h
+    FROM net_pos_raw
   )
 
-SELECT * FROM joined;
+SELECT
+  pf.time,
+  pf.price_eur_mwh,
+  pf.lag_1h,
+  pf.lag_24h,
+  pf.lag_168h,
+  pf.rolling_avg_24h,
+  pf.rolling_avg_7d,
+  pf.hour_of_day,
+  pf.day_of_week,
+  pf.month,
+  pf.is_weekend,
+  pf.is_peak_hour,
+  -- Weather CH (Winterthur, 47.5001 / 8.7502)
+  w_ch.temperature_2m,
+  w_ch.wind_speed_10m,
+  w_ch.shortwave_radiation,
+  w_ch.cloud_cover,
+  w_ch.precipitation_mm,
+  AVG(w_ch.temperature_2m) OVER (
+    ORDER BY pf.time ROWS BETWEEN 23 PRECEDING AND CURRENT ROW
+  ) AS temp_rolling_avg_24h,
+  -- Weather DE-Nord (Hamburg, 53.5 / 10.0 – DE wind generation proxy)
+  w_de_n.wind_speed_10m      AS wind_speed_de_nord,
+  w_de_n.shortwave_radiation AS solar_de_nord,
+  -- Weather DE-Süd (Stuttgart, 48.5 / 9.0 – DE solar generation proxy)
+  w_de_s.shortwave_radiation AS solar_de_sued,
+  w_de_s.wind_speed_10m      AS wind_speed_de_sued,
+  -- ENTSO-E generation lags
+  gl_b12.hydro_ror_ch_lag_24h,
+  gl_b12.hydro_ror_ch_lag_168h,
+  gl_b16.solar_gen_ch_lag_24h,
+  gl_b16.solar_gen_ch_lag_168h,
+  gl_b19.wind_gen_de_lag_24h,
+  gl_b19.wind_gen_de_lag_168h,
+  -- ENTSO-E actual load lags
+  al.actual_load_ch_lag_24h,
+  al.actual_load_ch_lag_168h,
+  -- CH net position lags
+  np.net_position_ch_lag_24h,
+  np.net_position_ch_lag_168h,
+  -- Load forecast (day-ahead, valid for D+1 use only)
+  lf.load_mwh AS load_forecast_ch
+FROM price_features pf
+LEFT JOIN weather_hourly w_ch
+  ON  w_ch.time      = pf.time
+  AND w_ch.latitude  = 47.5001
+  AND w_ch.longitude = 8.7502
+LEFT JOIN weather_hourly w_de_n
+  ON  w_de_n.time      = pf.time
+  AND w_de_n.latitude  = 53.5
+  AND w_de_n.longitude = 10.0
+LEFT JOIN weather_hourly w_de_s
+  ON  w_de_s.time      = pf.time
+  AND w_de_s.latitude  = 48.5
+  AND w_de_s.longitude = 9.0
+LEFT JOIN gen_b12    gl_b12 ON gl_b12.time = pf.time
+LEFT JOIN gen_b16    gl_b16 ON gl_b16.time = pf.time
+LEFT JOIN gen_de_b19 gl_b19 ON gl_b19.time = pf.time
+LEFT JOIN actual_load   al  ON al.time     = pf.time
+LEFT JOIN net_pos       np  ON np.time     = pf.time
+LEFT JOIN entsoe_load_forecast lf
+  ON  lf.time   = pf.time
+  AND lf.domain = '10YCH-SWISSGRIDZ';
 
--- ─── 10b. API Call Log (rate-limit tracking — ISOLATED from ML features) ─────
+-- ─── 10f. API Call Log (rate-limit tracking — ISOLATED from ML features) ─────
 -- WARNING: this table MUST NEVER be joined into training_features or
 -- winterthur_net_load_features. It is operational metadata only.
 CREATE TABLE IF NOT EXISTS api_call_log (

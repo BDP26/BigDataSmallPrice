@@ -70,6 +70,7 @@ class OpenMeteoCollector(BaseCollector):
             response = self._fetch_with_retry(
                 _ARCHIVE_URL,
                 params=params,
+                timeout=60,
                 source=self._source_name,
                 date_fetched=self.date,
             )

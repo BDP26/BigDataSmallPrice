@@ -93,18 +93,30 @@ class BaseCollector(ABC):
         date_fetched: str | None = None,
     ) -> httpx.Response:
         """
-        GET *url* with automatic retry on 429 / 5xx responses.
+        GET *url* with automatic retry on 429 / 5xx responses and network errors.
 
         - 429 Too Many Requests: waits Retry-After seconds (default 60).
         - 500/502/503: exponential back-off (1s, 2s, 4s).
+        - ConnectTimeout/ReadTimeout/ConnectError: exponential back-off.
         - All other errors raise immediately via raise_for_status().
 
         If *source* is provided, each response is logged to api_call_log.
         """
         response: httpx.Response | None = None
+        last_exc: BaseException | None = None
         for attempt in range(max_retries):
             t0 = time.monotonic()
-            response = httpx.get(url, params=params, timeout=timeout)
+            try:
+                response = httpx.get(url, params=params, timeout=timeout)
+            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.ConnectError) as exc:
+                last_exc = exc
+                wait = 2 ** attempt
+                _LOG.warning(
+                    "Network error on attempt %d/%d for %s: %s – retrying in %ds",
+                    attempt + 1, max_retries, url, exc, wait,
+                )
+                time.sleep(wait)
+                continue
             response_ms = int((time.monotonic() - t0) * 1000)
 
             if source:
@@ -119,8 +131,9 @@ class BaseCollector(ABC):
                 continue
             response.raise_for_status()
             return response
-        # Last attempt exhausted – raise whatever we got
-        assert response is not None
+        # Last attempt exhausted
+        if response is None:
+            raise last_exc  # type: ignore[misc]
         response.raise_for_status()
         return response  # unreachable, but satisfies type checkers
 

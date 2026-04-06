@@ -21,25 +21,11 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install test dependencies
+      - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install \
-            httpx \
-            psycopg2-binary \
-            pandas \
-            pyarrow \
-            fastapi \
-            uvicorn \
-            python-multipart \
-            scikit-learn \
-            "xgboost>=2.0" \
-            "PyJWT>=2.8" \
-            joblib \
-            pytest \
-            pytest-mock \
-            responses \
-            ruff
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pytest-mock responses ruff  # Test-Tools separat
 
       - name: Lint with ruff
         run: |

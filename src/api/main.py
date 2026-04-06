@@ -16,6 +16,10 @@ Serves:
   POST /api/predict                   → model inference (JWT required)
   POST /api/backfill/trigger          → trigger bdsp_backfill Airflow DAG
   GET  /api/backfill/status/{run_id}  → poll a specific backfill dag_run by run-id
+  GET  /api/models/status             → list trained models + evaluation metrics
+  GET  /api/models/validation/{name}  → val-set predictions + loss history for a model
+  POST /api/training/trigger          → trigger bdsp_training_daily DAG
+  GET  /api/training/status/{run_id}  → poll a specific training dag_run by run-id
 """
 
 from __future__ import annotations
@@ -49,15 +53,19 @@ _DB = {
 }
 
 _TABLES = {
-    "entsoe":            "entsoe_day_ahead_prices",
-    "weather":           "weather_hourly",
-    "ckw":               "ckw_tariffs_raw",
-    "groupe_e":          "groupe_e_tariffs_raw",
-    "ekz":               "ekz_tariffs_raw",
-    "bafu":              "bafu_hydro",
-    "winterthur_load":   "winterthur_load",
-    "winterthur_pv":     "winterthur_pv",
-    "features":          "training_features",
+    "entsoe":          "entsoe_day_ahead_prices",
+    "entsoe_load":     "entsoe_actual_load",
+    "entsoe_gen":      "entsoe_generation",
+    "entsoe_flows":    "entsoe_crossborder_flows",
+    "entsoe_forecast": "entsoe_load_forecast",
+    "weather":         "weather_hourly",
+    "ckw":             "ckw_tariffs_raw",
+    "groupe_e":        "groupe_e_tariffs_raw",
+    "ekz":             "ekz_tariffs_raw",
+    "bafu":            "bafu_hydro",
+    "winterthur_load": "winterthur_load",
+    "winterthur_pv":   "winterthur_pv",
+    "features":        "training_features",
 }
 
 _AIRFLOW_URL  = os.getenv("AIRFLOW_API_URL",     "http://airflow-webserver:8080")
@@ -446,6 +454,138 @@ def db_rows(
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
+@app.get("/api/timeseries/{table}")
+def timeseries(
+    table: str,
+    horizon: str = Query(default="1w"),
+):
+    """
+    Return Plotly-ready time series traces for a whitelisted table.
+
+    horizon: 1d | 1w | 1m | 1y | all
+    """
+    if table not in _ALLOWED_TABLES:
+        return JSONResponse({"error": f"Unknown table: {table!r}"}, status_code=400)
+
+    horizon_map = {
+        "1d": "1 day", "1w": "7 days", "1m": "30 days", "1y": "365 days",
+    }
+    where_extra = (
+        f"AND time >= NOW() - INTERVAL '{horizon_map[horizon]}'"
+        if horizon in horizon_map else ""
+    )
+
+    # Categorical grouping columns: pivot these into separate traces
+    _GROUP_COLS: dict[str, list[str]] = {
+        "entsoe_generation":        ["domain", "psr_type"],
+        "entsoe_crossborder_flows": ["in_domain", "out_domain"],
+        "ckw_tariffs_raw":          ["tariff_type"],
+        "groupe_e_tariffs_raw":     ["tariff_type"],
+        "ekz_tariffs_raw":          ["tariff_type"],
+        "bafu_hydro":               ["station_id"],
+        "entsoe_day_ahead_prices":  [],
+        "entsoe_actual_load":       [],
+        "entsoe_load_forecast":     [],
+        "weather_hourly":           [],
+        "winterthur_load":          [],
+        "winterthur_pv":            [],
+        "training_features":        [],
+    }
+
+    # Columns to skip even if numeric (coordinates, IDs)
+    _SKIP_COLS = {"latitude", "longitude", "id"}
+
+    try:
+        conn = _connect()
+        cur = conn.cursor()
+
+        # Fetch column metadata
+        cur.execute(
+            """
+            SELECT column_name, data_type
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = %s
+            ORDER BY ordinal_position
+            """,
+            (table,),
+        )
+        schema = cur.fetchall()
+
+        numeric_types = {"double precision", "numeric", "integer", "bigint", "real", "smallint"}
+        group_cols = _GROUP_COLS.get(table, [])
+        num_cols = [
+            c for c, t in schema
+            if t in numeric_types and c not in _SKIP_COLS
+        ]
+
+        if not num_cols:
+            cur.close()
+            conn.close()
+            return {"traces": []}
+
+        select_cols = ["time"] + group_cols + num_cols
+        # Use parameterized query for horizon but safe string interpolation for
+        # column/table names (already validated via whitelist)
+        sql = (
+            f"SELECT {', '.join(select_cols)} "  # noqa: S608
+            f"FROM {table} "
+            f"WHERE TRUE {where_extra} "
+            f"ORDER BY time ASC "
+            f"LIMIT 10000"
+        )
+        cur.execute(sql)
+        rows = cur.fetchall()
+        col_names = [desc[0] for desc in cur.description]
+        cur.close()
+        conn.close()
+
+        if not rows:
+            return {"traces": []}
+
+        col_idx = {c: i for i, c in enumerate(col_names)}
+
+        if group_cols:
+            # Pivot: one trace per unique combination of group columns
+            from collections import defaultdict
+            buckets: dict[str, dict] = defaultdict(lambda: {"x": [], "y_map": {}})
+
+            for row in rows:
+                t = row[col_idx["time"]].isoformat()
+                cat_key = " | ".join(str(row[col_idx[g]]) for g in group_cols)
+                bucket = buckets[cat_key]
+                bucket["x"].append(t)
+                for nc in num_cols:
+                    v = row[col_idx[nc]]
+                    bucket["y_map"].setdefault(nc, []).append(
+                        float(v) if v is not None else None
+                    )
+
+            traces = []
+            for cat_key, bucket in buckets.items():
+                for nc, ys in bucket["y_map"].items():
+                    name = f"{cat_key}" if len(num_cols) == 1 else f"{cat_key} · {nc}"
+                    traces.append({"name": name, "x": bucket["x"], "y": ys})
+        else:
+            # Simple: one trace per numeric column
+            times = [row[col_idx["time"]].isoformat() for row in rows]
+            traces = [
+                {
+                    "name": nc,
+                    "x": times,
+                    "y": [
+                        float(row[col_idx[nc]]) if row[col_idx[nc]] is not None else None
+                        for row in rows
+                    ],
+                }
+                for nc in num_cols
+            ]
+
+        return {"traces": traces}
+
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
 @app.get("/api/feature-status")
 def feature_status():
     sql = """
@@ -753,6 +893,282 @@ def backfill_status(dag_run_id: str):
                 "start_date": data.get("start_date"),
                 "end_date":   data.get("end_date"),
             }
+    except httpx.ConnectError:
+        return JSONResponse({"error": "Airflow not reachable"}, status_code=503)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+# ── Model registry / training endpoints ──────────────────────────────────────
+
+
+@app.get("/api/models/status")
+def models_status():
+    """
+    Return info on all trained models and their evaluation metrics.
+
+    Scans BDSP_MODELS_DIR for *.joblib files and the corresponding
+    metrics_<YYYYMMDD>.json / metrics_load_<YYYYMMDD>.json files.
+
+    Returns a dict with two keys:
+      model_b  – EPEX energy-price models (naive / linear / xgb)
+      model_a  – Winterthur load models  (naive_load / linear_load / model_load)
+    """
+    import json as _json
+    import re as _re
+
+    models_dir = Path(os.getenv("BDSP_MODELS_DIR", "models/"))
+
+    def _latest_json(prefix: str) -> dict:
+        """Find the newest metrics JSON with the exact prefix (YYYYMMDD suffix only)."""
+        # Use regex to avoid metrics_*.json also matching metrics_load_*.json
+        files = sorted(
+            f for f in models_dir.glob(f"{prefix}_*.json")
+            if _re.match(rf"^{_re.escape(prefix)}_\d{{8}}\.json$", f.name)
+        )
+        if not files:
+            return {}
+        try:
+            return _json.loads(files[-1].read_text())
+        except Exception:
+            return {}
+
+    def _latest_model_date(prefix: str) -> str | None:
+        """Return the date portion (YYYYMMDD) from the newest matching .joblib."""
+        files = sorted(models_dir.glob(f"{prefix}_*.joblib"))
+        if not files:
+            return None
+        m = _re.search(r"(\d{8})", files[-1].name)
+        return m.group(1) if m else None
+
+    model_b_date = _latest_model_date("xgb")
+    model_a_date = _latest_model_date("model_load")
+
+    return {
+        "model_b": {
+            "description": "EPEX day-ahead price (EUR/MWh)",
+            "latest_date": model_b_date,
+            "metrics": _latest_json("metrics"),
+        },
+        "model_a": {
+            "description": "Winterthur net grid load (kWh)",
+            "latest_date": model_a_date,
+            "metrics": _latest_json("metrics_load"),
+            "mape_threshold": 8.0,
+        },
+    }
+
+
+@app.get("/api/models/validation/{model_name}")
+def models_validation(model_name: str):
+    """
+    Return validation-set predictions + XGBoost loss history for a trained model.
+
+    model_name must be one of:
+      xgb, linear, naive            → data/energy/  (Model B, EPEX price)
+      model_load, linear_load, naive_load → data/load/  (Model A, net load)
+
+    Returns:
+      model_name, n_points, timestamps, y_true, y_pred, loss_history (or null)
+    """
+    import json as _json
+    import re as _re
+
+    _ENERGY_MODELS = {"xgb", "linear", "naive"}
+    _LOAD_MODELS   = {"model_load", "linear_load", "naive_load"}
+    if model_name not in _ENERGY_MODELS | _LOAD_MODELS:
+        return JSONResponse({"error": f"Unknown model '{model_name}'"}, status_code=400)
+
+    models_dir = Path(os.getenv("BDSP_MODELS_DIR", "models/"))
+    is_load    = model_name in _LOAD_MODELS
+    default_data_dir = (
+        "/opt/airflow/data/load/" if is_load else "/opt/airflow/data/energy/"
+    )
+    data_dir = Path(
+        os.getenv("BDSP_LOAD_EXPORT_DIR" if is_load else "BDSP_ENERGY_EXPORT_DIR",
+                  default_data_dir)
+    )
+
+    # ── Load model ────────────────────────────────────────────────────────────
+    model_files = sorted(models_dir.glob(f"{model_name}_*.joblib"))
+    if not model_files:
+        return JSONResponse(
+            {"error": f"No trained model found for '{model_name}' in {models_dir}"},
+            status_code=404,
+        )
+    try:
+        import joblib as _joblib
+        model = _joblib.load(model_files[-1])
+    except Exception as exc:
+        return JSONResponse({"error": f"Failed to load model: {exc}"}, status_code=500)
+
+    # ── Load validation parquets ──────────────────────────────────────────────
+    x_path  = data_dir / "X_val.parquet"
+    y_path  = data_dir / "y_val.parquet"
+    ts_path = data_dir / "timestamps_val.parquet"
+
+    if not x_path.exists() or not y_path.exists():
+        return JSONResponse(
+            {"error": f"Validation parquets not found in {data_dir}. "
+                      "Re-run the feature export pipeline first."},
+            status_code=404,
+        )
+
+    try:
+        X_val  = pd.read_parquet(x_path)
+        y_val  = pd.read_parquet(y_path)
+        X_filled = X_val.fillna(X_val.median(numeric_only=True)).fillna(0)
+        y_pred_arr = model.predict(X_filled)
+        y_true_list = y_val.values.ravel().tolist()
+        y_pred_list = [float(v) for v in y_pred_arr]
+
+        if ts_path.exists():
+            ts_df = pd.read_parquet(ts_path)
+            raw_ts = ts_df.iloc[:, 0]
+            # Ensure tz-aware timestamps → ISO 8601
+            if hasattr(raw_ts.dtype, "tz") and raw_ts.dtype.tz is not None:
+                timestamps = raw_ts.dt.strftime("%Y-%m-%dT%H:%M:%SZ").tolist()
+            else:
+                timestamps = pd.to_datetime(raw_ts).dt.strftime(
+                    "%Y-%m-%dT%H:%M:%S"
+                ).tolist()
+        else:
+            timestamps = list(range(len(y_true_list)))
+
+        # Downsample to ≤ 500 points for chart performance
+        n = len(y_true_list)
+        if n > 500:
+            step    = max(1, n // 500)
+            indices = list(range(0, n, step))[:500]
+            y_true_list = [y_true_list[i] for i in indices]
+            y_pred_list = [y_pred_list[i] for i in indices]
+            timestamps  = [timestamps[i]  for i in indices]
+
+        # ── Loss history (XGBoost only, when val was used during training) ───
+        loss_history = None
+        loss_files = sorted(
+            f for f in models_dir.glob(f"{model_name}_loss_*.json")
+            if _re.match(
+                rf"^{_re.escape(model_name)}_loss_\d{{8}}\.json$", f.name
+            )
+        )
+        if loss_files:
+            try:
+                loss_history = _json.loads(loss_files[-1].read_text())
+            except Exception:
+                pass
+
+        return {
+            "model_name":   model_name,
+            "n_points":     len(y_true_list),
+            "timestamps":   timestamps,
+            "y_true":       y_true_list,
+            "y_pred":       y_pred_list,
+            "loss_history": loss_history,
+        }
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.post("/api/training/trigger")
+def training_trigger():
+    """Trigger the bdsp_training_daily Airflow DAG (manual run)."""
+    url = f"{_AIRFLOW_URL.rstrip('/')}/api/v1/dags/bdsp_training_daily/dagRuns"
+    try:
+        with httpx.Client(timeout=10) as client:
+            resp = client.post(url, json={}, auth=(_AIRFLOW_USER, _AIRFLOW_PASS))
+            if resp.status_code not in (200, 201):
+                return JSONResponse(
+                    {"error": f"Airflow returned {resp.status_code}: {resp.text}"},
+                    status_code=502,
+                )
+            data = resp.json()
+            return {
+                "dag_run_id": data.get("dag_run_id"),
+                "state":      data.get("state", "queued"),
+                "message":    "Training triggered.",
+            }
+    except httpx.ConnectError:
+        return JSONResponse({"error": "Airflow not reachable"}, status_code=503)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.get("/api/training/status/{dag_run_id}")
+def training_status(dag_run_id: str):
+    """Poll the state of a specific bdsp_training_daily DAG run."""
+    url = (
+        f"{_AIRFLOW_URL.rstrip('/')}/api/v1"
+        f"/dags/bdsp_training_daily/dagRuns/{dag_run_id}"
+    )
+    try:
+        with httpx.Client(timeout=10) as client:
+            resp = client.get(url, auth=(_AIRFLOW_USER, _AIRFLOW_PASS))
+            if resp.status_code == 404:
+                return JSONResponse(
+                    {"error": f"DAG run '{dag_run_id}' not found"}, status_code=404
+                )
+            resp.raise_for_status()
+            data = resp.json()
+            return {
+                "dag_run_id": data.get("dag_run_id"),
+                "state":      data.get("state"),
+                "start_date": data.get("start_date"),
+                "end_date":   data.get("end_date"),
+            }
+    except httpx.ConnectError:
+        return JSONResponse({"error": "Airflow not reachable"}, status_code=503)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.get("/api/training/tasks/{dag_run_id}")
+def training_tasks(dag_run_id: str):
+    """
+    Return the state of each task instance for a bdsp_training_daily DAG run.
+
+    Used by the admin dashboard to show per-task progress (Model A / Model B).
+    """
+    base = _AIRFLOW_URL.rstrip("/") + "/api/v1"
+    auth = (_AIRFLOW_USER, _AIRFLOW_PASS)
+    try:
+        with httpx.Client(timeout=10) as client:
+            # Overall run state
+            run_resp = client.get(
+                f"{base}/dags/bdsp_training_daily/dagRuns/{dag_run_id}",
+                auth=auth,
+            )
+            if run_resp.status_code == 404:
+                return JSONResponse({"error": "DAG run not found"}, status_code=404)
+            run_resp.raise_for_status()
+            run_data = run_resp.json()
+
+            # Individual task states
+            ti_resp = client.get(
+                f"{base}/dags/bdsp_training_daily/dagRuns/{dag_run_id}/taskInstances",
+                auth=auth,
+            )
+            ti_resp.raise_for_status()
+            task_instances = ti_resp.json().get("task_instances", [])
+
+        tasks = {
+            ti["task_id"]: {
+                "state":      ti.get("state"),
+                "start_date": ti.get("start_date"),
+                "end_date":   ti.get("end_date"),
+                "duration":   ti.get("duration"),
+                "try_number": ti.get("try_number", 1),
+            }
+            for ti in task_instances
+        }
+
+        return {
+            "dag_run_id": run_data.get("dag_run_id"),
+            "run_state":  run_data.get("state"),
+            "start_date": run_data.get("start_date"),
+            "end_date":   run_data.get("end_date"),
+            "tasks":      tasks,
+        }
     except httpx.ConnectError:
         return JSONResponse({"error": "Airflow not reachable"}, status_code=503)
     except Exception as exc:
