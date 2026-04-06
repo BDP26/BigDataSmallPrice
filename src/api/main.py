@@ -941,6 +941,14 @@ def models_status():
         m = _re.search(r"(\d{8})", files[-1].name)
         return m.group(1) if m else None
 
+    def _latest_torch_date(prefix: str) -> str | None:
+        """Return the date portion (YYYYMMDD) from the newest matching .pt bundle."""
+        files = sorted(models_dir.glob(f"{prefix}_*.pt"))
+        if not files:
+            return None
+        m = _re.search(r"(\d{8})", files[-1].name)
+        return m.group(1) if m else None
+
     model_b_date = _latest_model_date("xgb")
     model_a_date = _latest_model_date("model_load")
 
@@ -956,17 +964,36 @@ def models_status():
             "metrics": _latest_json("metrics_load"),
             "mape_threshold": 8.0,
         },
+        "lstm_energy": {
+            "description": "EPEX day-ahead price – LSTM (EUR/MWh)",
+            "latest_date": _latest_torch_date("lstm_energy"),
+            "metrics": _latest_json("metrics_lstm_energy"),
+        },
+        "lstm_load": {
+            "description": "Winterthur net grid load – LSTM (kWh)",
+            "latest_date": _latest_torch_date("lstm_load"),
+            "metrics": _latest_json("metrics_lstm_load"),
+            "mape_threshold": 8.0,
+        },
+        "transformer_load": {
+            "description": "Winterthur net grid load – Transformer (kWh)",
+            "latest_date": _latest_torch_date("transformer_load"),
+            "metrics": _latest_json("metrics_transformer_load"),
+            "mape_threshold": 8.0,
+        },
     }
 
 
 @app.get("/api/models/validation/{model_name}")
 def models_validation(model_name: str):
     """
-    Return validation-set predictions + XGBoost loss history for a trained model.
+    Return validation-set predictions + loss history for a trained model.
 
     model_name must be one of:
-      xgb, linear, naive            → data/energy/  (Model B, EPEX price)
-      model_load, linear_load, naive_load → data/load/  (Model A, net load)
+      xgb, linear, naive                      → data/energy/  (Model B, EPEX)
+      model_load, linear_load, naive_load      → data/load/   (Model A, load)
+      lstm_energy                              → data/energy/  (Model B, LSTM)
+      lstm_load, transformer_load              → data/load/   (Model A, DL)
 
     Returns:
       model_name, n_points, timestamps, y_true, y_pred, loss_history (or null)
@@ -974,8 +1001,11 @@ def models_validation(model_name: str):
     import json as _json
     import re as _re
 
-    _ENERGY_MODELS = {"xgb", "linear", "naive"}
-    _LOAD_MODELS   = {"model_load", "linear_load", "naive_load"}
+    _ENERGY_MODELS = {"xgb", "linear", "naive", "lstm_energy"}
+    _LOAD_MODELS   = {"model_load", "linear_load", "naive_load",
+                      "lstm_load", "transformer_load"}
+    _TORCH_MODELS  = {"lstm_energy", "lstm_load", "transformer_load"}
+
     if model_name not in _ENERGY_MODELS | _LOAD_MODELS:
         return JSONResponse({"error": f"Unknown model '{model_name}'"}, status_code=400)
 
@@ -989,20 +1019,6 @@ def models_validation(model_name: str):
                   default_data_dir)
     )
 
-    # ── Load model ────────────────────────────────────────────────────────────
-    model_files = sorted(models_dir.glob(f"{model_name}_*.joblib"))
-    if not model_files:
-        return JSONResponse(
-            {"error": f"No trained model found for '{model_name}' in {models_dir}"},
-            status_code=404,
-        )
-    try:
-        import joblib as _joblib
-        model = _joblib.load(model_files[-1])
-    except Exception as exc:
-        return JSONResponse({"error": f"Failed to load model: {exc}"}, status_code=500)
-
-    # ── Load validation parquets ──────────────────────────────────────────────
     x_path  = data_dir / "X_val.parquet"
     y_path  = data_dir / "y_val.parquet"
     ts_path = data_dir / "timestamps_val.parquet"
@@ -1015,17 +1031,55 @@ def models_validation(model_name: str):
         )
 
     try:
-        X_val  = pd.read_parquet(x_path)
-        y_val  = pd.read_parquet(y_path)
-        X_filled = X_val.fillna(X_val.median(numeric_only=True)).fillna(0)
-        y_pred_arr = model.predict(X_filled)
+        y_val = pd.read_parquet(y_path)
         y_true_list = y_val.values.ravel().tolist()
-        y_pred_list = [float(v) for v in y_pred_arr]
 
+        # ── Torch sequence models (LSTM / Transformer) ────────────────────────
+        if model_name in _TORCH_MODELS:
+            pt_files = sorted(models_dir.glob(f"{model_name}_*.pt"))
+            if not pt_files:
+                return JSONResponse(
+                    {"error": f"No trained torch model found for '{model_name}' in {models_dir}. "
+                              "Trigger the training DAG first."},
+                    status_code=404,
+                )
+            from modelling.predict import predict_sequence_val  # noqa: PLC0415
+
+            X_val = pd.read_parquet(x_path).fillna(0)
+            x_train_path = data_dir / "X_train.parquet"
+            if not x_train_path.exists():
+                return JSONResponse(
+                    {"error": "X_train.parquet not found – needed as context for sequence inference."},
+                    status_code=404,
+                )
+            X_train = pd.read_parquet(x_train_path).fillna(0)
+            y_pred_arr = predict_sequence_val(pt_files[-1], X_train, X_val)
+            y_pred_list = [float(v) for v in y_pred_arr]
+
+        # ── Sklearn / XGBoost (joblib) models ─────────────────────────────────
+        else:
+            model_files = sorted(models_dir.glob(f"{model_name}_*.joblib"))
+            if not model_files:
+                return JSONResponse(
+                    {"error": f"No trained model found for '{model_name}' in {models_dir}"},
+                    status_code=404,
+                )
+            import joblib as _joblib  # noqa: PLC0415
+            model  = _joblib.load(model_files[-1])
+            X_val  = pd.read_parquet(x_path)
+            X_filled = X_val.fillna(X_val.median(numeric_only=True)).fillna(0)
+            y_pred_arr = model.predict(X_filled)
+            y_pred_list = [float(v) for v in y_pred_arr]
+
+        # ── Align lengths (torch models may produce fewer points due to lookback) ──
+        min_len = min(len(y_true_list), len(y_pred_list))
+        y_true_list = y_true_list[-min_len:]
+        y_pred_list = y_pred_list[-min_len:]
+
+        # ── Timestamps ────────────────────────────────────────────────────────
         if ts_path.exists():
-            ts_df = pd.read_parquet(ts_path)
-            raw_ts = ts_df.iloc[:, 0]
-            # Ensure tz-aware timestamps → ISO 8601
+            ts_df  = pd.read_parquet(ts_path)
+            raw_ts = ts_df.iloc[:, 0].iloc[-min_len:]
             if hasattr(raw_ts.dtype, "tz") and raw_ts.dtype.tz is not None:
                 timestamps = raw_ts.dt.strftime("%Y-%m-%dT%H:%M:%SZ").tolist()
             else:
@@ -1033,7 +1087,7 @@ def models_validation(model_name: str):
                     "%Y-%m-%dT%H:%M:%S"
                 ).tolist()
         else:
-            timestamps = list(range(len(y_true_list)))
+            timestamps = list(range(min_len))
 
         # Downsample to ≤ 500 points for chart performance
         n = len(y_true_list)
@@ -1044,7 +1098,7 @@ def models_validation(model_name: str):
             y_pred_list = [y_pred_list[i] for i in indices]
             timestamps  = [timestamps[i]  for i in indices]
 
-        # ── Loss history (XGBoost only, when val was used during training) ───
+        # ── Loss history (XGBoost / LSTM / Transformer when val was used) ────
         loss_history = None
         loss_files = sorted(
             f for f in models_dir.glob(f"{model_name}_loss_*.json")

@@ -7,3 +7,9 @@ RUN pip install --no-cache-dir \
     "xgboost>=2.0" \
     "pyarrow>=15" \
     "holidays>=0.46"
+
+# PyTorch with CUDA 12.4 support (sequence models: LSTM + Transformer)
+# Falls back to CPU automatically when no GPU is accessible at runtime.
+RUN pip install --no-cache-dir \
+    "torch>=2.2" \
+    --index-url https://download.pytorch.org/whl/cu124

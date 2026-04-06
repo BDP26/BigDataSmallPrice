@@ -22,6 +22,13 @@ x-airflow-common: &airflow-common
     - ./src:/opt/airflow/src
     - ./data:/opt/airflow/data
     - ./models:/opt/airflow/models
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            device_ids: ["0"]   # RTX 3080 – dediziert für ML-Training
+            capabilities: [gpu]
   depends_on:
     postgres:
       condition: service_healthy

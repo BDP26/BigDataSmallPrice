@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+import numpy as np
 import pandas as pd
 
 
@@ -29,17 +30,17 @@ def _feature_cols() -> list[str]:
     return FEATURE_COLS
 
 
-# ── Public API ────────────────────────────────────────────────────────────────
+# ── Sklearn / XGBoost (joblib) models ────────────────────────────────────────
 
 
 def load_model(path: str | Path) -> Any:
-    """Load a joblib-serialised model from *path*."""
+    """Load a joblib-serialised sklearn/XGBoost model from *path*."""
     return joblib.load(path)
 
 
 def find_latest_model(models_dir: str = "models/", prefix: str = "xgb") -> Path:
     """
-    Return the path to the most recently created model file with *prefix*.
+    Return the path to the most recently created ``.joblib`` file with *prefix*.
 
     Args:
         models_dir: Directory to search.
@@ -85,3 +86,77 @@ def predict_from_dict(model: Any, feature_dict: dict[str, float]) -> float:
     row = {col: feature_dict.get(col, float("nan")) for col in cols}
     X = pd.DataFrame([row])
     return float(predict(model, X)[0])
+
+
+# ── PyTorch sequence models (LSTM / Transformer) ──────────────────────────────
+
+
+def find_latest_torch_model(models_dir: str = "models/", prefix: str = "lstm_load") -> Path:
+    """
+    Return the path to the most recently created ``.pt`` bundle with *prefix*.
+
+    Raises:
+        FileNotFoundError: If no matching file is found.
+    """
+    files = sorted(Path(models_dir).glob(f"{prefix}_*.pt"))
+    if not files:
+        raise FileNotFoundError(
+            f"No torch model with prefix {prefix!r} found in {models_dir!r}. "
+            "Train a sequence model first."
+        )
+    return files[-1]
+
+
+def predict_sequence_val(
+    bundle_path: str | Path,
+    X_train_tail: pd.DataFrame,
+    X_val: pd.DataFrame,
+    batch_size: int = 1024,
+) -> np.ndarray:
+    """
+    Run a trained LSTM/Transformer on the validation set.
+
+    Prepends the last *lookback* rows of *X_train_tail* as context so that
+    the very first validation step has a full input window.  Applies the
+    scaler stored in the bundle and rescales predictions to original units.
+
+    Args:
+        bundle_path:   Path to a ``.pt`` bundle created by save_torch_model().
+        X_train_tail:  Last *lookback* rows of training features (unscaled).
+        X_val:         Validation feature DataFrame (unscaled).
+        batch_size:    Inference batch size.
+
+    Returns:
+        Array of shape (len(X_val),) in original target units.
+    """
+    from modelling.sequence_models import (  # noqa: PLC0415
+        load_torch_bundle,
+        predict_from_sequences,
+        reconstruct_model,
+    )
+
+    bundle = load_torch_bundle(bundle_path)
+    model = reconstruct_model(bundle)
+
+    lookback: int = bundle["lookback"]
+    X_mean: np.ndarray = bundle["scaler_mean"]
+    X_scale: np.ndarray = bundle["scaler_scale"]
+    y_mean: float = bundle["y_mean"]
+    y_scale: float = bundle["y_scale"]
+    feature_cols: list[str] = bundle["feature_cols"]
+
+    # Align columns to what the model was trained on
+    def _align(df: pd.DataFrame) -> np.ndarray:
+        aligned = pd.DataFrame(
+            {col: df[col] if col in df.columns else 0.0 for col in feature_cols}
+        )
+        return aligned.fillna(0).values.astype("float32")
+
+    tail_np = _align(X_train_tail)[-lookback:]
+    val_np  = _align(X_val)
+
+    X_ctx = np.concatenate([tail_np, val_np], axis=0)
+    X_ctx_sc = (X_ctx - X_mean) / X_scale
+
+    preds_sc = predict_from_sequences(model, X_ctx_sc, lookback, batch_size)
+    return preds_sc * y_scale + y_mean
