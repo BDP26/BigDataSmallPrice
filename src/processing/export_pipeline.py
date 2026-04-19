@@ -44,6 +44,13 @@ FEATURE_COLS: list[str] = [
     "month",
     "is_weekend",
     "is_peak_hour",
+    # Cyclical encoding (sin/cos features for time-based patterns)
+    "hour_sin",
+    "hour_cos",
+    "dow_sin",
+    "dow_cos",
+    "month_sin",
+    "month_cos",
     # Weather – CH (Winterthur)
     "temperature_2m",
     "wind_speed_10m",

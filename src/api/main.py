@@ -352,6 +352,260 @@ def forecast():
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
+@app.get("/api/forecast/week")
+def forecast_week():
+    """
+    Return a 7-day price forecast in 15-min intervals (672 points).
+
+    Strategy (Wochenanker): for each future slot t the feature row from
+    t−168 h (same time last week) is used as template.  Lag features and
+    calendar fields are corrected for the actual future timestamp; future
+    weather data from weather_hourly overrides template weather when
+    available.  XGBoost Model B (EPEX energy) is always run; Model A
+    (Winterthur net load) is run when available and drives the netzpreis
+    component, otherwise DEFAULT_NETZ_STANDARD is used as fallback.
+
+    Returns parallel arrays plus the top-6 cheapest non-overlapping 2-h
+    windows for appliance-scheduling recommendations.
+    """
+    import datetime as _dt
+    import math as _math
+
+    HORIZON_DAYS = 7
+    SLOT_MIN     = 15
+    SLOTS_PER_DAY = 96
+
+    try:
+        conn = _connect()
+
+        # ── 1. Forecast window ────────────────────────────────────────────────
+        now = _dt.datetime.now(_dt.timezone.utc).replace(second=0, microsecond=0)
+        rem = now.minute % SLOT_MIN
+        forecast_start = now + _dt.timedelta(minutes=(SLOT_MIN - rem) % SLOT_MIN or SLOT_MIN)
+        forecast_start = forecast_start.replace(second=0, microsecond=0)
+        n_slots    = HORIZON_DAYS * SLOTS_PER_DAY   # 672
+        future_ts  = [forecast_start + _dt.timedelta(minutes=SLOT_MIN * i) for i in range(n_slots)]
+        forecast_end = future_ts[-1] + _dt.timedelta(minutes=SLOT_MIN)
+
+        # ── 2. Historical energy features (last 14 days) ──────────────────────
+        hist_start = forecast_start - _dt.timedelta(days=14, hours=1)
+        df_e = pd.read_sql(
+            "SELECT * FROM training_features WHERE time >= %s AND time < %s ORDER BY time",
+            conn, params=(hist_start, forecast_start), parse_dates=["time"],
+        )
+        if not df_e.empty:
+            if df_e["time"].dt.tz is None:
+                df_e["time"] = df_e["time"].dt.tz_localize("UTC")
+            df_e = df_e.set_index("time")
+
+        # ── 3. Historical net load for Model A lag features ───────────────────
+        df_nl: pd.DataFrame = pd.DataFrame()
+        try:
+            df_nl = pd.read_sql(
+                "SELECT time, net_load_kwh, load_rolling_avg_24h "
+                "FROM winterthur_net_load_features "
+                "WHERE time >= %s AND time < %s ORDER BY time",
+                conn, params=(hist_start, forecast_start), parse_dates=["time"],
+            )
+            if not df_nl.empty:
+                if df_nl["time"].dt.tz is None:
+                    df_nl["time"] = df_nl["time"].dt.tz_localize("UTC")
+                df_nl = df_nl.set_index("time")
+        except Exception:
+            pass
+
+        # ── 4. Future weather (overrides template when available) ─────────────
+        df_wf: pd.DataFrame = pd.DataFrame()
+        try:
+            df_wf = pd.read_sql(
+                "SELECT time, temperature_2m, wind_speed_10m, shortwave_radiation, "
+                "cloud_cover, precipitation_mm FROM weather_hourly "
+                "WHERE time >= %s AND time <= %s "
+                "AND latitude = 47.5001 AND longitude = 8.7502 ORDER BY time",
+                conn, params=(forecast_start, forecast_end), parse_dates=["time"],
+            )
+            if not df_wf.empty:
+                if df_wf["time"].dt.tz is None:
+                    df_wf["time"] = df_wf["time"].dt.tz_localize("UTC")
+                df_wf = df_wf.set_index("time")
+        except Exception:
+            pass
+        conn.close()
+
+        weather_fut: dict = {} if df_wf.empty else df_wf.to_dict("index")
+
+        # ── 5. Build feature rows ─────────────────────────────────────────────
+        from processing.export_pipeline import FEATURE_COLS, LOAD_FEATURE_COLS  # noqa: PLC0415
+
+        def _hist_price(ts: _dt.datetime) -> float:
+            if df_e.empty or ts not in df_e.index:
+                return float("nan")
+            v = df_e.loc[ts, "price_eur_mwh"] if "price_eur_mwh" in df_e.columns else float("nan")
+            return float(v)
+
+        def _hist_load(ts: _dt.datetime) -> float:
+            if df_nl.empty or ts not in df_nl.index:
+                return float("nan")
+            v = df_nl.loc[ts, "net_load_kwh"] if "net_load_kwh" in df_nl.columns else float("nan")
+            return float(v)
+
+        energy_rows: list[dict] = []
+        load_rows:   list[dict] = []
+
+        for t in future_ts:
+            t_168 = t - _dt.timedelta(hours=168)
+            t_24  = t - _dt.timedelta(hours=24)
+            t_h   = t.replace(minute=0, second=0, microsecond=0)
+
+            # ── Energy (Model B) row ──────────────────────────────────────────
+            e_tmpl = df_e.loc[t_168].to_dict() if (not df_e.empty and t_168 in df_e.index) else {}
+            e_row  = dict(e_tmpl)
+
+            # Correct lag features for the future timestamp
+            e_row["lag_168h"] = _hist_price(t_168)
+            e_row["lag_24h"]  = _hist_price(t_24)
+            e_row["lag_1h"]   = float("nan")
+
+            # Calendar features (deterministic)
+            e_row["hour_of_day"]  = t.hour
+            e_row["day_of_week"]  = t.weekday()
+            e_row["month"]        = t.month
+            e_row["is_weekend"]   = int(t.weekday() >= 5)
+            e_row["is_peak_hour"] = int(7 <= t.hour <= 20)
+            e_row["hour_sin"]  = _math.sin(2 * _math.pi * t.hour / 24)
+            e_row["hour_cos"]  = _math.cos(2 * _math.pi * t.hour / 24)
+            e_row["dow_sin"]   = _math.sin(2 * _math.pi * t.weekday() / 7)
+            e_row["dow_cos"]   = _math.cos(2 * _math.pi * t.weekday() / 7)
+            e_row["month_sin"] = _math.sin(2 * _math.pi * (t.month - 1) / 12)
+            e_row["month_cos"] = _math.cos(2 * _math.pi * (t.month - 1) / 12)
+
+            # Weather: prefer future forecast, fall back to template
+            if t_h in weather_fut:
+                w = weather_fut[t_h]
+                for key in ("temperature_2m", "wind_speed_10m", "shortwave_radiation",
+                            "cloud_cover", "precipitation_mm"):
+                    v = w.get(key)
+                    if v is not None:
+                        e_row[key] = float(v)
+
+            energy_rows.append(e_row)
+
+            # ── Load (Model A) row ────────────────────────────────────────────
+            load_lag_7d = _hist_load(t_168)
+            load_lag_1d = _hist_load(t_24)
+            roll_avg    = (
+                float(df_nl.loc[t_168, "load_rolling_avg_24h"])
+                if (not df_nl.empty and t_168 in df_nl.index
+                    and "load_rolling_avg_24h" in df_nl.columns)
+                else float("nan")
+            )
+            temp_c   = e_row.get("temperature_2m", float("nan"))
+            temp_avg = e_row.get("temp_rolling_avg_24h", temp_c)
+            temp_dev = (temp_c - temp_avg) if not (_math.isnan(temp_c) or _math.isnan(temp_avg)) else float("nan")
+
+            load_rows.append({
+                "load_lag_1h":          float("nan"),
+                "load_lag_1d":          load_lag_1d,
+                "load_lag_7d":          load_lag_7d,
+                "load_rolling_avg_24h": roll_avg,
+                "hour":                 t.hour,
+                "weekday":              t.weekday(),
+                "month":                t.month,
+                "quarter":              (t.month - 1) // 3 + 1,
+                "is_weekend":           int(t.weekday() >= 5),
+                "is_holiday_zh":        0,
+                "is_school_holiday":    0,
+                "temp_c":               temp_c,
+                "wind_speed_ms":        e_row.get("wind_speed_10m", float("nan")),
+                "ghi_wm2":              e_row.get("shortwave_radiation", float("nan")),
+                "cloud_cover_pct":      e_row.get("cloud_cover", float("nan")),
+                "precipitation_mm":     e_row.get("precipitation_mm", float("nan")),
+                "temp_deviation":       temp_dev,
+                "pv_feed_in":           float("nan"),
+            })
+
+        # ── 6. Model B: EPEX energy price forecast ────────────────────────────
+        from modelling.predict import predict_from_dict  # noqa: PLC0415
+        model_b    = _get_model("xgb")
+        epex_preds = [predict_from_dict(model_b, r) for r in energy_rows]
+
+        # ── 7. Model A: net load forecast (optional) ──────────────────────────
+        net_load_preds: list[float | None] = [None] * n_slots
+        try:
+            model_a       = _get_model("model_load")
+            net_load_preds = [predict_from_dict(model_a, r) for r in load_rows]
+        except Exception:
+            pass
+
+        # ── 8. Tariff formulas ────────────────────────────────────────────────
+        from processing.tariff_formulas import (  # noqa: PLC0415
+            compute_tariff,
+            energiepreis as _ep,
+            gesamttarif as _gt,
+            DEFAULT_NETZ_STANDARD,
+        )
+
+        netz_arr, energie_arr, gesamt_arr, level_arr = [], [], [], []
+        for epex, load in zip(epex_preds, net_load_preds):
+            if load is not None:
+                tf      = compute_tariff(net_load=load, epex_eur_mwh=epex)
+                netz    = tf["netzpreis_rp_kwh"]
+                energie = tf["energiepreis_rp_kwh"]
+                gesamt  = tf["gesamttarif_rp_kwh"]
+            else:
+                energie = round(_ep(epex), 2)
+                netz    = round(DEFAULT_NETZ_STANDARD, 2)
+                gesamt  = round(_gt(netz, energie), 2)
+            level = "low" if gesamt < 15 else ("high" if gesamt > 22 else "medium")
+            netz_arr.append(netz)
+            energie_arr.append(energie)
+            gesamt_arr.append(gesamt)
+            level_arr.append(level)
+
+        # ── 9. Cheapest non-overlapping 2-h windows ───────────────────────────
+        WIN_SLOTS = 8  # 2 h × 4 slots/h
+        scored = sorted(
+            (sum(gesamt_arr[i : i + WIN_SLOTS]) / WIN_SLOTS, i)
+            for i in range(n_slots - WIN_SLOTS)
+        )
+        cheap_windows: list[dict] = []
+        used_slots: set[int] = set()
+        for avg_p, si in scored:
+            sl = set(range(si, si + WIN_SLOTS))
+            if sl & used_slots:
+                continue
+            used_slots |= sl
+            cheap_windows.append({
+                "start":           future_ts[si].isoformat(),
+                "end":             (future_ts[si] + _dt.timedelta(hours=2)).isoformat(),
+                "avg_gesamttarif": round(avg_p, 2),
+            })
+            if len(cheap_windows) >= 6:
+                break
+
+        return {
+            "generated_at":       now.isoformat(),
+            "horizon_days":       HORIZON_DAYS,
+            "n_points":           n_slots,
+            "times":              [t.isoformat() for t in future_ts],
+            "epex_eur_mwh":       [round(p, 2) for p in epex_preds],
+            "netzpreis":          netz_arr,
+            "energiepreis":       energie_arr,
+            "gesamttarif":        gesamt_arr,
+            "price_level":        level_arr,
+            "cheapest_windows":   cheap_windows,
+            "net_load_available": net_load_preds[0] is not None,
+        }
+
+    except FileNotFoundError:
+        return JSONResponse(
+            {"error": "No trained model available. Run the training pipeline first."},
+            status_code=503,
+        )
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
 @app.get("/api/price-history")
 def price_history(hours: int = Query(default=24, ge=1, le=168)):
     """Return the last *hours* of actual ENTSO-E day-ahead prices."""

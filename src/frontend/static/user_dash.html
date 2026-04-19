@@ -1,461 +1,735 @@
 <!DOCTYPE html>
-
 <html class="light" lang="de">
-
 <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
-        rel="stylesheet" />
-    <link
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
-        rel="stylesheet" />
-    <script id="tailwind-config">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <script>
         tailwind.config = {
             darkMode: "class",
             theme: {
                 extend: {
                     colors: {
-                        "primary": "#137fec",
-                        "background-light": "#f6f7f8",
-                        "background-dark": "#101922",
+                        primary:            "#137fec",
+                        "primary-dark":     "#0e6dcc",
+                        "bg-light":         "#f6f7f8",
+                        "bg-dark":          "#0f172a",
+                        "card-dark":        "#1e293b",
+                        "border-dark":      "#334155",
                     },
-                    fontFamily: {
-                        "display": ["Inter"]
-                    },
-                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                    fontFamily: { display: ["Inter"] },
+                    borderRadius: { DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", "2xl": "1rem", full: "9999px" },
                 },
             },
-        }
+        };
     </script>
-    <title>Swiss Energy Pulse - Dashboard</title>
+    <title>Swiss Energy Pulse – Stromtarif Winterthur</title>
+    <style>
+        .skeleton { animation: pulse 1.5s ease-in-out infinite; background: linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%); background-size: 200%; }
+        .dark .skeleton { background: linear-gradient(90deg,#334155 25%,#475569 50%,#334155 75%); background-size: 200%; }
+        @keyframes pulse { 0%{background-position:200%} 100%{background-position:-200%} }
+        .chart-tooltip { pointer-events:none; transition: opacity .1s; }
+        #chart-svg { cursor:crosshair; }
+    </style>
 </head>
+<body class="bg-bg-light dark:bg-bg-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
 
-<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
-    <div class="relative flex min-h-screen w-full flex-col overflow-x-hidden">
-        <div class="layout-container flex h-full grow flex-col">
-            <!-- Header Section -->
-            <header
-                class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-800 px-6 md:px-10 py-4 bg-white dark:bg-slate-900 shadow-sm">
-                <div class="flex items-center gap-4">
-                    <div class="size-8 flex items-center justify-center bg-primary rounded-lg text-white">
-                        <span class="material-symbols-outlined">bolt</span>
-                    </div>
-                    <h2 class="text-slate-900 dark:text-slate-100 text-xl font-bold leading-tight tracking-tight">Swiss
-                        Energy Pulse</h2>
-                </div>
-                <div class="flex items-center gap-3">
-                    <button
-                        class="flex min-w-[100px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold transition-all hover:bg-primary/90">
-                        <span class="material-symbols-outlined mr-2 text-sm">location_on</span>
-                        <span class="truncate">Winterthur</span>
-                    </button>
-                    <div id="clock"
-                        class="flex items-center justify-center rounded-lg h-10 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 gap-2 text-sm font-medium border border-slate-200 dark:border-slate-700">
-                        <span class="material-symbols-outlined text-[20px]">schedule</span>
-                        <span id="clock-time">--:--</span>
-                    </div>
-                </div>
-            </header>
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header class="sticky top-0 z-20 flex items-center justify-between px-4 md:px-8 py-3
+               bg-white/90 dark:bg-card-dark/90 backdrop-blur-md
+               border-b border-slate-200 dark:border-border-dark shadow-sm">
+    <div class="flex items-center gap-3">
+        <div class="flex items-center justify-center w-9 h-9 bg-primary rounded-xl text-white shadow">
+            <span class="material-symbols-outlined text-[22px]">bolt</span>
+        </div>
+        <div>
+            <h1 class="text-base font-bold leading-tight">Swiss Energy Pulse</h1>
+            <p class="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">Dynamischer Stromtarif · Winterthur</p>
+        </div>
+    </div>
+    <div class="flex items-center gap-2">
+        <div id="clock"
+             class="hidden sm:flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300
+                    bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-border-dark
+                    rounded-lg px-3 py-1.5">
+            <span class="material-symbols-outlined text-[16px] text-slate-400">schedule</span>
+            <span id="clock-time">--:--</span>
+        </div>
+        <button id="dark-toggle" aria-label="Dark mode toggle"
+                class="flex items-center justify-center w-9 h-9 rounded-lg
+                       bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-border-dark
+                       text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+            <span id="dark-icon" class="material-symbols-outlined text-[18px]">dark_mode</span>
+        </button>
+        <a href="/docs" class="hidden md:flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400
+                               hover:text-primary transition-colors px-2">
+            <span class="material-symbols-outlined text-[15px]">api</span> API
+        </a>
+    </div>
+</header>
 
-            <!-- Error Banner -->
-            <div id="error-banner" class="hidden bg-amber-50 border-b border-amber-200 px-6 py-3 text-amber-800 text-sm flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">warning</span>
-                <span id="error-text">Modelldaten nicht verfügbar – es werden Platzhalterwerte angezeigt.</span>
+<!-- ── Error Banner ──────────────────────────────────────────────────────────── -->
+<div id="error-banner" class="hidden items-center gap-2 px-6 py-2.5 bg-amber-50 dark:bg-amber-900/20
+                               border-b border-amber-200 dark:border-amber-800
+                               text-amber-800 dark:text-amber-300 text-xs">
+    <span class="material-symbols-outlined text-[16px]">warning</span>
+    <span id="error-text">Modelldaten nicht verfügbar – Platzhalterwerte werden angezeigt.</span>
+</div>
+
+<!-- ── Main ──────────────────────────────────────────────────────────────────── -->
+<main class="max-w-7xl mx-auto px-4 md:px-8 py-6 flex flex-col gap-6">
+
+    <!-- Row 1: Current price + 7-day chart -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        <!-- Left: Current price card -->
+        <div class="lg:col-span-4 flex flex-col gap-4">
+
+            <!-- Traffic light card -->
+            <div class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-6 flex flex-col items-center text-center">
+                <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Aktueller Tarif</p>
+
+                <!-- Animated circle -->
+                <div class="relative mb-5">
+                    <div id="pulse-ring" class="absolute inset-0 m-auto w-28 h-28 rounded-full animate-ping opacity-20 bg-emerald-500"></div>
+                    <div id="traffic-light" class="relative w-24 h-24 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg border-4 border-white dark:border-card-dark">
+                        <span id="traffic-icon" class="material-symbols-outlined text-white text-5xl" style="font-variation-settings:'FILL' 1">energy_savings_leaf</span>
+                    </div>
+                </div>
+
+                <h2 id="price-label" class="text-2xl font-black tracking-tight mb-1">WIRD GELADEN…</h2>
+                <p id="price-phase" class="text-sm font-medium text-emerald-600 dark:text-emerald-400 mb-4">–</p>
+
+                <!-- Tariff breakdown -->
+                <div class="w-full rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-border-dark p-4 flex flex-col gap-2 text-left">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                            <span class="material-symbols-outlined text-[15px]">cell_tower</span> Netzpreis
+                        </span>
+                        <span id="netz-value" class="font-semibold text-slate-700 dark:text-slate-200">–</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                            <span class="material-symbols-outlined text-[15px]">electric_bolt</span> Energiepreis
+                        </span>
+                        <span id="energie-value" class="font-semibold text-slate-700 dark:text-slate-200">–</span>
+                    </div>
+                    <div class="h-px bg-slate-200 dark:bg-border-dark my-1"></div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">Gesamttarif</span>
+                        <span class="text-xl font-black text-primary italic">
+                            <span id="price-value">–</span><small class="text-xs font-normal ml-0.5">Rp/kWh</small>
+                        </span>
+                    </div>
+                </div>
             </div>
 
-            <main class="flex-1 flex justify-center p-4 md:p-8">
-                <div class="max-w-5xl w-full flex flex-col gap-6">
-                    <!-- Dashboard Grid -->
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        <!-- Left Column: Traffic Light & Explanation -->
-                        <div class="lg:col-span-5 flex flex-col gap-6">
-                            <!-- Price Traffic Light -->
-                            <div
-                                class="bg-white dark:bg-slate-900 p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center text-center">
-                                <p
-                                    class="text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider text-xs mb-4">
-                                    Aktueller Stromtarif</p>
-                                <div class="relative flex items-center justify-center mb-6">
-                                    <div id="pulse-ring" class="absolute w-40 h-40 rounded-full animate-pulse bg-emerald-500/20"></div>
-                                    <div id="traffic-light"
-                                        class="relative w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center border-4 border-white dark:border-slate-800 shadow-lg">
-                                        <span id="traffic-icon" class="material-symbols-outlined text-white text-6xl"
-                                            style="font-variation-settings: 'FILL' 1">energy_savings_leaf</span>
-                                    </div>
-                                </div>
-                                <h1 id="price-label" class="text-3xl font-black text-slate-900 dark:text-slate-100 mb-2">WIRD GELADEN…</h1>
-                                <p id="price-phase" class="text-emerald-600 dark:text-emerald-400 font-bold text-lg mb-4">–</p>
-                                <div
-                                    class="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-lg flex justify-between items-center border border-slate-100 dark:border-slate-700">
-                                    <span class="text-slate-600 dark:text-slate-400 text-sm">Aktueller Preis:</span>
-                                    <span class="text-2xl font-bold text-primary italic">
-                                        <span id="price-value">–</span><small class="text-sm font-normal"> Rp/kWh</small>
-                                    </span>
-                                </div>
-                            </div>
-                            <!-- Why Box -->
-                            <div id="why-box" class="bg-primary/5 border border-primary/20 p-6 rounded-xl flex gap-4">
-                                <div class="text-primary pt-1">
-                                    <span class="material-symbols-outlined text-3xl">info</span>
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-slate-900 dark:text-slate-100 mb-1">Warum ist es gerade
-                                        so?</h3>
-                                    <p id="why-text" class="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
-                                        Preisprognose wird geladen…
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Right Column: Chart & Recommendations -->
-                        <div class="lg:col-span-7 flex flex-col gap-6">
-                            <!-- Price Chart -->
-                            <div
-                                class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                                <div class="flex justify-between items-center mb-6">
-                                    <h3 class="font-bold text-lg">Preisverlauf (letzte 24h)</h3>
-                                    <div class="flex gap-2">
-                                        <span class="flex items-center gap-1 text-xs font-medium text-slate-500">
-                                            <div class="w-2 h-2 rounded-full bg-primary"></div> Rp./kWh
-                                        </span>
-                                        <span class="flex items-center gap-1 text-xs font-medium text-emerald-500">
-                                            <div class="w-2 h-2 rounded-full bg-emerald-400"></div> günstig
-                                        </span>
-                                    </div>
-                                </div>
-                                <div class="h-48 w-full relative">
-                                    <svg id="price-chart" class="w-full h-full overflow-visible" viewBox="0 0 400 100">
-                                        <defs>
-                                            <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
-                                                <stop offset="0%" stop-color="#137fec" stop-opacity="0.2"></stop>
-                                                <stop offset="100%" stop-color="#137fec" stop-opacity="0"></stop>
-                                            </linearGradient>
-                                        </defs>
-                                        <path id="chart-line" d="M0,80 Q50,70 80,40 T150,20 T220,60 T300,90 T400,30" fill="none"
-                                            stroke="#137fec" stroke-linecap="round" stroke-width="3"></path>
-                                        <path id="chart-area" d="M0,80 Q50,70 80,40 T150,20 T220,60 T300,90 T400,30 V100 H0 Z"
-                                            fill="url(#chartGradient)"></path>
-                                        <circle id="chart-dot" cx="150" cy="20" fill="#137fec" r="4"></circle>
-                                    </svg>
-                                    <div id="chart-labels"
-                                        class="absolute top-0 left-0 w-full h-full flex items-end justify-between px-1 text-[10px] text-slate-400 pt-4">
-                                        <span id="label-0">–</span>
-                                        <span id="label-1">–</span>
-                                        <span id="label-2">–</span>
-                                        <span id="label-3">–</span>
-                                        <span id="label-4">–</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- Best Time to Run Section -->
-                            <div class="flex flex-col gap-4">
-                                <div class="flex items-center gap-2">
-                                    <span class="material-symbols-outlined text-primary">schedule_send</span>
-                                    <h3 class="font-bold text-lg">Beste Nutzungszeiten</h3>
-                                </div>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <!-- Device 1 -->
-                                    <div id="dev1"
-                                        class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors">
-                                        <div
-                                            class="p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-lg">
-                                            <span class="material-symbols-outlined">dishwasher_gen</span>
-                                        </div>
-                                        <div>
-                                            <p class="text-xs text-slate-500 font-medium">Waschmaschine / Spüler</p>
-                                            <p id="dev1-time" class="font-bold text-emerald-600">–</p>
-                                        </div>
-                                    </div>
-                                    <!-- Device 2 -->
-                                    <div id="dev2"
-                                        class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors">
-                                        <div
-                                            class="p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-lg">
-                                            <span class="material-symbols-outlined">ev_station</span>
-                                        </div>
-                                        <div>
-                                            <p class="text-xs text-slate-500 font-medium">EV Ladestation</p>
-                                            <p id="dev2-time" class="font-bold text-emerald-600">–</p>
-                                        </div>
-                                    </div>
-                                    <!-- Device 3 -->
-                                    <div
-                                        class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 opacity-75">
-                                        <div class="p-3 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-lg">
-                                            <span class="material-symbols-outlined">oven</span>
-                                        </div>
-                                        <div>
-                                            <p class="text-xs text-slate-500 font-medium">Ofen / Herd</p>
-                                            <p id="dev3-time" class="font-bold text-slate-700 dark:text-slate-300">–</p>
-                                        </div>
-                                    </div>
-                                    <!-- Device 4 -->
-                                    <div
-                                        class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 opacity-75">
-                                        <div class="p-3 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-lg">
-                                            <span class="material-symbols-outlined">heat_pump</span>
-                                        </div>
-                                        <div>
-                                            <p class="text-xs text-slate-500 font-medium">Wärmepumpe</p>
-                                            <p id="dev4-time" class="font-bold text-slate-700 dark:text-slate-300">–</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+            <!-- Why card -->
+            <div id="why-box" class="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl p-4 flex gap-3">
+                <span class="material-symbols-outlined text-primary text-2xl mt-0.5">info</span>
+                <div>
+                    <h3 class="font-bold text-sm mb-1 text-slate-800 dark:text-slate-100">Warum gerade so?</h3>
+                    <p id="why-text" class="text-slate-500 dark:text-slate-400 text-xs leading-relaxed">Preisprognose wird geladen…</p>
+                </div>
+            </div>
+
+            <!-- Data timestamp -->
+            <p class="text-[10px] text-slate-400 text-center">
+                Daten: ENTSO-E · Open-Meteo · BAFU &nbsp;·&nbsp;
+                Update: <span id="last-update">–</span>
+            </p>
+        </div>
+
+        <!-- Right: 7-day forecast chart -->
+        <div class="lg:col-span-8 bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-5 flex flex-col gap-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="font-bold text-base">7-Tage-Preisprognose</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Gesamttarif in Rp./kWh · 15-Min-Auflösung</p>
+                </div>
+                <div class="flex items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400">
+                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-1 rounded-full bg-primary"></span>Gesamt</span>
+                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-1 rounded-full bg-emerald-400"></span>Günstig</span>
+                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-1 rounded-full bg-red-400"></span>Teuer</span>
+                </div>
+            </div>
+
+            <!-- Chart area -->
+            <div class="relative select-none" id="chart-wrap">
+                <!-- Skeleton while loading -->
+                <div id="chart-skeleton" class="skeleton h-52 rounded-xl"></div>
+
+                <!-- SVG chart -->
+                <svg id="chart-svg" class="hidden w-full" style="height:220px" viewBox="0 0 800 180" preserveAspectRatio="none">
+                    <defs>
+                        <linearGradient id="areaGrad" x1="0" x2="0" y1="0" y2="1">
+                            <stop offset="0%" stop-color="#137fec" stop-opacity="0.18"/>
+                            <stop offset="100%" stop-color="#137fec" stop-opacity="0"/>
+                        </linearGradient>
+                        <clipPath id="clip-plot"><rect x="0" y="0" width="800" height="160"/></clipPath>
+                    </defs>
+                    <!-- Background price bands -->
+                    <g id="price-bands" clip-path="url(#clip-plot)"></g>
+                    <!-- Cheap window highlights -->
+                    <g id="cheap-highlights" clip-path="url(#clip-plot)"></g>
+                    <!-- Day separators -->
+                    <g id="day-lines"></g>
+                    <!-- "Jetzt" marker -->
+                    <line id="now-line" x1="0" y1="0" x2="0" y2="160" stroke="#137fec" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
+                    <!-- Price area fill -->
+                    <path id="chart-area" fill="url(#areaGrad)" clip-path="url(#clip-plot)"/>
+                    <!-- Price line -->
+                    <path id="chart-line" fill="none" stroke="#137fec" stroke-width="2" stroke-linejoin="round" clip-path="url(#clip-plot)"/>
+                    <!-- Day labels (bottom) -->
+                    <g id="day-labels" font-size="9" fill="#94a3b8" text-anchor="middle"></g>
+                    <!-- Y-axis labels -->
+                    <g id="y-labels" font-size="9" fill="#94a3b8"></g>
+                    <!-- Hover crosshair -->
+                    <line id="hover-line" x1="0" y1="0" x2="0" y2="160" stroke="#64748b" stroke-width="1" stroke-dasharray="3,2" opacity="0" clip-path="url(#clip-plot)"/>
+                    <circle id="hover-dot" cx="0" cy="0" r="4" fill="#137fec" stroke="white" stroke-width="1.5" opacity="0"/>
+                </svg>
+
+                <!-- Tooltip -->
+                <div id="tooltip" class="chart-tooltip opacity-0 absolute pointer-events-none z-10
+                                         bg-white dark:bg-slate-800 border border-slate-200 dark:border-border-dark
+                                         rounded-xl shadow-lg px-3 py-2 text-xs min-w-[130px]">
+                    <p id="tt-time" class="font-bold text-slate-700 dark:text-slate-200 mb-1">–</p>
+                    <div class="flex justify-between gap-4">
+                        <span class="text-slate-400">Netz</span>
+                        <span id="tt-netz" class="font-semibold">–</span>
                     </div>
-                    <!-- Footer -->
-                    <div
-                        class="border-t border-slate-200 dark:border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-xs">
-                        <div class="flex items-center gap-6">
-                            <span class="flex items-center gap-1"><span
-                                    class="material-symbols-outlined text-[14px]">shield</span> Daten: ENTSO-E, Open-Meteo, BAFU</span>
-                            <span class="flex items-center gap-1"><span
-                                    class="material-symbols-outlined text-[14px]">update</span>
-                                Letztes Update: <span id="last-update">–</span></span>
-                        </div>
-                        <div class="flex gap-4">
-                            <a class="hover:text-primary transition-colors" href="/docs">API Docs</a>
-                            <a class="hover:text-primary transition-colors" href="/">Admin</a>
-                        </div>
+                    <div class="flex justify-between gap-4">
+                        <span class="text-slate-400">Energie</span>
+                        <span id="tt-energie" class="font-semibold">–</span>
+                    </div>
+                    <div class="flex justify-between gap-4 border-t border-slate-100 dark:border-border-dark mt-1 pt-1">
+                        <span class="text-slate-600 dark:text-slate-300 font-medium">Gesamt</span>
+                        <span id="tt-gesamt" class="font-bold text-primary">–</span>
                     </div>
                 </div>
-            </main>
-            <!-- Mobile Navigation -->
-            <nav
-                class="sticky bottom-0 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-6 py-3 block md:hidden">
-                <div class="flex justify-around items-center">
-                    <button class="flex flex-col items-center gap-1 text-primary">
-                        <span class="material-symbols-outlined"
-                            style="font-variation-settings: 'FILL' 1">dashboard</span>
-                        <span class="text-[10px] font-bold">Home</span>
-                    </button>
-                    <button class="flex flex-col items-center gap-1 text-slate-400">
-                        <span class="material-symbols-outlined">analytics</span>
-                        <span class="text-[10px] font-medium">Verbrauch</span>
-                    </button>
-                    <button class="flex flex-col items-center gap-1 text-slate-400">
-                        <span class="material-symbols-outlined">devices_other</span>
-                        <span class="text-[10px] font-medium">Geräte</span>
-                    </button>
-                    <button class="flex flex-col items-center gap-1 text-slate-400">
-                        <span class="material-symbols-outlined">settings</span>
-                        <span class="text-[10px] font-medium">Profil</span>
-                    </button>
-                </div>
-            </nav>
+            </div>
         </div>
     </div>
 
-    <script>
-        // ── Live clock ────────────────────────────────────────────────────────
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock-time').textContent =
-                now.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+    <!-- Row 2: Cheapest windows -->
+    <div class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-5">
+        <div class="flex items-center gap-2 mb-4">
+            <span class="material-symbols-outlined text-primary text-xl">schedule_send</span>
+            <h2 class="font-bold text-base">Beste Nutzungszeiten (nächste 7 Tage)</h2>
+            <span class="ml-auto text-[10px] text-slate-400">Günstigste 2-Stunden-Fenster</span>
+        </div>
+        <div id="windows-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <!-- Skeleton cards while loading -->
+            <div class="skeleton h-20 rounded-xl"></div>
+            <div class="skeleton h-20 rounded-xl"></div>
+            <div class="skeleton h-20 rounded-xl"></div>
+            <div class="skeleton h-20 rounded-xl hidden sm:block"></div>
+            <div class="skeleton h-20 rounded-xl hidden lg:block"></div>
+            <div class="skeleton h-20 rounded-xl hidden lg:block"></div>
+        </div>
+    </div>
+
+    <!-- Row 3: Device recommendations (derived from cheapest windows) -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <!-- Generated dynamically by JS -->
+        <div id="dev-card-0" class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-4 flex items-center gap-3 opacity-60">
+            <div class="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl">
+                <span class="material-symbols-outlined">dishwasher_gen</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-[10px] text-slate-400 font-medium truncate">Waschmaschine / Spüler</p>
+                <p id="dev0-time" class="text-sm font-bold text-slate-500 truncate">Wird geladen…</p>
+            </div>
+        </div>
+        <div id="dev-card-1" class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-4 flex items-center gap-3 opacity-60">
+            <div class="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl">
+                <span class="material-symbols-outlined">ev_station</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-[10px] text-slate-400 font-medium truncate">EV Ladestation</p>
+                <p id="dev1-time" class="text-sm font-bold text-slate-500 truncate">Wird geladen…</p>
+            </div>
+        </div>
+        <div id="dev-card-2" class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-4 flex items-center gap-3 opacity-60">
+            <div class="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl">
+                <span class="material-symbols-outlined">heat_pump</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-[10px] text-slate-400 font-medium truncate">Wärmepumpe</p>
+                <p id="dev2-time" class="text-sm font-bold text-slate-500 truncate">Wird geladen…</p>
+            </div>
+        </div>
+        <div id="dev-card-3" class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-4 flex items-center gap-3 opacity-60">
+            <div class="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl">
+                <span class="material-symbols-outlined">water_heater</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-[10px] text-slate-400 font-medium truncate">Boiler / Warmwasser</p>
+                <p id="dev3-time" class="text-sm font-bold text-slate-500 truncate">Wird geladen…</p>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- ── Mobile nav ─────────────────────────────────────────────────────────────── -->
+<nav class="sticky bottom-0 w-full bg-white/80 dark:bg-card-dark/80 backdrop-blur-md
+            border-t border-slate-200 dark:border-border-dark px-6 py-2.5 block md:hidden">
+    <div class="flex justify-around items-center">
+        <button class="flex flex-col items-center gap-1 text-primary">
+            <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">dashboard</span>
+            <span class="text-[9px] font-bold">Tarif</span>
+        </button>
+        <a href="/" class="flex flex-col items-center gap-1 text-slate-400">
+            <span class="material-symbols-outlined">admin_panel_settings</span>
+            <span class="text-[9px] font-medium">Admin</span>
+        </a>
+        <a href="/docs" class="flex flex-col items-center gap-1 text-slate-400">
+            <span class="material-symbols-outlined">api</span>
+            <span class="text-[9px] font-medium">API</span>
+        </a>
+    </div>
+</nav>
+
+<script>
+// ── Dark mode ──────────────────────────────────────────────────────────────────
+(function () {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+})();
+document.getElementById('dark-toggle').addEventListener('click', () => {
+    const isDark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    document.getElementById('dark-icon').textContent = isDark ? 'light_mode' : 'dark_mode';
+});
+(function () {
+    const isDark = document.documentElement.classList.contains('dark');
+    document.getElementById('dark-icon').textContent = isDark ? 'light_mode' : 'dark_mode';
+})();
+
+// ── Clock ──────────────────────────────────────────────────────────────────────
+function updateClock() {
+    document.getElementById('clock-time').textContent =
+        new Date().toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+}
+updateClock();
+setInterval(updateClock, 30_000);
+
+// ── Traffic-light configuration ────────────────────────────────────────────────
+const LEVELS = {
+    low: {
+        bg: 'bg-emerald-500', pulse: 'bg-emerald-500',
+        icon: 'energy_savings_leaf',
+        label: 'GÜNSTIG', labelColor: 'text-emerald-600 dark:text-emerald-400',
+        phase: 'Günstiger Tarif – jetzt Geräte starten!',
+        why: 'Hohe erneuerbare Einspeisung trifft auf moderate Nachfrage. Ideal für energieintensive Haushaltsgeräte.',
+    },
+    medium: {
+        bg: 'bg-amber-400', pulse: 'bg-amber-400',
+        icon: 'electric_bolt',
+        label: 'NORMAL', labelColor: 'text-amber-600 dark:text-amber-400',
+        phase: 'Normaler Tarif – warten wenn möglich.',
+        why: 'Die Stromnachfrage ist durchschnittlich. Nicht-dringende Verbraucher besser auf günstigere Stunden verschieben.',
+    },
+    high: {
+        bg: 'bg-red-500', pulse: 'bg-red-500',
+        icon: 'priority_high',
+        label: 'SPITZENTARIF', labelColor: 'text-red-600 dark:text-red-400',
+        phase: 'Hoher Tarif – Verbrauch reduzieren!',
+        why: 'Hohe Stromnachfrage bei geringer erneuerbarer Einspeisung. Nicht-essenzielle Geräte ausschalten.',
+    },
+};
+
+const ALL_BG_CLASSES = ['bg-emerald-500','bg-amber-400','bg-red-500'];
+
+function applyLevel(level, netz, energie, gesamt) {
+    const cfg = LEVELS[level] || LEVELS.medium;
+    const tl  = document.getElementById('traffic-light');
+    const pr  = document.getElementById('pulse-ring');
+    ALL_BG_CLASSES.forEach(c => { tl.classList.remove(c); pr.classList.remove(c); });
+    tl.classList.add(cfg.bg);
+    pr.classList.add(cfg.pulse);
+    document.getElementById('traffic-icon').textContent = cfg.icon;
+    document.getElementById('price-label').textContent  = cfg.label;
+
+    const phaseEl = document.getElementById('price-phase');
+    phaseEl.textContent = cfg.phase;
+    phaseEl.className = `text-sm font-medium mb-4 ${cfg.labelColor}`;
+
+    document.getElementById('why-text').textContent = cfg.why;
+
+    // Tariff breakdown
+    if (netz    !== undefined) document.getElementById('netz-value').textContent    = netz.toFixed(2) + ' Rp/kWh';
+    if (energie !== undefined) document.getElementById('energie-value').textContent = energie.toFixed(2) + ' Rp/kWh';
+    if (gesamt  !== undefined) document.getElementById('price-value').textContent   = gesamt.toFixed(1);
+}
+
+// ── Date/time helpers ──────────────────────────────────────────────────────────
+const DE_DAYS  = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+const DE_MONTHS = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+function fmtTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+}
+function fmtDateShort(iso) {
+    const d = new Date(iso);
+    return `${DE_DAYS[d.getDay()]} ${d.getDate()}. ${DE_MONTHS[d.getMonth()]}`;
+}
+function fmtWindowLabel(iso) {
+    const d = new Date(iso);
+    return `${DE_DAYS[d.getDay()]} ${d.getDate()}.${d.getMonth()+1}. ${fmtTime(iso)}`;
+}
+
+// ── SVG chart ──────────────────────────────────────────────────────────────────
+let _chartData = null;  // { times, netzpreis, energiepreis, gesamttarif, price_level, cheapest_windows }
+
+const CHART_W  = 800;
+const PLOT_H   = 160;
+const AXIS_H   = 20;   // space for day labels below plot
+const PAD_L    = 28;   // y-axis label space
+const PRICE_LO = 0;
+const PRICE_HI = 35;   // fixed Y range in Rp/kWh
+
+function priceToY(p) {
+    return PLOT_H - Math.max(0, Math.min(1, (p - PRICE_LO) / (PRICE_HI - PRICE_LO))) * PLOT_H;
+}
+
+function renderChart(data) {
+    _chartData = data;
+    const { times, netzpreis, energiepreis, gesamttarif, price_level, cheapest_windows } = data;
+    const n = gesamttarif.length;
+    if (!n) return;
+
+    const svg    = document.getElementById('chart-svg');
+    const toX    = i => PAD_L + (i / (n - 1)) * (CHART_W - PAD_L);
+
+    // ── Y-axis labels ─────────────────────────────────────────────────────────
+    const yLabels = document.getElementById('y-labels');
+    yLabels.innerHTML = '';
+    [5, 10, 15, 20, 25, 30].forEach(v => {
+        const y = priceToY(v);
+        if (y < 0 || y > PLOT_H) return;
+        const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        t.setAttribute('x', PAD_L - 3);
+        t.setAttribute('y', y + 3);
+        t.setAttribute('text-anchor', 'end');
+        t.textContent = v;
+        yLabels.appendChild(t);
+        // Horizontal grid line
+        const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        l.setAttribute('x1', PAD_L);
+        l.setAttribute('y1', y);
+        l.setAttribute('x2', CHART_W);
+        l.setAttribute('y2', y);
+        l.setAttribute('stroke', '#e2e8f0');
+        l.setAttribute('stroke-width', '0.5');
+        l.setAttribute('class', 'dark:stroke-border-dark');
+        yLabels.appendChild(l);
+    });
+
+    // ── Price bands (horizontal zones) ────────────────────────────────────────
+    const bandsG = document.getElementById('price-bands');
+    bandsG.innerHTML = '';
+    const bands = [
+        { lo: 0,  hi: 15, fill: '#10b98115' },  // green zone
+        { lo: 22, hi: 35, fill: '#ef444415' },  // red zone
+    ];
+    bands.forEach(({ lo, hi, fill }) => {
+        const yTop = priceToY(hi);
+        const yBot = priceToY(lo);
+        if (yTop >= yBot) return;
+        const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        r.setAttribute('x', PAD_L);
+        r.setAttribute('y', yTop);
+        r.setAttribute('width', CHART_W - PAD_L);
+        r.setAttribute('height', yBot - yTop);
+        r.setAttribute('fill', fill);
+        bandsG.appendChild(r);
+    });
+
+    // ── Cheap window highlights ───────────────────────────────────────────────
+    const cheapG = document.getElementById('cheap-highlights');
+    cheapG.innerHTML = '';
+    if (cheapest_windows) {
+        const firstTime = new Date(times[0]).getTime();
+        const lastTime  = new Date(times[n - 1]).getTime();
+        const timeRange = lastTime - firstTime || 1;
+        cheapest_windows.forEach(w => {
+            const ws = new Date(w.start).getTime();
+            const we = new Date(w.end).getTime();
+            const x1 = PAD_L + ((ws - firstTime) / timeRange) * (CHART_W - PAD_L);
+            const x2 = PAD_L + ((we - firstTime) / timeRange) * (CHART_W - PAD_L);
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x',      Math.max(PAD_L, x1));
+            rect.setAttribute('y',      0);
+            rect.setAttribute('width',  Math.max(0, Math.min(x2, CHART_W) - Math.max(PAD_L, x1)));
+            rect.setAttribute('height', PLOT_H);
+            rect.setAttribute('fill',   '#10b98120');
+            rect.setAttribute('rx',     '2');
+            cheapG.appendChild(rect);
+        });
+    }
+
+    // ── Day separators + labels ───────────────────────────────────────────────
+    const dayLinesG  = document.getElementById('day-lines');
+    const dayLabelsG = document.getElementById('day-labels');
+    dayLinesG.innerHTML = '';
+    dayLabelsG.innerHTML = '';
+
+    let lastDay = null;
+    times.forEach((t, i) => {
+        const d = new Date(t).toLocaleDateString('de-CH');
+        if (d !== lastDay) {
+            lastDay = d;
+            const x = toX(i);
+            if (i > 0) {
+                const sep = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                sep.setAttribute('x1', x); sep.setAttribute('y1', 0);
+                sep.setAttribute('x2', x); sep.setAttribute('y2', PLOT_H);
+                sep.setAttribute('stroke', '#cbd5e1');
+                sep.setAttribute('stroke-width', '0.8');
+                sep.setAttribute('stroke-dasharray', '3,3');
+                dayLinesG.appendChild(sep);
+            }
+            const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            lbl.setAttribute('x', Math.min(x + 4, CHART_W - 20));
+            lbl.setAttribute('y', PLOT_H + 12);
+            lbl.textContent = fmtDateShort(t);
+            lbl.style.fontFamily = 'Inter, sans-serif';
+            dayLabelsG.appendChild(lbl);
         }
-        updateClock();
-        setInterval(updateClock, 30000);
+    });
 
-        // ── Traffic-light helpers ─────────────────────────────────────────────
-        const LEVELS = {
-            low: {
-                bg: 'bg-emerald-500',
-                pulse: 'bg-emerald-500/20',
-                icon: 'energy_savings_leaf',
-                label: 'JETZT GÜNSTIG',
-                labelColor: 'text-emerald-600 dark:text-emerald-400',
-                phase: 'Günstiger Tarif – jetzt Geräte starten!',
-                why: 'Hohe erneuerbare Einspeisung trifft auf moderate Nachfrage. Ideal für energieintensive Haushaltsgeräte.',
-                dev1: 'Jetzt optimal',
-                dev2: 'Jetzt laden',
-                dev3: 'Jetzt nutzbar',
-                dev4: 'Jetzt starten',
-            },
-            medium: {
-                bg: 'bg-amber-400',
-                pulse: 'bg-amber-400/20',
-                icon: 'electric_bolt',
-                label: 'MITTLERER TARIF',
-                labelColor: 'text-amber-600 dark:text-amber-400',
-                phase: 'Normaler Tarif – warten wenn möglich.',
-                why: 'Die Stromnachfrage ist durchschnittlich. Nicht-dringende Verbraucher besser auf günstigere Stunden verschieben.',
-                dev1: 'Wenn nötig',
-                dev2: 'Besser warten',
-                dev3: 'Normalbetrieb',
-                dev4: 'Normalbetrieb',
-            },
-            high: {
-                bg: 'bg-red-500',
-                pulse: 'bg-red-500/20',
-                icon: 'priority_high',
-                label: 'SPITZENTARIF',
-                labelColor: 'text-red-600 dark:text-red-400',
-                phase: 'Hoher Tarif – Verbrauch reduzieren!',
-                why: 'Hohe Stromnachfrage bei geringer erneuerbarer Einspeisung. Nicht-essenzielle Geräte ausschalten.',
-                dev1: 'Verschieben',
-                dev2: 'Nicht laden',
-                dev3: 'Verschieben',
-                dev4: 'Reduzieren',
-            },
-        };
+    // ── Price line + area ─────────────────────────────────────────────────────
+    const pts = gesamttarif.map((p, i) => `${toX(i).toFixed(1)},${priceToY(p).toFixed(1)}`).join(' L ');
+    const linePath = `M ${pts}`;
+    const areaPath = `${linePath} L ${toX(n-1)},${PLOT_H} L ${toX(0)},${PLOT_H} Z`;
+    document.getElementById('chart-line').setAttribute('d', linePath);
+    document.getElementById('chart-area').setAttribute('d', areaPath);
 
-        function applyLevel(level) {
-            const cfg = LEVELS[level] || LEVELS.medium;
-            const tl = document.getElementById('traffic-light');
-            const pr = document.getElementById('pulse-ring');
+    // ── "Jetzt" marker (at start of forecast = index 0) ──────────────────────
+    document.getElementById('now-line').setAttribute('x1', toX(0));
+    document.getElementById('now-line').setAttribute('x2', toX(0));
 
-            // Remove all possible color classes
-            ['bg-emerald-500', 'bg-amber-400', 'bg-red-500'].forEach(c => tl.classList.remove(c));
-            ['bg-emerald-500/20', 'bg-amber-400/20', 'bg-red-500/20'].forEach(c => pr.classList.remove(c));
-            tl.classList.add(cfg.bg);
-            pr.classList.add(cfg.pulse);
+    // ── Show chart, hide skeleton ─────────────────────────────────────────────
+    document.getElementById('chart-skeleton').classList.add('hidden');
+    document.getElementById('chart-svg').classList.remove('hidden');
 
-            document.getElementById('traffic-icon').textContent = cfg.icon;
-            document.getElementById('price-label').textContent = cfg.label;
+    // ── Hover interaction ─────────────────────────────────────────────────────
+    setupHover(data, toX, n);
+}
 
-            const phaseEl = document.getElementById('price-phase');
-            phaseEl.textContent = cfg.phase;
-            ['text-emerald-600', 'text-amber-600', 'text-red-600',
-             'dark:text-emerald-400', 'dark:text-amber-400', 'dark:text-red-400'].forEach(c => phaseEl.classList.remove(c));
-            cfg.labelColor.split(' ').forEach(c => phaseEl.classList.add(c));
+function setupHover(data, toX, n) {
+    const svgEl    = document.getElementById('chart-svg');
+    const hLine    = document.getElementById('hover-line');
+    const hDot     = document.getElementById('hover-dot');
+    const tooltip  = document.getElementById('tooltip');
+    const wrap     = document.getElementById('chart-wrap');
 
-            document.getElementById('why-text').textContent = cfg.why;
-            document.getElementById('dev1-time').textContent = cfg.dev1;
-            document.getElementById('dev2-time').textContent = cfg.dev2;
-            document.getElementById('dev3-time').textContent = cfg.dev3;
-            document.getElementById('dev4-time').textContent = cfg.dev4;
+    function getIdx(clientX) {
+        const rect = svgEl.getBoundingClientRect();
+        const relX = clientX - rect.left;
+        const frac = (relX / rect.width * CHART_W - PAD_L) / (CHART_W - PAD_L);
+        return Math.max(0, Math.min(n - 1, Math.round(frac * (n - 1))));
+    }
+
+    function showTooltip(clientX, clientY, idx) {
+        const t  = data.times[idx];
+        const g  = data.gesamttarif[idx];
+        const nz = data.netzpreis[idx];
+        const en = data.energiepreis[idx];
+
+        const svgRect = svgEl.getBoundingClientRect();
+        const x  = toX(idx);
+        const y  = priceToY(g);
+        const cx = (x / CHART_W) * svgRect.width + svgRect.left;
+        const cy = (y / 180)     * svgRect.height + svgRect.top;
+
+        hLine.setAttribute('x1', x); hLine.setAttribute('x2', x);
+        hDot.setAttribute('cx', x);  hDot.setAttribute('cy', y);
+        hLine.setAttribute('opacity', '1');
+        hDot.setAttribute('opacity', '1');
+
+        document.getElementById('tt-time').textContent   = fmtDateShort(t) + ' ' + fmtTime(t);
+        document.getElementById('tt-netz').textContent    = nz.toFixed(2) + ' Rp';
+        document.getElementById('tt-energie').textContent = en.toFixed(2) + ' Rp';
+        document.getElementById('tt-gesamt').textContent  = g.toFixed(2) + ' Rp/kWh';
+
+        const wrapRect = wrap.getBoundingClientRect();
+        let left = cx - wrapRect.left + 12;
+        let top  = cy - wrapRect.top  - 60;
+        if (left + 145 > wrap.offsetWidth) left -= 155;
+        if (top < 0) top = 4;
+        tooltip.style.left    = left + 'px';
+        tooltip.style.top     = top  + 'px';
+        tooltip.style.opacity = '1';
+    }
+
+    function hideTooltip() {
+        hLine.setAttribute('opacity', '0');
+        hDot.setAttribute('opacity', '0');
+        tooltip.style.opacity = '0';
+    }
+
+    svgEl.addEventListener('mousemove', e => showTooltip(e.clientX, e.clientY, getIdx(e.clientX)));
+    svgEl.addEventListener('mouseleave', hideTooltip);
+    svgEl.addEventListener('touchmove', e => {
+        e.preventDefault();
+        const t = e.touches[0];
+        showTooltip(t.clientX, t.clientY, getIdx(t.clientX));
+    }, { passive: false });
+    svgEl.addEventListener('touchend', hideTooltip);
+}
+
+// ── Cheapest windows grid ──────────────────────────────────────────────────────
+const WINDOW_ICONS = ['🌙','⚡','🌅','💧','🔋','☀️'];
+
+function renderCheapWindows(windows) {
+    const grid = document.getElementById('windows-grid');
+    if (!windows || !windows.length) {
+        grid.innerHTML = '<p class="col-span-full text-xs text-slate-400 text-center py-4">Keine Daten verfügbar</p>';
+        return;
+    }
+    grid.innerHTML = windows.map((w, i) => {
+        const startLabel = fmtWindowLabel(w.start);
+        const endTime    = fmtTime(w.end);
+        const priceLabel = w.avg_gesamttarif.toFixed(1) + ' Rp';
+        const icon = WINDOW_ICONS[i] || '⚡';
+        return `<div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800
+                           rounded-xl p-3 flex flex-col gap-1.5 cursor-default hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors">
+                    <div class="flex items-center justify-between">
+                        <span class="text-lg">${icon}</span>
+                        <span class="text-[10px] font-bold bg-emerald-500 text-white rounded-full px-2 py-0.5">${priceLabel}</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-700 dark:text-slate-200 leading-tight">${startLabel}</p>
+                    <p class="text-[10px] text-slate-400 leading-tight">bis ${endTime}</p>
+                </div>`;
+    }).join('');
+}
+
+// ── Device recommendation cards ────────────────────────────────────────────────
+const DEVICES = [
+    { id: 0, name: 'Waschmaschine / Spüler' },
+    { id: 1, name: 'EV Ladestation' },
+    { id: 2, name: 'Wärmepumpe' },
+    { id: 3, name: 'Boiler / Warmwasser' },
+];
+
+function updateDeviceCards(windows) {
+    const CARD_BG_ACTIVE = 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800';
+    const CARD_BG_DEFAULT = 'bg-white dark:bg-card-dark border-slate-200 dark:border-border-dark';
+    const ICON_BG_ACTIVE  = 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600';
+    const ICON_BG_DEFAULT = 'bg-slate-100 dark:bg-slate-800 text-slate-400';
+
+    DEVICES.forEach(({ id }) => {
+        const card    = document.getElementById(`dev-card-${id}`);
+        const timeEl  = document.getElementById(`dev${id}-time`);
+        const iconDiv = card.querySelector('div.p-2\\.5');
+        const win     = windows && windows[id];
+
+        card.classList.remove('opacity-60');
+        card.className = card.className.replace(/bg-\S+/g, '').replace(/border-\S+/g, '').trim();
+
+        if (win) {
+            const label = fmtWindowLabel(win.start) + ' – ' + fmtTime(win.end);
+            timeEl.textContent = label;
+            timeEl.classList.remove('text-slate-500');
+            timeEl.classList.add('text-emerald-600', 'dark:text-emerald-400');
+            card.classList.add(...CARD_BG_ACTIVE.split(' '));
+            if (iconDiv) {
+                ICON_BG_DEFAULT.split(' ').forEach(c => iconDiv.classList.remove(c));
+                ICON_BG_ACTIVE.split(' ').forEach(c => iconDiv.classList.add(c));
+            }
+        } else {
+            timeEl.textContent = 'Keine Daten';
+            card.classList.add(...CARD_BG_DEFAULT.split(' '));
         }
+    });
+}
 
-        // ── SVG chart from price array ────────────────────────────────────────
-        // prices: EUR/MWh from API → converted to Rp./kWh for display
-        const EUR_MWH_TO_RP_KWH = 0.095;  // approx. 1 EUR/MWh ≈ 0.095 Rp./kWh
+// ── Main data load ─────────────────────────────────────────────────────────────
+async function loadDashboard() {
+    let usedFallback = false;
 
-        function renderChart(rawPrices, times) {
-            if (!rawPrices || rawPrices.length < 2) return;
+    try {
+        const resp = await fetch('/api/forecast/week');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
 
-            // Convert EUR/MWh → Rp./kWh
-            const prices = rawPrices.map(p => p * EUR_MWH_TO_RP_KWH);
+        // Current price = first point of forecast (≈ "now")
+        const netz    = data.netzpreis[0];
+        const energie = data.energiepreis[0];
+        const gesamt  = data.gesamttarif[0];
+        const level   = data.price_level[0];
+        applyLevel(level, netz, energie, gesamt);
 
-            const W = 400, H = 100, pad = 5;
-            const min = Math.min(...prices);
-            const max = Math.max(...prices);
-            const range = max - min || 1;
+        document.getElementById('last-update').textContent =
+            new Date(data.generated_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
 
-            // Cheap threshold: < avg * 0.9
-            const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
-            const cheapThreshold = avg * 0.90;
+        renderChart(data);
+        renderCheapWindows(data.cheapest_windows);
+        updateDeviceCards(data.cheapest_windows);
 
-            const toX = i => (i / (prices.length - 1)) * W;
-            const toY = p => H - pad - ((p - min) / range) * (H - 2 * pad);
+    } catch (err) {
+        usedFallback = true;
 
-            // Build main SVG polyline path
-            const pts = prices.map((p, i) => `${toX(i).toFixed(1)},${toY(p).toFixed(1)}`).join(' L ');
-            const linePath = `M ${pts}`;
-            const areaPath = `${linePath} L ${W},${H} L 0,${H} Z`;
-
-            document.getElementById('chart-line').setAttribute('d', linePath);
-            document.getElementById('chart-area').setAttribute('d', areaPath);
-
-            // Highlight cheap segments (< avg − 10%) as emerald dots
-            const svg = document.getElementById('price-chart');
-            // Remove previous cheap markers
-            svg.querySelectorAll('.cheap-dot').forEach(el => el.remove());
-            prices.forEach((p, i) => {
-                if (p < cheapThreshold) {
-                    const cx = toX(i).toFixed(1);
-                    const cy = toY(p).toFixed(1);
-                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                    circle.setAttribute('cx', cx);
-                    circle.setAttribute('cy', cy);
-                    circle.setAttribute('r', '3');
-                    circle.setAttribute('fill', '#10b981');
-                    circle.setAttribute('class', 'cheap-dot');
-                    circle.setAttribute('opacity', '0.7');
-                    svg.appendChild(circle);
-                }
-            });
-
-            // Place dot at the last (most recent) point
-            const lastX = toX(prices.length - 1);
-            const lastY = toY(prices[prices.length - 1]);
-            document.getElementById('chart-dot').setAttribute('cx', lastX.toFixed(1));
-            document.getElementById('chart-dot').setAttribute('cy', lastY.toFixed(1));
-
-            // Update time labels at 0, 25%, 50%, 75%, 100%
-            const indices = [0, Math.floor(prices.length * 0.25), Math.floor(prices.length * 0.5),
-                             Math.floor(prices.length * 0.75), prices.length - 1];
-            indices.forEach((idx, i) => {
-                const t = times && times[idx] ? new Date(times[idx]) : null;
-                const label = t ? t.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }) : '–';
-                const el = document.getElementById(`label-${i}`);
-                if (el) el.textContent = label;
-            });
-        }
-
-        // ── Main data fetch ───────────────────────────────────────────────────
-        async function loadDashboard() {
-            let usedFallback = false;
-
-            // 1. Fetch current forecast
-            try {
-                const resp = await fetch('/api/forecast');
-                if (resp.ok) {
-                    const data = await resp.json();
-                    if (!data.error) {
-                        // Prefer gesamttarif (tariff breakdown) if available
-                        const displayPrice = data.gesamttarif_rp_kwh ?? data.price_rp_kwh ?? '–';
-                        document.getElementById('price-value').textContent =
-                            typeof displayPrice === 'number' ? displayPrice.toFixed(1) : displayPrice;
-                        applyLevel(data.price_level ?? 'medium');
-
-                        // Update timestamp
-                        if (data.time) {
-                            const t = new Date(data.time);
-                            document.getElementById('last-update').textContent =
-                                t.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
-                        }
-                    } else {
-                        usedFallback = true;
+        // Fallback: try /api/forecast for current price at least
+        try {
+            const r2 = await fetch('/api/forecast');
+            if (r2.ok) {
+                const d2 = await r2.json();
+                if (!d2.error) {
+                    applyLevel(d2.price_level ?? 'medium',
+                               d2.netzpreis_rp_kwh, d2.energiepreis_rp_kwh, d2.gesamttarif_rp_kwh);
+                    if (d2.time) {
+                        document.getElementById('last-update').textContent =
+                            new Date(d2.time).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
                     }
-                } else {
-                    usedFallback = true;
                 }
-            } catch {
-                usedFallback = true;
             }
+        } catch (_) { /* ignore */ }
 
-            // 2. Fetch price history for chart
-            try {
-                const resp = await fetch('/api/price-history?hours=24');
-                if (resp.ok) {
-                    const data = await resp.json();
-                    if (data.prices && data.prices.length > 1) {
-                        renderChart(data.prices, data.times);
-                    }
+        // Fallback chart: fetch price history for the last 24h
+        try {
+            const rh = await fetch('/api/price-history?hours=24');
+            if (rh.ok) {
+                const dh = await rh.json();
+                if (dh.prices && dh.prices.length > 1) {
+                    const CONV = 0.095;  // rough EUR/MWh → Rp/kWh (display only)
+                    const fallbackData = {
+                        times:           dh.times,
+                        netzpreis:       dh.prices.map(() => 10.0),
+                        energiepreis:    dh.prices.map(p => Math.max(3, Math.min(13, p * CONV))),
+                        gesamttarif:     dh.prices.map(p => Math.max(13, Math.min(23, p * CONV + 10))),
+                        price_level:     dh.prices.map(p => p * CONV + 10 < 15 ? 'low' : (p * CONV + 10 > 22 ? 'high' : 'medium')),
+                        cheapest_windows: [],
+                    };
+                    renderChart(fallbackData);
                 }
-            } catch {
-                // keep static chart
             }
+        } catch (_) { /* ignore */ }
+    }
 
-            // 3. Show warning if model not available
-            if (usedFallback) {
-                // Use static fallback values
-                applyLevel('medium');
-                document.getElementById('price-value').textContent = '–';
-                document.getElementById('last-update').textContent = 'nicht verfügbar';
-                const banner = document.getElementById('error-banner');
-                banner.classList.remove('hidden');
-                banner.classList.add('flex');
-            }
-        }
+    if (usedFallback) {
+        const banner = document.getElementById('error-banner');
+        document.getElementById('error-text').textContent =
+            '7-Tage-Prognose nicht verfügbar – Fallback-Ansicht (letzte 24h) wird angezeigt.';
+        banner.classList.remove('hidden');
+        banner.classList.add('flex');
+        // Clear skeleton in windows grid
+        document.getElementById('windows-grid').innerHTML =
+            '<p class="col-span-full text-xs text-slate-400 text-center py-4">Keine Prognosedaten verfügbar</p>';
+    }
+}
 
-        // Load on startup and refresh every 5 minutes
-        loadDashboard();
-        setInterval(loadDashboard, 5 * 60 * 1000);
-    </script>
+// Load on startup; refresh every 30 minutes
+loadDashboard();
+setInterval(loadDashboard, 30 * 60 * 1000);
+</script>
 </body>
-
 </html>
