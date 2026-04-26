@@ -36,6 +36,13 @@
 </head>
 <body class="bg-bg-light dark:bg-bg-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
 
+<!-- ── Onboarding Overlay ────────────────────────────────────────────────────── -->
+<div id="ob-overlay" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4">
+    <div id="ob-card" class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-2xl w-full max-w-sm transition-all duration-200">
+        <!-- Content rendered by obRender() -->
+    </div>
+</div>
+
 <!-- ── Header ──────────────────────────────────────────────────────────────── -->
 <header class="sticky top-0 z-20 flex items-center justify-between px-4 md:px-8 py-3
                bg-white/90 dark:bg-card-dark/90 backdrop-blur-md
@@ -613,19 +620,22 @@ function renderCheapWindows(windows) {
 
 // ── Device recommendation cards ────────────────────────────────────────────────
 const DEVICES = [
-    { id: 0, name: 'Waschmaschine / Spüler' },
-    { id: 1, name: 'EV Ladestation' },
-    { id: 2, name: 'Wärmepumpe' },
-    { id: 3, name: 'Boiler / Warmwasser' },
+    { id: 0, key: 'washer',   name: 'Waschmaschine / Spüler' },
+    { id: 1, key: 'ev',       name: 'EV Ladestation' },
+    { id: 2, key: 'heatpump', name: 'Wärmepumpe' },
+    { id: 3, key: 'boiler',   name: 'Boiler / Warmwasser' },
 ];
 
 function updateDeviceCards(windows) {
-    const CARD_BG_ACTIVE = 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800';
-    const CARD_BG_DEFAULT = 'bg-white dark:bg-card-dark border-slate-200 dark:border-border-dark';
-    const ICON_BG_ACTIVE  = 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600';
-    const ICON_BG_DEFAULT = 'bg-slate-100 dark:bg-slate-800 text-slate-400';
+    const CARD_BG_ACTIVE   = 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800';
+    const CARD_BG_DEFAULT  = 'bg-white dark:bg-card-dark border-slate-200 dark:border-border-dark';
+    const CARD_BG_DISABLED = 'bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-border-dark';
+    const ICON_BG_ACTIVE   = 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600';
+    const ICON_BG_DEFAULT  = 'bg-slate-100 dark:bg-slate-800 text-slate-400';
 
-    DEVICES.forEach(({ id }) => {
+    const savedConfig = obLoad();
+
+    DEVICES.forEach(({ id, key }) => {
         const card    = document.getElementById(`dev-card-${id}`);
         const timeEl  = document.getElementById(`dev${id}-time`);
         const iconDiv = card.querySelector('div.p-2\\.5');
@@ -633,6 +643,15 @@ function updateDeviceCards(windows) {
 
         card.classList.remove('opacity-60');
         card.className = card.className.replace(/bg-\S+/g, '').replace(/border-\S+/g, '').trim();
+
+        // Device explicitly disabled in onboarding
+        const devConfig = savedConfig?.devices?.[key];
+        if (devConfig && devConfig.enabled === false) {
+            timeEl.textContent = 'Nicht konfiguriert';
+            timeEl.className = 'text-sm font-medium text-slate-400 truncate';
+            card.classList.add(...CARD_BG_DISABLED.split(' '), 'opacity-50');
+            return;
+        }
 
         if (win) {
             const label = fmtWindowLabel(win.start) + ' – ' + fmtTime(win.end);
@@ -730,6 +749,222 @@ async function loadDashboard() {
 // Load on startup; refresh every 30 minutes
 loadDashboard();
 setInterval(loadDashboard, 30 * 60 * 1000);
+
+// ── Onboarding ─────────────────────────────────────────────────────────────────
+const OB_KEY = 'bdsp_appliances_v1';
+
+const OB_DEVICES = [
+    {
+        key: 'washer', icon: 'dishwasher_gen',
+        name: 'Waschmaschine / Spüler',
+        desc: 'Wähle die ungefähre Kapazität deiner Geräte.',
+        options: [
+            { label: 'Klein',    sub: '1,5 kWh · ~2h',   kwh: 1.5, duration_h: 2   },
+            { label: 'Standard', sub: '2,0 kWh · ~2.5h', kwh: 2.0, duration_h: 2.5 },
+            { label: 'Gross',    sub: '2,5 kWh · ~3h',   kwh: 2.5, duration_h: 3   },
+        ],
+    },
+    {
+        key: 'ev', icon: 'ev_station',
+        name: 'EV Ladestation',
+        desc: 'Wie schnell lädt deine Ladestation?',
+        options: [
+            { label: 'Langsam',       sub: '3,7 kW', kw: 3.7 },
+            { label: 'Standard',      sub: '7,4 kW', kw: 7.4 },
+            { label: 'Schnell',       sub: '11 kW',  kw: 11  },
+            { label: 'Sehr schnell',  sub: '22 kW',  kw: 22  },
+        ],
+    },
+    {
+        key: 'heatpump', icon: 'heat_pump',
+        name: 'Wärmepumpe',
+        desc: 'Welche Leistung hat deine Wärmepumpe?',
+        options: [
+            { label: 'Klein',    sub: '2 kW',  kw: 2  },
+            { label: 'Standard', sub: '5 kW',  kw: 5  },
+            { label: 'Gross',    sub: '10 kW', kw: 10 },
+        ],
+    },
+    {
+        key: 'boiler', icon: 'water_heater',
+        name: 'Boiler / Warmwasser',
+        desc: 'Welche Kapazität hat dein Warmwasserboiler?',
+        options: [
+            { label: '100 Liter', sub: '2 kW', kw: 2 },
+            { label: '200 Liter', sub: '3 kW', kw: 3 },
+            { label: '300 Liter', sub: '6 kW', kw: 6 },
+        ],
+    },
+];
+
+let obStep = 0;
+const obSelections = {};
+
+function obLoad() {
+    try { return JSON.parse(localStorage.getItem(OB_KEY)); } catch { return null; }
+}
+
+function obClose() {
+    document.getElementById('ob-overlay').classList.add('hidden');
+}
+
+function obRender() {
+    const card = document.getElementById('ob-card');
+
+    if (obStep === 0) {
+        card.innerHTML = `
+          <div class="flex flex-col items-center text-center p-8 gap-6">
+            <div class="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/30">
+              <span class="material-symbols-outlined text-white text-[38px]" style="font-variation-settings:'FILL' 1">bolt</span>
+            </div>
+            <div class="flex flex-col gap-2">
+              <h2 class="text-2xl font-black text-slate-900 dark:text-white">Willkommen bei<br>Swiss Energy Pulse</h2>
+              <p class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                Richte in 4 kurzen Schritten deine Haushaltsgeräte ein –
+                so zeigen wir dir, wann du am günstigsten Strom beziehst.
+              </p>
+            </div>
+            <div class="flex flex-col gap-3 w-full">
+              <button onclick="obStep=1;obRender()"
+                      class="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 rounded-xl transition-colors shadow-sm">
+                Jetzt einrichten →
+              </button>
+              <button onclick="obSkipAll()"
+                      class="text-xs text-slate-400 hover:text-primary transition-colors py-1">
+                Später einrichten
+              </button>
+            </div>
+          </div>`;
+        return;
+    }
+
+    if (obStep === 5) {
+        const active  = OB_DEVICES.filter(d => obSelections[d.key]?.enabled);
+        const skipped = OB_DEVICES.filter(d => !obSelections[d.key]?.enabled);
+        card.innerHTML = `
+          <div class="flex flex-col items-center text-center p-8 gap-6">
+            <div class="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              <span class="material-symbols-outlined text-white text-[38px]" style="font-variation-settings:'FILL' 1">check</span>
+            </div>
+            <div class="flex flex-col gap-2">
+              <h2 class="text-2xl font-black text-slate-900 dark:text-white">Alles bereit!</h2>
+              <p class="text-sm text-slate-500 dark:text-slate-400">Deine Empfehlungen werden nun auf dich abgestimmt.</p>
+            </div>
+            <div class="w-full rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-border-dark p-4 flex flex-col gap-2 text-left">
+              ${active.map(d => `
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>
+                  <span class="text-sm text-slate-700 dark:text-slate-200">${d.name}</span>
+                </div>`).join('')}
+              ${skipped.map(d => `
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-slate-300 dark:text-slate-600 text-[18px]">remove_circle</span>
+                  <span class="text-sm text-slate-400">${d.name}</span>
+                </div>`).join('')}
+            </div>
+            <button onclick="obFinish()"
+                    class="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 rounded-xl transition-colors shadow-sm">
+              Dashboard öffnen
+            </button>
+          </div>`;
+        return;
+    }
+
+    // Steps 1–4: device configuration
+    const dev = OB_DEVICES[obStep - 1];
+    const sel = obSelections[dev.key];
+    const hasSelection = !!(sel && sel.enabled && sel.optionIdx !== undefined);
+
+    const dots = OB_DEVICES.map((_, i) => {
+        if (i < obStep - 1)  return `<div class="w-2 h-2 rounded-full bg-primary/50"></div>`;
+        if (i === obStep - 1) return `<div class="w-6 h-2 rounded-full bg-primary transition-all duration-300"></div>`;
+        return `<div class="w-2 h-2 rounded-full bg-slate-200 dark:bg-slate-700"></div>`;
+    }).join('');
+
+    const gridCols = dev.options.length === 4 ? 'grid-cols-2' : 'grid-cols-3';
+    const opts = dev.options.map((opt, i) => {
+        const isSelected = hasSelection && sel.optionIdx === i;
+        return `
+          <button onclick="obSelect(${i})"
+                  class="flex flex-col items-center justify-center text-center p-3.5 rounded-xl border-2 transition-all duration-150 ${
+                    isSelected
+                      ? 'border-primary bg-primary/10 dark:bg-primary/15'
+                      : 'border-slate-200 dark:border-border-dark hover:border-primary/40 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                  }">
+            <span class="material-symbols-outlined text-[16px] mb-1 ${isSelected ? 'text-primary' : 'text-slate-300 dark:text-slate-600'}"
+                  style="font-variation-settings:'FILL' ${isSelected ? 1 : 0}">
+              ${isSelected ? 'radio_button_checked' : 'radio_button_unchecked'}
+            </span>
+            <span class="font-bold text-sm ${isSelected ? 'text-primary' : 'text-slate-700 dark:text-slate-200'}">${opt.label}</span>
+            <span class="text-[11px] mt-0.5 leading-tight ${isSelected ? 'text-primary/70' : 'text-slate-400'}">${opt.sub}</span>
+          </button>`;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="flex flex-col gap-5 p-6">
+        <div class="flex items-center justify-center gap-1.5">${dots}</div>
+        <div class="flex flex-col items-center text-center gap-2">
+          <div class="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-200 dark:border-border-dark">
+            <span class="material-symbols-outlined text-primary text-3xl">${dev.icon}</span>
+          </div>
+          <div>
+            <h3 class="font-black text-lg text-slate-900 dark:text-white">${dev.name}</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">${dev.desc}</p>
+          </div>
+        </div>
+        <div class="grid ${gridCols} gap-2">${opts}</div>
+        <div class="flex flex-col gap-2">
+          <button onclick="obNext()" ${hasSelection ? '' : 'disabled'}
+                  class="w-full font-bold py-3 rounded-xl transition-colors ${
+                    hasSelection
+                      ? 'bg-primary hover:bg-primary-dark text-white shadow-sm cursor-pointer'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                  }">
+            ${obStep < 4 ? 'Weiter →' : 'Fertig ✓'}
+          </button>
+          <button onclick="obSkipDevice()"
+                  class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors py-1.5">
+            Ich habe dieses Gerät nicht
+          </button>
+        </div>
+      </div>`;
+}
+
+function obSelect(idx) {
+    const dev = OB_DEVICES[obStep - 1];
+    obSelections[dev.key] = { enabled: true, optionIdx: idx, ...dev.options[idx] };
+    obRender();
+}
+
+function obNext() {
+    const dev = OB_DEVICES[obStep - 1];
+    if (!obSelections[dev.key]?.enabled) return;
+    obStep++;
+    obRender();
+}
+
+function obSkipDevice() {
+    const dev = OB_DEVICES[obStep - 1];
+    obSelections[dev.key] = { enabled: false };
+    obStep++;
+    obRender();
+}
+
+function obSkipAll() {
+    localStorage.setItem(OB_KEY, JSON.stringify({ configured: true, skipped: true, devices: {} }));
+    obClose();
+}
+
+function obFinish() {
+    localStorage.setItem(OB_KEY, JSON.stringify({ configured: true, devices: obSelections }));
+    obClose();
+}
+
+// Show onboarding if not yet configured
+if (!obLoad()) {
+    document.getElementById('ob-overlay').classList.remove('hidden');
+    obRender();
+}
 </script>
 </body>
 </html>
