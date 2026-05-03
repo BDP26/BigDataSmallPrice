@@ -1,7 +1,7 @@
 # Plan: README.md erstellen für BigDataSmallPrice
 
 ## Context
-Das Projekt "BigDataSmallPrice" ist eine dynamische Strompreis-Prognose-Plattform für Winterthur (ZHAW PM4 Semesterprojekt). Das bestehende README ist leer (nur Titel). Es soll ein vollständiges, professionelles README auf Deutsch erstellt werden.
+Das Projekt "BigDataSmallPrice" ist eine dynamische Strompreis-Prognose-Plattform für Winterthur (ZHAW PM4 Semesterprojekt).
 
 ## Empfohlene Struktur & Unterkategorien
 
