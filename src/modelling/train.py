@@ -30,6 +30,32 @@ from sklearn.linear_model import LinearRegression
 from xgboost import XGBRegressor
 
 
+# ── Feature helpers ───────────────────────────────────────────────────────────
+
+
+_CYCLICAL_PAIRS: dict[str, tuple[str, str]] = {
+    "hour_of_day": ("hour_sin", "hour_cos"),
+    "day_of_week": ("dow_sin",  "dow_cos"),
+    "month":       ("month_sin", "month_cos"),
+}
+
+
+def _drop_redundant_calendar_cols(df: pd.DataFrame | None) -> pd.DataFrame | None:
+    """
+    Drop raw calendar cols (hour_of_day, day_of_week, month) when both their
+    sin/cos counterparts are present. Sequence models overfit when fed both
+    encodings; XGBoost/Linear are unaffected because they read the original
+    parquets unchanged. No-op when cyclical features are absent.
+    """
+    if df is None:
+        return None
+    drop = [
+        raw for raw, (s, c) in _CYCLICAL_PAIRS.items()
+        if raw in df.columns and s in df.columns and c in df.columns
+    ]
+    return df.drop(columns=drop) if drop else df
+
+
 # ── Training functions ────────────────────────────────────────────────────────
 
 
@@ -403,6 +429,7 @@ def run_lstm_load_training(
         LSTMModel,
         predict_from_sequences,
         save_torch_model,
+        seed_everything,
         train_sequence_model,
     )
 
@@ -419,6 +446,10 @@ def run_lstm_load_training(
     y_val   = pd.read_parquet(data_path / "y_val.parquet") if (data_path / "y_val.parquet").exists() else None
     X_test  = pd.read_parquet(data_path / "X_test.parquet").fillna(0) if (data_path / "X_test.parquet").exists() else None
     y_test  = pd.read_parquet(data_path / "y_test.parquet") if (data_path / "y_test.parquet").exists() else None
+
+    X_train = _drop_redundant_calendar_cols(X_train)
+    X_val   = _drop_redundant_calendar_cols(X_val)
+    X_test  = _drop_redundant_calendar_cols(X_test)
 
     feature_cols = list(X_train.columns)
     X_mean, X_scale, y_mean, y_scale = _fit_scalers(X_train, y_train)
@@ -439,6 +470,7 @@ def run_lstm_load_training(
         X_val_ctx_sc = (X_val_ctx - X_mean) / X_scale
         y_val_ctx_sc = (y_val_ctx - y_mean) / y_scale
 
+    seed_everything(42)
     model = LSTMModel(input_size=len(feature_cols), hidden_size=64, num_layers=2, dropout=0.2)
     print(f"Training LSTM (Model A load), lookback={lookback}, max_seqs={max_train_seqs}")
 
@@ -522,6 +554,7 @@ def run_lstm_energy_training(
         LSTMModel,
         predict_from_sequences,
         save_torch_model,
+        seed_everything,
         train_sequence_model,
     )
 
@@ -538,6 +571,10 @@ def run_lstm_energy_training(
     y_val   = pd.read_parquet(data_path / "y_val.parquet") if (data_path / "y_val.parquet").exists() else None
     X_test  = pd.read_parquet(data_path / "X_test.parquet").fillna(0) if (data_path / "X_test.parquet").exists() else None
     y_test  = pd.read_parquet(data_path / "y_test.parquet") if (data_path / "y_test.parquet").exists() else None
+
+    X_train = _drop_redundant_calendar_cols(X_train)
+    X_val   = _drop_redundant_calendar_cols(X_val)
+    X_test  = _drop_redundant_calendar_cols(X_test)
 
     feature_cols = list(X_train.columns)
     X_mean, X_scale, y_mean, y_scale = _fit_scalers(X_train, y_train)
@@ -557,6 +594,7 @@ def run_lstm_energy_training(
         X_val_ctx_sc = (X_val_ctx - X_mean) / X_scale
         y_val_ctx_sc = (y_val_ctx - y_mean) / y_scale
 
+    seed_everything(42)
     model = LSTMModel(input_size=len(feature_cols), hidden_size=64, num_layers=2, dropout=0.2)
     print(f"Training LSTM (Model B EPEX), lookback={lookback}")
 
@@ -641,6 +679,7 @@ def run_transformer_load_training(
         TransformerModel,
         predict_from_sequences,
         save_torch_model,
+        seed_everything,
         train_sequence_model,
     )
 
@@ -657,6 +696,10 @@ def run_transformer_load_training(
     y_val   = pd.read_parquet(data_path / "y_val.parquet") if (data_path / "y_val.parquet").exists() else None
     X_test  = pd.read_parquet(data_path / "X_test.parquet").fillna(0) if (data_path / "X_test.parquet").exists() else None
     y_test  = pd.read_parquet(data_path / "y_test.parquet") if (data_path / "y_test.parquet").exists() else None
+
+    X_train = _drop_redundant_calendar_cols(X_train)
+    X_val   = _drop_redundant_calendar_cols(X_val)
+    X_test  = _drop_redundant_calendar_cols(X_test)
 
     feature_cols = list(X_train.columns)
     X_mean, X_scale, y_mean, y_scale = _fit_scalers(X_train, y_train)
@@ -676,6 +719,7 @@ def run_transformer_load_training(
         X_val_ctx_sc = (X_val_ctx - X_mean) / X_scale
         y_val_ctx_sc = (y_val_ctx - y_mean) / y_scale
 
+    seed_everything(42)
     model = TransformerModel(input_size=len(feature_cols), d_model=64, nhead=4, num_layers=2, dropout=0.1)
     print(f"Training Transformer (Model A load), lookback={lookback}, max_seqs={max_train_seqs}")
 

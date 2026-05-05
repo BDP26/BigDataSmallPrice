@@ -295,7 +295,9 @@ def forecast():
 
         row = df_epex.iloc[0]
         feature_dict = {
-            col: float(row[col]) for col in FEATURE_COLS if col in df_epex.columns
+            col: (float(row[col]) if row[col] is not None else float("nan"))
+            for col in FEATURE_COLS
+            if col in df_epex.columns
         }
 
         # Model B: EPEX price prediction
@@ -471,7 +473,7 @@ def forecast_week():
             e_row["day_of_week"]  = t.weekday()
             e_row["month"]        = t.month
             e_row["is_weekend"]   = int(t.weekday() >= 5)
-            e_row["is_peak_hour"] = int(7 <= t.hour <= 20)
+            e_row["is_peak_hour"] = int(7 <= t.hour <= 22)
             e_row["hour_sin"]  = _math.sin(2 * _math.pi * t.hour / 24)
             e_row["hour_cos"]  = _math.cos(2 * _math.pi * t.hour / 24)
             e_row["dow_sin"]   = _math.sin(2 * _math.pi * t.weekday() / 7)

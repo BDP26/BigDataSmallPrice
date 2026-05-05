@@ -35,6 +35,56 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 
 
+# ── Device selection ──────────────────────────────────────────────────────────
+
+
+def seed_everything(seed: int) -> None:
+    """Seed Python, NumPy, and torch (CPU + all CUDA devices) for reproducibility."""
+    import random  # noqa: PLC0415
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def select_device(prefer_index: int | None = None) -> torch.device:
+    """
+    Pick a CUDA device dynamically; fall back to CPU if no GPU is usable.
+
+    Picks the GPU with the most free memory when multiple are present, unless
+    *prefer_index* is given. Falls back to CPU if CUDA is unavailable or any
+    probe fails (driver issue, OOM, etc.).
+    """
+    if not torch.cuda.is_available():
+        return torch.device("cpu")
+    try:
+        n = torch.cuda.device_count()
+        if n == 0:
+            return torch.device("cpu")
+        if prefer_index is not None and 0 <= prefer_index < n:
+            idx = prefer_index
+        elif n == 1:
+            idx = 0
+        else:
+            free_per_dev = []
+            for i in range(n):
+                free, _total = torch.cuda.mem_get_info(i)
+                free_per_dev.append((free, i))
+            idx = max(free_per_dev)[1]
+        return torch.device(f"cuda:{idx}")
+    except Exception as e:
+        print(f"  CUDA probe failed ({e}); falling back to CPU.")
+        return torch.device("cpu")
+
+
+def _device_label(device: torch.device) -> str:
+    if device.type == "cuda":
+        return f"cuda:{device.index} ({torch.cuda.get_device_name(device.index)})"
+    return "cpu"
+
+
 # ── Dataset ───────────────────────────────────────────────────────────────────
 
 
@@ -154,6 +204,7 @@ def train_sequence_model(
     lr: float = 1e-3,
     patience: int = 7,
     max_train_seqs: int | None = 30_000,
+    seed: int | None = 42,
 ) -> tuple[nn.Module, list[float]]:
     """
     Generic training loop for LSTM / Transformer sequence models.
@@ -182,9 +233,8 @@ def train_sequence_model(
         (model, val_losses) where val_losses is a list of per-epoch val MSE
         values (empty list if no validation set was provided).
     """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"  Training device: {device}" + (f" ({torch.cuda.get_device_name(0)})" if device.type == "cuda" else ""))
-    model = model.to(device)
+    if seed is not None:
+        seed_everything(seed)
 
     # ── Subsample training data if needed ─────────────────────────────────────
     n_seqs = len(X_train) - lookback
@@ -194,71 +244,93 @@ def train_sequence_model(
         y_train = y_train[-keep:]
         print(f"  Subsampled training to last {keep} rows ({max_train_seqs} sequences).")
 
-    train_ds = SequenceDataset(X_train, y_train, lookback)
-    train_loader = DataLoader(
-        train_ds, batch_size=batch_size, shuffle=True, num_workers=0
-    )
+    initial_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, patience=3, factor=0.5, min_lr=1e-5
-    )
-    loss_fn = nn.MSELoss()
+    def _run(device: torch.device) -> tuple[nn.Module, list[float]]:
+        print(f"  Training device: {_device_label(device)}")
+        model.load_state_dict(initial_state)
+        model.to(device)
 
-    val_losses: list[float] = []
-    best_val_loss = float("inf")
-    best_state: dict | None = None
-    wait = 0
+        train_ds = SequenceDataset(X_train, y_train, lookback)
+        if seed is not None:
+            g = torch.Generator()
+            g.manual_seed(seed)
+            train_loader = DataLoader(
+                train_ds, batch_size=batch_size, shuffle=True, num_workers=0, generator=g,
+            )
+        else:
+            train_loader = DataLoader(
+                train_ds, batch_size=batch_size, shuffle=True, num_workers=0,
+            )
 
-    for epoch in range(epochs):
-        # ── Train ─────────────────────────────────────────────────────────────
-        model.train()
-        for x_batch, y_batch in train_loader:
-            pred = model(x_batch.to(device))
-            loss = loss_fn(pred, y_batch.to(device))
-            optimizer.zero_grad()
-            loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, patience=3, factor=0.5, min_lr=1e-5
+        )
+        loss_fn = nn.MSELoss()
 
-        # ── Validate ──────────────────────────────────────────────────────────
-        if X_val is not None and y_val is not None:
-            model.eval()
-            val_ds = SequenceDataset(X_val, y_val, lookback)
-            val_loader = DataLoader(val_ds, batch_size=1024, shuffle=False, num_workers=0)
-            preds_v, true_v = [], []
-            with torch.no_grad():
-                for x_b, y_b in val_loader:
-                    preds_v.append(model(x_b.to(device)).cpu())
-                    true_v.append(y_b)
-            val_loss = loss_fn(torch.cat(preds_v), torch.cat(true_v)).item()
-            val_losses.append(val_loss)
-            scheduler.step(val_loss)
+        val_losses: list[float] = []
+        best_val_loss = float("inf")
+        best_state: dict | None = None
+        wait = 0
 
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
-                wait = 0
-            else:
-                wait += 1
-                if wait >= patience:
+        for epoch in range(epochs):
+            model.train()
+            for x_batch, y_batch in train_loader:
+                pred = model(x_batch.to(device))
+                loss = loss_fn(pred, y_batch.to(device))
+                optimizer.zero_grad()
+                loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                optimizer.step()
+
+            if X_val is not None and y_val is not None:
+                model.eval()
+                val_ds = SequenceDataset(X_val, y_val, lookback)
+                val_loader = DataLoader(val_ds, batch_size=1024, shuffle=False, num_workers=0)
+                preds_v, true_v = [], []
+                with torch.no_grad():
+                    for x_b, y_b in val_loader:
+                        preds_v.append(model(x_b.to(device)).cpu())
+                        true_v.append(y_b)
+                val_loss = loss_fn(torch.cat(preds_v), torch.cat(true_v)).item()
+                val_losses.append(val_loss)
+                scheduler.step(val_loss)
+
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+                    wait = 0
+                else:
+                    wait += 1
+                    if wait >= patience:
+                        print(
+                            f"  Early stopping at epoch {epoch + 1}; "
+                            f"best val_loss={best_val_loss:.6f}"
+                        )
+                        break
+
+                if (epoch + 1) % 5 == 0 or epoch == 0:
                     print(
-                        f"  Early stopping at epoch {epoch + 1}; "
-                        f"best val_loss={best_val_loss:.6f}"
+                        f"  Epoch {epoch + 1}/{epochs}: val_loss={val_loss:.6f}  "
+                        f"lr={optimizer.param_groups[0]['lr']:.2e}"
                     )
-                    break
 
-            if (epoch + 1) % 5 == 0 or epoch == 0:
-                print(
-                    f"  Epoch {epoch + 1}/{epochs}: val_loss={val_loss:.6f}  "
-                    f"lr={optimizer.param_groups[0]['lr']:.2e}"
-                )
+        if best_state is not None:
+            model.load_state_dict(best_state)
 
-    if best_state is not None:
-        model.load_state_dict(best_state)
+        model.eval()
+        return model, val_losses
 
-    model.eval()
-    return model, val_losses
+    device = select_device()
+    if device.type == "cuda":
+        try:
+            return _run(device)
+        except (RuntimeError, torch.cuda.OutOfMemoryError) as e:
+            print(f"  GPU training failed ({e}); falling back to CPU.")
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+    return _run(torch.device("cpu"))
 
 
 # ── Inference ─────────────────────────────────────────────────────────────────
@@ -287,11 +359,24 @@ def predict_from_sequences(
     y_dummy = np.zeros(len(X_scaled), dtype=np.float32)
     ds = SequenceDataset(X_scaled.astype(np.float32), y_dummy, lookback)
     loader = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=0)
-    preds: list[np.ndarray] = []
-    with torch.no_grad():
-        for x_batch, _ in loader:
-            preds.append(model(x_batch).numpy())
-    return np.concatenate(preds) if preds else np.array([], dtype=np.float32)
+
+    def _infer(device: torch.device) -> np.ndarray:
+        model.to(device)
+        preds: list[np.ndarray] = []
+        with torch.no_grad():
+            for x_batch, _ in loader:
+                preds.append(model(x_batch.to(device)).cpu().numpy())
+        return np.concatenate(preds) if preds else np.array([], dtype=np.float32)
+
+    device = next(model.parameters()).device
+    if device.type == "cuda":
+        try:
+            return _infer(device)
+        except (RuntimeError, torch.cuda.OutOfMemoryError) as e:
+            print(f"  GPU inference failed ({e}); falling back to CPU.")
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+    return _infer(torch.device("cpu"))
 
 
 # ── Serialisation ─────────────────────────────────────────────────────────────
