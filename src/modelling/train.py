@@ -215,7 +215,13 @@ def run_load_training(
     Raises:
         FileNotFoundError: If the training parquet files are not found.
     """
-    from modelling.evaluate import check_load_quality, evaluate_all, save_metrics
+    from modelling.evaluate import (
+        check_load_quality,
+        evaluate_all,
+        save_metrics,
+        select_best_model,
+        write_best_models_manifest,
+    )
 
     data_path = Path(data_dir)
     x_path = data_path / "X_train.parquet"
@@ -269,6 +275,23 @@ def run_load_training(
         save_metrics(metrics, "metrics_load", models_dir)
         check_load_quality(metrics)
 
+        pick = select_best_model(
+            metrics, candidates=["linear_load", "model_load"], metric="rmse"
+        )
+        if pick is not None:
+            name, m = pick
+            entry = {
+                "prefix": name,
+                "rmse": m.get("rmse"),
+                "mae": m.get("mae"),
+                "mape": m.get("mape"),
+                "residual_std": m.get("residual_std"),
+                "n_residuals": m.get("n_residuals"),
+                "trained_on": datetime.now(timezone.utc).strftime("%Y%m%d"),
+            }
+            write_best_models_manifest(models_dir, {"load": entry})
+            print(f"Best load model by RMSE: {name} (rmse={m.get('rmse'):.3f})")
+
     return paths
 
 
@@ -299,7 +322,12 @@ def run_training(
     Raises:
         FileNotFoundError: If training parquet files are not found in *data_dir*.
     """
-    from modelling.evaluate import evaluate_all, save_metrics
+    from modelling.evaluate import (
+        evaluate_all,
+        save_metrics,
+        select_best_model,
+        write_best_models_manifest,
+    )
 
     data_path = Path(data_dir)
     x_path = data_path / "X_train.parquet"
@@ -352,6 +380,23 @@ def run_training(
             y_test,
         )
         save_metrics(metrics, "metrics", models_dir)
+
+        pick = select_best_model(
+            metrics, candidates=["linear", "xgb"], metric="rmse"
+        )
+        if pick is not None:
+            name, m = pick
+            entry = {
+                "prefix": name,
+                "rmse": m.get("rmse"),
+                "mae": m.get("mae"),
+                "mape": m.get("mape"),
+                "residual_std": m.get("residual_std"),
+                "n_residuals": m.get("n_residuals"),
+                "trained_on": datetime.now(timezone.utc).strftime("%Y%m%d"),
+            }
+            write_best_models_manifest(models_dir, {"energy": entry})
+            print(f"Best energy model by RMSE: {name} (rmse={m.get('rmse'):.3f})")
 
     return paths
 

@@ -25,6 +25,7 @@ Serves:
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import time
 from decimal import Decimal
@@ -204,6 +205,64 @@ def _get_model(prefix: str = "xgb"):
     return _model_cache[prefix]
 
 
+# ── Best-model manifest (auto-selection after each training run) ──────────────
+
+_manifest_cache: dict = {"mtime": None, "data": {}}
+
+
+def _manifest_path() -> Path:
+    return Path(os.getenv("BDSP_MODELS_DIR", "models/")) / "best_models.json"
+
+
+def _load_manifest() -> dict:
+    """
+    Read ``best_models.json`` with mtime-based caching.
+
+    Returns ``{}`` when the file is missing or invalid so that callers can
+    fall back to hardcoded defaults instead of 500-ing.
+    """
+    path = _manifest_path()
+    try:
+        mtime = path.stat().st_mtime
+    except FileNotFoundError:
+        _manifest_cache["mtime"] = None
+        _manifest_cache["data"] = {}
+        return {}
+    if _manifest_cache["mtime"] == mtime:
+        return _manifest_cache["data"]
+    try:
+        with path.open("r") as fh:
+            data = json.load(fh) or {}
+    except (json.JSONDecodeError, OSError):
+        data = {}
+    _manifest_cache["mtime"] = mtime
+    _manifest_cache["data"] = data
+    return data
+
+
+def _best_prefix(target: str, default: str) -> str:
+    entry = _load_manifest().get(target) or {}
+    return entry.get("prefix") or default
+
+
+def _residual_std(target: str) -> float | None:
+    entry = _load_manifest().get(target) or {}
+    v = entry.get("residual_std")
+    if v is None:
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    if f != f or f <= 0:  # NaN or non-positive
+        return None
+    return f
+
+
+# 95% prediction interval (two-sided Gaussian assumption)
+_CI_Z = 1.96
+
+
 # ── Auth endpoints ────────────────────────────────────────────────────────────
 
 
@@ -243,15 +302,16 @@ def predict_price(
     Body: ``{"features": {"lag_1h": 75.0, "temperature_2m": 8.5, ...}}``
     """
     from modelling.predict import predict_from_dict  # noqa: PLC0415
+    energy_prefix = _best_prefix("energy", "xgb")
     try:
-        model = _get_model("xgb")
+        model = _get_model(energy_prefix)
         price = predict_from_dict(model, request.features)
     except FileNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="No trained model available. Run the training pipeline first.",
         )
-    return {"prediction_eur_mwh": price, "model": "xgb"}
+    return {"prediction_eur_mwh": price, "model": energy_prefix}
 
 
 # ── Public forecast endpoints ─────────────────────────────────────────────────
@@ -301,14 +361,16 @@ def forecast():
         }
 
         # Model B: EPEX price prediction
-        model_epex = _get_model("xgb")
+        energy_prefix = _best_prefix("energy", "xgb")
+        model_epex = _get_model(energy_prefix)
         epex_price = predict_from_dict(model_epex, feature_dict)
 
         # Model A: net load prediction (optional)
         net_load: float | None = None
+        load_prefix = _best_prefix("load", "model_load")
         if not df_load.empty:
             try:
-                load_model = _get_model("model_load")
+                load_model = _get_model(load_prefix)
                 from processing.export_pipeline import LOAD_FEATURE_COLS  # noqa: PLC0415
                 load_row = df_load.iloc[0]
                 load_features = {
@@ -321,12 +383,14 @@ def forecast():
                 net_load = None
 
         # Compute tariff breakdown
+        from processing.tariff_formulas import (  # noqa: PLC0415
+            DEFAULT_NETZ_STANDARD,
+            energiepreis,
+            gesamttarif,
+        )
         if net_load is not None:
             tariff = compute_tariff(net_load=net_load, epex_eur_mwh=epex_price)
         else:
-            # Fallback: energy-only estimate (no network component)
-            from processing.tariff_formulas import energiepreis, gesamttarif  # noqa: PLC0415
-            from processing.tariff_formulas import DEFAULT_NETZ_STANDARD  # noqa: PLC0415
             energie = energiepreis(epex_price)
             tariff = {
                 "netzpreis_rp_kwh":    round(DEFAULT_NETZ_STANDARD, 2),
@@ -338,6 +402,34 @@ def forecast():
         # Traffic-light thresholds on gesamttarif (Rp./kWh)
         level = "low" if gesamt < 15 else ("high" if gesamt > 22 else "medium")
 
+        # 95% prediction interval — propagate epex residual std through
+        # energiepreis() at both endpoints because of clipping non-linearity.
+        sigma_eur = _residual_std("energy")
+        netz_const = tariff["netzpreis_rp_kwh"]
+        ci: dict = {}
+        if sigma_eur is not None:
+            half = _CI_Z * sigma_eur
+            lower_eur = epex_price - half
+            upper_eur = epex_price + half
+            energie_lo = energiepreis(lower_eur)
+            energie_hi = energiepreis(upper_eur)
+            gesamt_lo = round(gesamttarif(netz_const, energie_lo), 2)
+            gesamt_hi = round(gesamttarif(netz_const, energie_hi), 2)
+            ci = {
+                "predicted_price_ci_lower_eur_mwh": round(lower_eur, 2),
+                "predicted_price_ci_upper_eur_mwh": round(upper_eur, 2),
+                "energiepreis_ci_lower_rp_kwh":     round(energie_lo, 2),
+                "energiepreis_ci_upper_rp_kwh":     round(energie_hi, 2),
+                "gesamttarif_ci_lower_rp_kwh":      gesamt_lo,
+                "gesamttarif_ci_upper_rp_kwh":      gesamt_hi,
+            }
+
+        sigma_load = _residual_std("load")
+        if net_load is not None and sigma_load is not None:
+            half_l = _CI_Z * sigma_load
+            ci["net_load_ci_lower"] = round(net_load - half_l, 2)
+            ci["net_load_ci_upper"] = round(net_load + half_l, 2)
+
         return {
             "time":                   row["time"].isoformat(),
             "predicted_price_eur_mwh": round(epex_price, 2),
@@ -347,6 +439,9 @@ def forecast():
             "price_rp_kwh":           gesamt,   # backward-compat alias
             "price_level":            level,
             "net_load_available":     net_load is not None,
+            "model_energy":           energy_prefix,
+            "model_load":             load_prefix if net_load is not None else None,
+            **ci,
         }
     except FileNotFoundError:
         return JSONResponse({"error": "No trained model available"}, status_code=503)
@@ -528,13 +623,15 @@ def forecast_week():
 
         # ── 6. Model B: EPEX energy price forecast ────────────────────────────
         from modelling.predict import predict_from_dict  # noqa: PLC0415
-        model_b    = _get_model("xgb")
+        energy_prefix = _best_prefix("energy", "xgb")
+        load_prefix   = _best_prefix("load", "model_load")
+        model_b    = _get_model(energy_prefix)
         epex_preds = [predict_from_dict(model_b, r) for r in energy_rows]
 
         # ── 7. Model A: net load forecast (optional) ──────────────────────────
         net_load_preds: list[float | None] = [None] * n_slots
         try:
-            model_a       = _get_model("model_load")
+            model_a       = _get_model(load_prefix)
             net_load_preds = [predict_from_dict(model_a, r) for r in load_rows]
         except Exception:
             pass
@@ -547,7 +644,15 @@ def forecast_week():
             DEFAULT_NETZ_STANDARD,
         )
 
+        sigma_eur  = _residual_std("energy")
+        sigma_load = _residual_std("load")
+        ci_active  = sigma_eur is not None
+
         netz_arr, energie_arr, gesamt_arr, level_arr = [], [], [], []
+        gesamt_lo_arr: list[float | None] = []
+        gesamt_hi_arr: list[float | None] = []
+        net_load_lo_arr: list[float | None] = []
+        net_load_hi_arr: list[float | None] = []
         for epex, load in zip(epex_preds, net_load_preds):
             if load is not None:
                 tf      = compute_tariff(net_load=load, epex_eur_mwh=epex)
@@ -563,6 +668,24 @@ def forecast_week():
             energie_arr.append(energie)
             gesamt_arr.append(gesamt)
             level_arr.append(level)
+
+            if ci_active:
+                half = _CI_Z * sigma_eur
+                e_lo = _ep(epex - half)
+                e_hi = _ep(epex + half)
+                gesamt_lo_arr.append(round(_gt(netz, e_lo), 2))
+                gesamt_hi_arr.append(round(_gt(netz, e_hi), 2))
+            else:
+                gesamt_lo_arr.append(None)
+                gesamt_hi_arr.append(None)
+
+            if load is not None and sigma_load is not None:
+                half_l = _CI_Z * sigma_load
+                net_load_lo_arr.append(round(load - half_l, 2))
+                net_load_hi_arr.append(round(load + half_l, 2))
+            else:
+                net_load_lo_arr.append(None)
+                net_load_hi_arr.append(None)
 
         # ── 9. Cheapest non-overlapping 2-h windows ───────────────────────────
         WIN_SLOTS = 8  # 2 h × 4 slots/h
@@ -597,6 +720,13 @@ def forecast_week():
             "price_level":        level_arr,
             "cheapest_windows":   cheap_windows,
             "net_load_available": net_load_preds[0] is not None,
+            "model_energy":       energy_prefix,
+            "model_load":         load_prefix if net_load_preds[0] is not None else None,
+            "ci_available":       ci_active,
+            "gesamttarif_ci_lower": gesamt_lo_arr,
+            "gesamttarif_ci_upper": gesamt_hi_arr,
+            "net_load_ci_lower":    net_load_lo_arr,
+            "net_load_ci_upper":    net_load_hi_arr,
         }
 
     except FileNotFoundError:

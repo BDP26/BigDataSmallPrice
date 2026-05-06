@@ -62,9 +62,11 @@ def predict(model: Any, X: pd.DataFrame) -> list[float]:
     """
     Run *model* on a feature DataFrame, returning predictions as a list.
 
-    NaN values are filled with column medians before prediction.
+    NaN values are filled with column medians, then with 0 as a final
+    fallback for models that don't accept NaN natively (e.g. LinearRegression).
+    Single-row inputs have no usable median, so the explicit 0-fill matters.
     """
-    X_filled = X.fillna(X.median(numeric_only=True))
+    X_filled = X.fillna(X.median(numeric_only=True)).fillna(0.0)
     return model.predict(X_filled).tolist()
 
 
@@ -82,7 +84,15 @@ def predict_from_dict(model: Any, feature_dict: dict[str, float]) -> float:
     Returns:
         Scalar predicted price in EUR/MWh.
     """
-    cols = _feature_cols()
+    # Prefer the model's own feature names so predictions stay compatible
+    # even when FEATURE_COLS evolves ahead of a retrain.
+    try:
+        if hasattr(model, "feature_names_in_"):
+            cols = list(model.feature_names_in_)
+        else:
+            cols = model.get_booster().feature_names or _feature_cols()
+    except Exception:
+        cols = _feature_cols()
     row = {col: feature_dict.get(col, float("nan")) for col in cols}
     X = pd.DataFrame([row])
     return float(predict(model, X)[0])

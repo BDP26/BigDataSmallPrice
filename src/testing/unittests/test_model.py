@@ -23,6 +23,8 @@ from src.modelling.evaluate import (
     compute_metrics,
     evaluate_all,
     save_metrics,
+    select_best_model,
+    write_best_models_manifest,
 )
 from src.modelling.predict import load_model, predict_from_dict
 from src.modelling.train import (
@@ -112,8 +114,23 @@ def test_metrics_all_near_zero_returns_nan():
 
 
 def test_metrics_returns_all_keys():
+    m = compute_metrics([50.0, 60.0], [55.0, 58.0])
+    assert {"mae", "rmse", "mape", "residual_std", "n_residuals"} == set(m.keys())
+
+
+def test_metrics_residual_std_known_values():
+    """residual_std uses ddof=1 sample std of (y_true - y_pred)."""
+    y_true = np.array([100.0, 100.0, 100.0, 100.0])
+    y_pred = np.array([90.0, 110.0, 95.0, 105.0])
+    m = compute_metrics(y_true, y_pred)
+    # residuals = [10, -10, 5, -5] → std ddof=1 = sqrt(250/3) ≈ 9.1287
+    assert m["residual_std"] == pytest.approx(np.sqrt(250.0 / 3.0))
+    assert m["n_residuals"] == 4
+
+
+def test_metrics_residual_std_single_sample_nan():
     m = compute_metrics([50.0], [55.0])
-    assert {"mae", "rmse", "mape"} == set(m.keys())
+    assert np.isnan(m["residual_std"])
 
 
 # ── train_naive ───────────────────────────────────────────────────────────────
@@ -348,3 +365,64 @@ def test_load_xgb_beats_naive(synthetic_data):
     assert xgb_rmse < naive_rmse, (
         f"Model A XGBoost RMSE {xgb_rmse:.3f} not better than naive RMSE {naive_rmse:.3f}"
     )
+
+
+# ── select_best_model & manifest ────────────────────────────────────
+
+
+def test_select_best_model_picks_min_rmse():
+    metrics = {
+        "linear": {"mae": 8.7, "rmse": 15.5, "mape": 9.9},
+        "xgb":    {"mae": 6.9, "rmse": 15.4, "mape": 7.7},
+    }
+    pick = select_best_model(metrics, candidates=["linear", "xgb"], metric="rmse")
+    assert pick is not None
+    name, m = pick
+    assert name == "xgb"
+    assert m["rmse"] == 15.4
+
+
+def test_select_best_model_skips_missing_metric():
+    metrics = {
+        "linear": {"mae": 8.7},  # no rmse → skipped
+        "xgb":    {"mae": 6.9, "rmse": 15.4, "mape": 7.7},
+    }
+    pick = select_best_model(metrics, candidates=["linear", "xgb"], metric="rmse")
+    assert pick is not None
+    name, _ = pick
+    assert name == "xgb"
+
+
+def test_select_best_model_returns_none_when_no_candidate_has_metric():
+    metrics = {"linear": {"mae": 8.7}, "xgb": {"mae": 6.9}}
+    assert select_best_model(metrics, candidates=["linear", "xgb"], metric="rmse") is None
+
+
+def test_select_best_model_skips_nan():
+    metrics = {
+        "linear": {"rmse": float("nan")},
+        "xgb":    {"rmse": 15.4},
+    }
+    pick = select_best_model(metrics, candidates=["linear", "xgb"], metric="rmse")
+    assert pick is not None and pick[0] == "xgb"
+
+
+def test_write_best_models_manifest_upsert(tmp_path):
+    """Existing entries for other targets must be preserved across calls."""
+    import json as _json
+
+    write_best_models_manifest(
+        tmp_path,
+        {"energy": {"prefix": "xgb", "rmse": 15.4, "residual_std": 14.9}},
+    )
+    # Second call with a different target — must merge, not overwrite.
+    write_best_models_manifest(
+        tmp_path,
+        {"load": {"prefix": "model_load", "rmse": 459.0, "residual_std": 459.0}},
+    )
+
+    with (tmp_path / "best_models.json").open() as fh:
+        manifest = _json.load(fh)
+    assert set(manifest.keys()) == {"energy", "load"}
+    assert manifest["energy"]["prefix"] == "xgb"
+    assert manifest["load"]["prefix"] == "model_load"

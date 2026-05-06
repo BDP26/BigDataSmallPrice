@@ -187,6 +187,8 @@
                     <line id="now-line" x1="0" y1="0" x2="0" y2="160" stroke="#137fec" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
                     <!-- Price area fill -->
                     <path id="chart-area" fill="url(#areaGrad)" clip-path="url(#clip-plot)"/>
+                    <!-- 95% confidence band (drawn beneath the line) -->
+                    <path id="chart-ci-band" fill="#137fec" fill-opacity="0.15" stroke="none" clip-path="url(#clip-plot)"/>
                     <!-- Price line -->
                     <path id="chart-line" fill="none" stroke="#137fec" stroke-width="2" stroke-linejoin="round" clip-path="url(#clip-plot)"/>
                     <!-- Day labels (bottom) -->
@@ -214,6 +216,10 @@
                     <div class="flex justify-between gap-4 border-t border-slate-100 dark:border-border-dark mt-1 pt-1">
                         <span class="text-slate-600 dark:text-slate-300 font-medium">Gesamt</span>
                         <span id="tt-gesamt" class="font-bold text-primary">–</span>
+                    </div>
+                    <div id="tt-ci-row" class="flex justify-between gap-4 hidden">
+                        <span class="text-slate-400">95% CI</span>
+                        <span id="tt-ci" class="text-slate-500 italic">–</span>
                     </div>
                 </div>
             </div>
@@ -518,6 +524,21 @@ function renderChart(data) {
     document.getElementById('chart-line').setAttribute('d', linePath);
     document.getElementById('chart-area').setAttribute('d', areaPath);
 
+    // ── 95% CI band (skipped if API didn't return bounds) ────────────────────
+    const ciBand = document.getElementById('chart-ci-band');
+    const lo = data.gesamttarif_ci_lower;
+    const hi = data.gesamttarif_ci_upper;
+    if (Array.isArray(lo) && Array.isArray(hi)
+        && lo.length === n && hi.length === n
+        && lo.every(v => v != null) && hi.every(v => v != null)) {
+        const upper = hi.map((p, i) => `${toX(i).toFixed(1)},${priceToY(p).toFixed(1)}`).join(' L ');
+        const lower = lo.map((p, i) => `${toX(i).toFixed(1)},${priceToY(p).toFixed(1)}`)
+                        .reverse().join(' L ');
+        ciBand.setAttribute('d', `M ${upper} L ${lower} Z`);
+    } else {
+        ciBand.setAttribute('d', '');
+    }
+
     // ── "Jetzt" marker (at start of forecast = index 0) ──────────────────────
     document.getElementById('now-line').setAttribute('x1', toX(0));
     document.getElementById('now-line').setAttribute('x2', toX(0));
@@ -565,6 +586,17 @@ function setupHover(data, toX, n) {
         document.getElementById('tt-netz').textContent    = nz.toFixed(2) + ' Rp';
         document.getElementById('tt-energie').textContent = en.toFixed(2) + ' Rp';
         document.getElementById('tt-gesamt').textContent  = g.toFixed(2) + ' Rp/kWh';
+
+        const ciRow = document.getElementById('tt-ci-row');
+        const ciLo  = data.gesamttarif_ci_lower && data.gesamttarif_ci_lower[idx];
+        const ciHi  = data.gesamttarif_ci_upper && data.gesamttarif_ci_upper[idx];
+        if (ciLo != null && ciHi != null) {
+            const half = ((ciHi - ciLo) / 2).toFixed(1);
+            document.getElementById('tt-ci').textContent = '± ' + half + ' Rp/kWh';
+            ciRow.classList.remove('hidden');
+        } else {
+            ciRow.classList.add('hidden');
+        }
 
         const wrapRect = wrap.getBoundingClientRect();
         let left = cx - wrapRect.left + 12;

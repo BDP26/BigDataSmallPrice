@@ -25,7 +25,7 @@ def compute_metrics(
     y_pred: np.ndarray | list,
 ) -> dict[str, float]:
     """
-    Compute MAE, RMSE, and MAPE between *y_true* and *y_pred*.
+    Compute MAE, RMSE, MAPE, and residual std between *y_true* and *y_pred*.
 
     MAPE uses only rows where ``|y_true| >= 10.0`` to avoid near-zero inflation.
     In practice, prices below 10 EUR/MWh (or loads below 10 kWh) occur rarely and
@@ -33,18 +33,26 @@ def compute_metrics(
     The denominator uses ``|y_true|`` so negative prices are handled correctly.
     If no rows pass the threshold, MAPE is returned as ``NaN``.
 
+    ``residual_std`` is the sample standard deviation of ``y_true - y_pred``
+    (ddof=1) — used by the API to derive 95% prediction intervals.
+
     Args:
         y_true: Ground-truth target values.
         y_pred: Model predictions.
 
     Returns:
-        Dict with keys ``"mae"``, ``"rmse"``, ``"mape"`` (all floats).
+        Dict with keys ``"mae"``, ``"rmse"``, ``"mape"``, ``"residual_std"``,
+        ``"n_residuals"``.
     """
     y_true = np.asarray(y_true, dtype=float)
     y_pred = np.asarray(y_pred, dtype=float)
 
-    mae = float(np.mean(np.abs(y_true - y_pred)))
-    rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
+    residuals = y_true - y_pred
+    mae = float(np.mean(np.abs(residuals)))
+    rmse = float(np.sqrt(np.mean(residuals ** 2)))
+    residual_std = (
+        float(np.std(residuals, ddof=1)) if len(residuals) > 1 else float("nan")
+    )
 
     # Filter rows where |y_true| < 10.0 to avoid near-zero inflation.
     # Using |y_true| in the denominator handles negative prices correctly.
@@ -58,7 +66,13 @@ def compute_metrics(
     else:
         mape = float("nan")
 
-    return {"mae": mae, "rmse": rmse, "mape": mape}
+    return {
+        "mae": mae,
+        "rmse": rmse,
+        "mape": mape,
+        "residual_std": residual_std,
+        "n_residuals": int(len(residuals)),
+    }
 
 
 def evaluate_all(
@@ -120,6 +134,85 @@ def save_metrics(
     with path.open("w") as fh:
         json.dump(metrics, fh, indent=2)
     print(f"Saved metrics: {path}")
+    return path
+
+
+BEST_MODELS_MANIFEST = "best_models.json"
+
+
+def select_best_model(
+    metrics: dict[str, dict[str, float]],
+    candidates: list[str],
+    metric: str = "rmse",
+) -> tuple[str, dict[str, float]] | None:
+    """
+    Pick the candidate with the lowest *metric* from *metrics*.
+
+    Candidates missing the metric key (or with NaN) are skipped. ``naive``
+    baselines should not appear in *candidates*; this function does not
+    exclude them implicitly.
+
+    Args:
+        metrics:    Dict mapping model name → metrics dict.
+        candidates: Allow-list of model names eligible for selection.
+        metric:     Key inside the per-model metrics dict to minimize.
+
+    Returns:
+        ``(name, metrics_dict)`` of the winner, or ``None`` if no candidate
+        has a usable metric value.
+    """
+    best: tuple[str, dict[str, float]] | None = None
+    best_value: float = float("inf")
+    for name in candidates:
+        m = metrics.get(name)
+        if not m:
+            continue
+        v = m.get(metric)
+        if v is None or (isinstance(v, float) and np.isnan(v)):
+            continue
+        if v < best_value:
+            best_value = v
+            best = (name, m)
+    return best
+
+
+def write_best_models_manifest(
+    models_dir: str | Path,
+    picks: dict[str, dict],
+) -> Path:
+    """
+    Upsert ``best_models.json`` with the provided *picks*.
+
+    Existing entries for other targets are preserved so that
+    ``run_training()`` and ``run_load_training()`` can run independently
+    without clobbering each other's manifest entries.
+
+    Args:
+        models_dir: Directory where the manifest lives.
+        picks:      Dict mapping target (e.g. ``"energy"``, ``"load"``)
+                    to a manifest entry, e.g.
+                    ``{"prefix": "xgb", "rmse": 15.4, "residual_std": 14.9,
+                       "n_residuals": 1234, "trained_on": "20260505"}``.
+
+    Returns:
+        Path to the written manifest.
+    """
+    out = Path(models_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / BEST_MODELS_MANIFEST
+
+    existing: dict = {}
+    if path.exists():
+        try:
+            with path.open("r") as fh:
+                existing = json.load(fh) or {}
+        except (json.JSONDecodeError, OSError):
+            existing = {}
+
+    existing.update(picks)
+    with path.open("w") as fh:
+        json.dump(existing, fh, indent=2)
+    print(f"Updated best-models manifest: {path}  targets={list(picks)}")
     return path
 
 
