@@ -262,6 +262,13 @@ def _residual_std(target: str) -> float | None:
 # 95% prediction interval (two-sided Gaussian assumption)
 _CI_Z = 1.96
 
+# Static traffic-light thresholds for the single-slot /api/forecast endpoint.
+# Calibrated on EKZ "integrated" tariff over the last 30 days:
+#   p33 = 18.25, p67 = 21.09 Rp/kWh (mean 19.78, range 12.2–29.0)
+# /api/forecast/week overrides this with dynamic per-week quantiles.
+_LEVEL_LOW_MAX  = 18.25
+_LEVEL_HIGH_MIN = 21.09
+
 
 # ── Auth endpoints ────────────────────────────────────────────────────────────
 
@@ -399,8 +406,12 @@ def forecast():
             }
 
         gesamt = tariff["gesamttarif_rp_kwh"]
-        # Traffic-light thresholds on gesamttarif (Rp./kWh)
-        level = "low" if gesamt < 15 else ("high" if gesamt > 22 else "medium")
+        # Traffic-light: static EKZ-integrated quantiles (p33 / p67)
+        level = (
+            "low"  if gesamt <= _LEVEL_LOW_MAX
+            else "high" if gesamt >= _LEVEL_HIGH_MIN
+            else "medium"
+        )
 
         # 95% prediction interval — propagate epex residual std through
         # energiepreis() at both endpoints because of clipping non-linearity.
@@ -648,7 +659,7 @@ def forecast_week():
         sigma_load = _residual_std("load")
         ci_active  = sigma_eur is not None
 
-        netz_arr, energie_arr, gesamt_arr, level_arr = [], [], [], []
+        netz_arr, energie_arr, gesamt_arr = [], [], []
         gesamt_lo_arr: list[float | None] = []
         gesamt_hi_arr: list[float | None] = []
         net_load_lo_arr: list[float | None] = []
@@ -663,11 +674,9 @@ def forecast_week():
                 energie = round(_ep(epex), 2)
                 netz    = round(DEFAULT_NETZ_STANDARD, 2)
                 gesamt  = round(_gt(netz, energie), 2)
-            level = "low" if gesamt < 15 else ("high" if gesamt > 22 else "medium")
             netz_arr.append(netz)
             energie_arr.append(energie)
             gesamt_arr.append(gesamt)
-            level_arr.append(level)
 
             if ci_active:
                 half = _CI_Z * sigma_eur
@@ -686,6 +695,18 @@ def forecast_week():
             else:
                 net_load_lo_arr.append(None)
                 net_load_hi_arr.append(None)
+
+        # ── 8b. Traffic-light: dynamic quantile thresholds within the week ────
+        # p33 / p67 split the 672 forecast slots into thirds (low / medium /
+        # high) so the dashboard always shows a meaningful colour mix even
+        # when absolute prices are uniformly above or below the EKZ average.
+        sorted_g = sorted(gesamt_arr)
+        q_lo = sorted_g[int(0.33 * (n_slots - 1))]
+        q_hi = sorted_g[int(0.67 * (n_slots - 1))]
+        level_arr = [
+            "low" if g <= q_lo else ("high" if g >= q_hi else "medium")
+            for g in gesamt_arr
+        ]
 
         # ── 9. Cheapest non-overlapping 2-h windows ───────────────────────────
         WIN_SLOTS = 8  # 2 h × 4 slots/h
@@ -727,6 +748,7 @@ def forecast_week():
             "gesamttarif_ci_upper": gesamt_hi_arr,
             "net_load_ci_lower":    net_load_lo_arr,
             "net_load_ci_upper":    net_load_hi_arr,
+            "level_thresholds":     {"low_max": round(q_lo, 2), "high_min": round(q_hi, 2)},
         }
 
     except FileNotFoundError:

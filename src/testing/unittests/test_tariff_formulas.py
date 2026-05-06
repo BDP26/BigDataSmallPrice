@@ -2,7 +2,7 @@
 Unit tests for processing/tariff_formulas.py.
 
 Tests cover:
-- Quadratic scaling of netzpreis
+- Linear scaling of netzpreis (exponent=1) and quadratic option
 - Clip behaviour at extremes
 - EUR/MWh → Rp./kWh unit conversion in energiepreis
 - gesamttarif summation
@@ -12,9 +12,9 @@ Tests cover:
 import pytest
 
 from processing.tariff_formulas import (
-    DEFAULT_ALPHA,
     DEFAULT_LOAD_MAX,
     DEFAULT_LOAD_MIN,
+    DEFAULT_NETZ_EXPONENT,
     DEFAULT_NETZ_STANDARD,
     ENERGIE_CLIP_DOWN,
     ENERGIE_CLIP_UP,
@@ -31,36 +31,40 @@ from processing.tariff_formulas import (
 
 
 def test_netzpreis_at_minimum_load():
-    """L_norm=0 → raw=0 → clipped to standardtarif - clip_down."""
+    """L_norm=0 → raw=floor (standardtarif − clip_down)."""
     result = netzpreis(DEFAULT_LOAD_MIN)
     expected_floor = DEFAULT_NETZ_STANDARD - NETZ_CLIP_DOWN
     assert result == pytest.approx(expected_floor)
 
 
 def test_netzpreis_at_maximum_load():
-    """L_norm=1 → raw=alpha → clipped within [floor, ceiling]."""
+    """L_norm=1 → raw=ceiling (standardtarif + clip_up)."""
     result = netzpreis(DEFAULT_LOAD_MAX)
-    raw = DEFAULT_ALPHA  # alpha * 1² = alpha
-    lo = DEFAULT_NETZ_STANDARD - NETZ_CLIP_DOWN
-    hi = DEFAULT_NETZ_STANDARD + NETZ_CLIP_UP
-    expected = float(max(lo, min(hi, raw)))
-    assert result == pytest.approx(expected)
+    expected_ceiling = DEFAULT_NETZ_STANDARD + NETZ_CLIP_UP
+    assert result == pytest.approx(expected_ceiling)
 
 
-def test_netzpreis_quadratic_midpoint():
-    """L_norm=0.5 → raw = alpha * 0.25."""
+def test_netzpreis_linear_midpoint():
+    """L_norm=0.5 with linear exponent → raw = (floor + ceiling) / 2 = standardtarif."""
     mid = (DEFAULT_LOAD_MIN + DEFAULT_LOAD_MAX) / 2
     result = netzpreis(mid)
-    raw = DEFAULT_ALPHA * 0.25
-    lo = DEFAULT_NETZ_STANDARD - NETZ_CLIP_DOWN
-    hi = DEFAULT_NETZ_STANDARD + NETZ_CLIP_UP
-    expected = max(lo, min(hi, raw))
+    assert result == pytest.approx(DEFAULT_NETZ_STANDARD)
+
+
+def test_netzpreis_quadratic_exponent_compresses_midrange():
+    """exponent=2 maps L_norm=0.5 to raw = floor + 0.25 · range (closer to floor)."""
+    mid = (DEFAULT_LOAD_MIN + DEFAULT_LOAD_MAX) / 2
+    result = netzpreis(mid, exponent=2.0)
+    floor = DEFAULT_NETZ_STANDARD - NETZ_CLIP_DOWN
+    ceiling = DEFAULT_NETZ_STANDARD + NETZ_CLIP_UP
+    expected = floor + (ceiling - floor) * 0.25
     assert result == pytest.approx(expected)
 
 
 def test_netzpreis_exceeds_clip_up():
-    """Extreme load above max should still be clipped to standardtarif + clip_up."""
-    result = netzpreis(1_000_000, load_min=0, load_max=100, standardtarif=10, alpha=1000)
+    """Extreme load above max → l_norm clipped to 1 → raw=ceiling."""
+    result = netzpreis(1_000_000, load_min=0, load_max=100, standardtarif=10,
+                       clip_down=NETZ_CLIP_DOWN, clip_up=NETZ_CLIP_UP)
     assert result == pytest.approx(10 + NETZ_CLIP_UP)
 
 
