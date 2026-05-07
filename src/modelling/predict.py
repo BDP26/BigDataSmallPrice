@@ -93,6 +93,14 @@ def predict_from_dict(model: Any, feature_dict: dict[str, float]) -> float:
             cols = model.get_booster().feature_names or _feature_cols()
     except Exception:
         cols = _feature_cols()
+
+    # Fast path for XGBoost models (avoids pandas DataFrame overhead)
+    if type(model).__name__.startswith("XGB"):
+        row_arr = [feature_dict.get(col, float("nan")) for col in cols]
+        import numpy as np
+        X_np = np.array([row_arr], dtype=np.float32)
+        return float(model.predict(X_np)[0])
+
     row = {col: feature_dict.get(col, float("nan")) for col in cols}
     X = pd.DataFrame([row])
     return float(predict(model, X)[0])

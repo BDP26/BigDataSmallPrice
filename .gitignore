@@ -60,3 +60,9 @@ infra/db/features.sql
 infra/db/*.backup.*
 infra/db/test_*.sql
 
+# Database backups (never commit — can contain sensitive data)
+backups/db/
+backups/*.sql
+backups/*.sql.gz
+backups/schema_backup_*.sql
+

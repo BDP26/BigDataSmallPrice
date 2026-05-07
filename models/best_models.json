@@ -1,0 +1,20 @@
+{
+  "energy": {
+    "prefix": "xgb",
+    "rmse": 15.44,
+    "mae": 6.9,
+    "mape": 7.7,
+    "residual_std": 15.4,
+    "n_residuals": 1234,
+    "trained_on": "20260506"
+  },
+  "load": {
+    "prefix": "model_load",
+    "rmse": 458.9,
+    "mae": 303.1,
+    "mape": 3.99,
+    "residual_std": 459.0,
+    "n_residuals": 1234,
+    "trained_on": "20260506"
+  }
+}

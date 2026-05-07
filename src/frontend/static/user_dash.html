@@ -1,23 +1,25 @@
 <!DOCTYPE html>
 <html class="light" lang="de">
+
 <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
     <script>
         tailwind.config = {
             darkMode: "class",
             theme: {
                 extend: {
                     colors: {
-                        primary:            "#137fec",
-                        "primary-dark":     "#0e6dcc",
-                        "bg-light":         "#f6f7f8",
-                        "bg-dark":          "#0f172a",
-                        "card-dark":        "#1e293b",
-                        "border-dark":      "#334155",
+                        primary: "#137fec",
+                        "primary-dark": "#0e6dcc",
+                        "bg-light": "#f6f7f8",
+                        "bg-dark": "#0f172a",
+                        "card-dark": "#1e293b",
+                        "border-dark": "#334155",
                     },
                     fontFamily: { display: ["Inter"] },
                     borderRadius: { DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", "2xl": "1rem", full: "9999px" },
@@ -27,618 +29,852 @@
     </script>
     <title>Swiss Energy Pulse – Stromtarif Winterthur</title>
     <style>
-        .skeleton { animation: pulse 1.5s ease-in-out infinite; background: linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%); background-size: 200%; }
-        .dark .skeleton { background: linear-gradient(90deg,#334155 25%,#475569 50%,#334155 75%); background-size: 200%; }
-        @keyframes pulse { 0%{background-position:200%} 100%{background-position:-200%} }
-        .chart-tooltip { pointer-events:none; transition: opacity .1s; }
-        #chart-svg { cursor:crosshair; }
+        .skeleton {
+            animation: pulse 1.5s ease-in-out infinite;
+            background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+            background-size: 200%;
+        }
+
+        .dark .skeleton {
+            background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+            background-size: 200%;
+        }
+
+        @keyframes pulse {
+            0% {
+                background-position: 200%
+            }
+
+            100% {
+                background-position: -200%
+            }
+        }
+
+        .chart-tooltip {
+            pointer-events: none;
+            transition: opacity .1s;
+        }
+
+        #chart-svg {
+            cursor: crosshair;
+        }
     </style>
 </head>
+
 <body class="bg-bg-light dark:bg-bg-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
 
-<!-- ── Onboarding Overlay ────────────────────────────────────────────────────── -->
-<div id="ob-overlay" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4">
-    <div id="ob-card" class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-2xl w-full max-w-sm transition-all duration-200">
-        <!-- Content rendered by obRender() -->
+    <!-- ── Onboarding Overlay ────────────────────────────────────────────────────── -->
+    <div id="ob-overlay"
+        class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4">
+        <div id="ob-card"
+            class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-2xl w-full max-w-sm transition-all duration-200">
+            <!-- Content rendered by obRender() -->
+        </div>
     </div>
-</div>
 
-<!-- ── Header ──────────────────────────────────────────────────────────────── -->
-<header class="sticky top-0 z-20 flex items-center justify-between px-4 md:px-8 py-3
+    <!-- ── Header ──────────────────────────────────────────────────────────────── -->
+    <header class="sticky top-0 z-20 flex items-center justify-between px-4 md:px-8 py-3
                bg-white/90 dark:bg-card-dark/90 backdrop-blur-md
                border-b border-slate-200 dark:border-border-dark shadow-sm">
-    <div class="flex items-center gap-3">
-        <div class="flex items-center justify-center w-9 h-9 bg-primary rounded-xl text-white shadow">
-            <span class="material-symbols-outlined text-[22px]">bolt</span>
+        <div class="flex items-center gap-3">
+            <div class="flex items-center justify-center w-9 h-9 bg-primary rounded-xl text-white shadow">
+                <span class="material-symbols-outlined text-[22px]">bolt</span>
+            </div>
+            <div>
+                <h1 class="text-base font-bold leading-tight">Swiss Energy Pulse</h1>
+                <p class="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">Dynamischer Stromtarif ·
+                    Winterthur</p>
+            </div>
         </div>
-        <div>
-            <h1 class="text-base font-bold leading-tight">Swiss Energy Pulse</h1>
-            <p class="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">Dynamischer Stromtarif · Winterthur</p>
-        </div>
-    </div>
-    <div class="flex items-center gap-2">
-        <div id="clock"
-             class="hidden sm:flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300
+        <div class="flex items-center gap-2">
+            <div id="clock" class="hidden sm:flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300
                     bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-border-dark
                     rounded-lg px-3 py-1.5">
-            <span class="material-symbols-outlined text-[16px] text-slate-400">schedule</span>
-            <span id="clock-time">--:--</span>
-        </div>
-        <button id="dark-toggle" aria-label="Dark mode toggle"
+                <span class="material-symbols-outlined text-[16px] text-slate-400">schedule</span>
+                <span id="clock-time">--:--</span>
+            </div>
+            <button id="dark-toggle" aria-label="Dark mode toggle"
                 class="flex items-center justify-center w-9 h-9 rounded-lg
                        bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-border-dark
                        text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-            <span id="dark-icon" class="material-symbols-outlined text-[18px]">dark_mode</span>
-        </button>
-        <a href="/docs" class="hidden md:flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400
+                <span id="dark-icon" class="material-symbols-outlined text-[18px]">dark_mode</span>
+            </button>
+            <button id="settings-toggle" aria-label="Einstellungen"
+                onclick="obStep=0; obRender(); document.getElementById('ob-overlay').classList.remove('hidden');"
+                class="flex items-center justify-center w-9 h-9 rounded-lg
+                       bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-border-dark
+                       text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                <span class="material-symbols-outlined text-[18px]">settings</span>
+            </button>
+            <a href="/docs" class="hidden md:flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400
                                hover:text-primary transition-colors px-2">
-            <span class="material-symbols-outlined text-[15px]">api</span> API
-        </a>
-    </div>
-</header>
+                <span class="material-symbols-outlined text-[15px]">api</span> API
+            </a>
+        </div>
+    </header>
 
-<!-- ── Error Banner ──────────────────────────────────────────────────────────── -->
-<div id="error-banner" class="hidden items-center gap-2 px-6 py-2.5 bg-amber-50 dark:bg-amber-900/20
+    <!-- ── Error Banner ──────────────────────────────────────────────────────────── -->
+    <div id="error-banner" class="hidden items-center gap-2 px-6 py-2.5 bg-amber-50 dark:bg-amber-900/20
                                border-b border-amber-200 dark:border-amber-800
                                text-amber-800 dark:text-amber-300 text-xs">
-    <span class="material-symbols-outlined text-[16px]">warning</span>
-    <span id="error-text">Modelldaten nicht verfügbar – Platzhalterwerte werden angezeigt.</span>
-</div>
+        <span class="material-symbols-outlined text-[16px]">warning</span>
+        <span id="error-text">Modelldaten nicht verfügbar – Platzhalterwerte werden angezeigt.</span>
+    </div>
 
-<!-- ── Main ──────────────────────────────────────────────────────────────────── -->
-<main class="max-w-7xl mx-auto px-4 md:px-8 py-6 flex flex-col gap-6">
+    <!-- ── Main ──────────────────────────────────────────────────────────────────── -->
+    <main class="max-w-7xl mx-auto px-4 md:px-8 py-6 flex flex-col gap-6">
 
-    <!-- Row 1: Current price + 7-day chart -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
-        <!-- Left: Current price card -->
-        <div class="lg:col-span-4 flex flex-col gap-4">
-
-            <!-- Traffic light card -->
-            <div class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-6 flex flex-col items-center text-center">
-                <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Aktueller Tarif</p>
-
-                <!-- Animated circle -->
-                <div class="relative mb-5">
-                    <div id="pulse-ring" class="absolute inset-0 m-auto w-28 h-28 rounded-full animate-ping opacity-20 bg-emerald-500"></div>
-                    <div id="traffic-light" class="relative w-24 h-24 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg border-4 border-white dark:border-card-dark">
-                        <span id="traffic-icon" class="material-symbols-outlined text-white text-5xl" style="font-variation-settings:'FILL' 1">energy_savings_leaf</span>
-                    </div>
-                </div>
-
-                <h2 id="price-label" class="text-2xl font-black tracking-tight mb-1">WIRD GELADEN…</h2>
-                <p id="price-phase" class="text-sm font-medium text-emerald-600 dark:text-emerald-400 mb-4">–</p>
-
-                <!-- Tariff breakdown -->
-                <div class="w-full rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-border-dark p-4 flex flex-col gap-2 text-left">
-                    <div class="flex justify-between items-center text-sm">
-                        <span class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                            <span class="material-symbols-outlined text-[15px]">cell_tower</span> Netzpreis
-                        </span>
-                        <span id="netz-value" class="font-semibold text-slate-700 dark:text-slate-200">–</span>
-                    </div>
-                    <div class="flex justify-between items-center text-sm">
-                        <span class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                            <span class="material-symbols-outlined text-[15px]">electric_bolt</span> Energiepreis
-                        </span>
-                        <span id="energie-value" class="font-semibold text-slate-700 dark:text-slate-200">–</span>
-                    </div>
-                    <div class="h-px bg-slate-200 dark:bg-border-dark my-1"></div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">Gesamttarif</span>
-                        <span class="text-xl font-black text-primary italic">
-                            <span id="price-value">–</span><small class="text-xs font-normal ml-0.5">Rp/kWh</small>
-                        </span>
-                    </div>
-                </div>
+        <!-- Row 0: Next-cheap-window countdown banner -->
+        <div id="next-window-card" class="hidden bg-gradient-to-r from-emerald-500 to-emerald-600 text-white
+                rounded-2xl shadow-md px-5 py-4 flex items-center gap-4">
+            <div class="flex items-center justify-center w-12 h-12 bg-white/20 rounded-xl shrink-0">
+                <span class="material-symbols-outlined text-[26px]">schedule</span>
             </div>
-
-            <!-- Why card -->
-            <div id="why-box" class="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl p-4 flex gap-3">
-                <span class="material-symbols-outlined text-primary text-2xl mt-0.5">info</span>
-                <div>
-                    <h3 class="font-bold text-sm mb-1 text-slate-800 dark:text-slate-100">Warum gerade so?</h3>
-                    <p id="why-text" class="text-slate-500 dark:text-slate-400 text-xs leading-relaxed">Preisprognose wird geladen…</p>
-                </div>
+            <div class="flex-1 min-w-0">
+                <p class="text-[10px] font-bold uppercase tracking-widest text-emerald-100/90">Nächstes Günstigfenster
+                </p>
+                <p id="next-window-headline" class="text-base sm:text-lg font-bold leading-tight">–</p>
+                <p id="next-window-sub" class="text-xs text-emerald-50/80 leading-tight mt-0.5">–</p>
             </div>
-
-            <!-- Data timestamp -->
-            <p class="text-[10px] text-slate-400 text-center">
-                Daten: ENTSO-E · Open-Meteo · BAFU &nbsp;·&nbsp;
-                Update: <span id="last-update">–</span>
-            </p>
+            <div class="text-right shrink-0">
+                <p id="next-window-price" class="text-2xl font-black leading-none">–</p>
+                <p class="text-[10px] uppercase tracking-wider text-emerald-100/80 mt-1">Ø Rp/kWh</p>
+            </div>
         </div>
 
-        <!-- Right: 7-day forecast chart -->
-        <div class="lg:col-span-8 bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-5 flex flex-col gap-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h2 class="font-bold text-base">7-Tage-Preisprognose</h2>
-                    <p class="text-xs text-slate-400 mt-0.5">Gesamttarif in Rp./kWh · 15-Min-Auflösung</p>
+        <!-- Row 1: Current price + 7-day chart -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+            <!-- Left: Current price card -->
+            <div class="lg:col-span-4 flex flex-col gap-4">
+
+                <!-- Traffic light card -->
+                <div
+                    class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-6 flex flex-col items-center text-center">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Aktueller Tarif</p>
+
+                    <!-- Animated circle -->
+                    <div class="relative mb-5">
+                        <div id="pulse-ring"
+                            class="absolute inset-0 m-auto w-28 h-28 rounded-full animate-ping opacity-20 bg-emerald-500">
+                        </div>
+                        <div id="traffic-light"
+                            class="relative w-24 h-24 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg border-4 border-white dark:border-card-dark">
+                            <span id="traffic-icon" class="material-symbols-outlined text-white text-5xl"
+                                style="font-variation-settings:'FILL' 1">energy_savings_leaf</span>
+                        </div>
+                    </div>
+
+                    <h2 id="price-label" class="text-2xl font-black tracking-tight mb-1">WIRD GELADEN…</h2>
+                    <p id="price-phase" class="text-sm font-medium text-emerald-600 dark:text-emerald-400 mb-4">–</p>
+
+                    <!-- Tariff breakdown -->
+                    <div
+                        class="w-full rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-border-dark p-4 flex flex-col gap-2 text-left">
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                                <span class="material-symbols-outlined text-[15px]">cell_tower</span> Netzpreis
+                            </span>
+                            <span id="netz-value" class="font-semibold text-slate-700 dark:text-slate-200">–</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                                <span class="material-symbols-outlined text-[15px]">electric_bolt</span> Energiepreis
+                            </span>
+                            <span id="energie-value" class="font-semibold text-slate-700 dark:text-slate-200">–</span>
+                        </div>
+                        <div class="h-px bg-slate-200 dark:bg-border-dark my-1"></div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">Gesamttarif</span>
+                            <span class="text-xl font-black text-primary italic">
+                                <span id="price-value">–</span><small class="text-xs font-normal ml-0.5">Rp/kWh</small>
+                            </span>
+                        </div>
+                        <p id="price-sigma" class="hidden text-[10px] text-slate-400 text-right -mt-1">
+                            Prognose-Toleranz: <span id="price-sigma-value">–</span>
+                        </p>
+                    </div>
                 </div>
-                <div class="flex items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400">
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-1 rounded-full bg-primary"></span>Gesamt</span>
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-1 rounded-full bg-emerald-400"></span>Günstig</span>
-                    <span class="flex items-center gap-1"><span class="inline-block w-3 h-1 rounded-full bg-red-400"></span>Teuer</span>
+
+                <!-- Why card -->
+                <div id="why-box"
+                    class="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl p-4 flex gap-3">
+                    <span class="material-symbols-outlined text-primary text-2xl mt-0.5">info</span>
+                    <div>
+                        <h3 class="font-bold text-sm mb-1 text-slate-800 dark:text-slate-100">Warum gerade so?</h3>
+                        <p id="why-text" class="text-slate-500 dark:text-slate-400 text-xs leading-relaxed">
+                            Preisprognose wird geladen…</p>
+                    </div>
                 </div>
+
+                <!-- Data timestamp -->
+                <p class="text-[10px] text-slate-400 text-center mt-2">
+                    Daten: ENTSO-E · Open-Meteo · BAFU &nbsp;·&nbsp;
+                    Update: <span id="last-update">–</span>
+                </p>
             </div>
 
-            <!-- Chart area -->
-            <div class="relative select-none" id="chart-wrap">
-                <!-- Skeleton while loading -->
-                <div id="chart-skeleton" class="skeleton h-52 rounded-xl"></div>
+            <!-- Right: 7-day forecast chart -->
+            <div
+                class="lg:col-span-8 bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-5 flex flex-col gap-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h2 class="font-bold text-base">Preisprognose</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Gesamttarif in Rp./kWh · 15-Min-Auflösung</p>
+                    </div>
 
-                <!-- SVG chart -->
-                <svg id="chart-svg" class="hidden w-full" style="height:220px" viewBox="0 0 800 180" preserveAspectRatio="none">
-                    <defs>
-                        <linearGradient id="areaGrad" x1="0" x2="0" y1="0" y2="1">
-                            <stop offset="0%" stop-color="#137fec" stop-opacity="0.18"/>
-                            <stop offset="100%" stop-color="#137fec" stop-opacity="0"/>
-                        </linearGradient>
-                        <clipPath id="clip-plot"><rect x="0" y="0" width="800" height="160"/></clipPath>
-                    </defs>
-                    <!-- Background price bands -->
-                    <g id="price-bands" clip-path="url(#clip-plot)"></g>
-                    <!-- Cheap window highlights -->
-                    <g id="cheap-highlights" clip-path="url(#clip-plot)"></g>
-                    <!-- Day separators -->
-                    <g id="day-lines"></g>
-                    <!-- "Jetzt" marker -->
-                    <line id="now-line" x1="0" y1="0" x2="0" y2="160" stroke="#137fec" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
-                    <!-- Price area fill -->
-                    <path id="chart-area" fill="url(#areaGrad)" clip-path="url(#clip-plot)"/>
-                    <!-- 95% confidence band (drawn beneath the line) -->
-                    <path id="chart-ci-band" fill="#137fec" fill-opacity="0.15" stroke="none" clip-path="url(#clip-plot)"/>
-                    <!-- Price line -->
-                    <path id="chart-line" fill="none" stroke="#137fec" stroke-width="2" stroke-linejoin="round" clip-path="url(#clip-plot)"/>
-                    <!-- Day labels (bottom) -->
-                    <g id="day-labels" font-size="9" fill="#94a3b8" text-anchor="middle"></g>
-                    <!-- Y-axis labels -->
-                    <g id="y-labels" font-size="9" fill="#94a3b8"></g>
-                    <!-- Hover crosshair -->
-                    <line id="hover-line" x1="0" y1="0" x2="0" y2="160" stroke="#64748b" stroke-width="1" stroke-dasharray="3,2" opacity="0" clip-path="url(#clip-plot)"/>
-                    <circle id="hover-dot" cx="0" cy="0" r="4" fill="#137fec" stroke="white" stroke-width="1.5" opacity="0"/>
-                </svg>
+                    <!-- Range buttons -->
+                    <div id="range-controls" role="group"
+                        class="inline-flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5 text-xs font-medium">
+                        <button data-range="today"
+                            class="range-btn px-3 py-1.5 rounded-md transition-colors text-slate-500 dark:text-slate-400">Heute</button>
+                        <button data-range="24h"
+                            class="range-btn px-3 py-1.5 rounded-md transition-colors text-slate-500 dark:text-slate-400">24
+                            h</button>
+                        <button data-range="3d"
+                            class="range-btn px-3 py-1.5 rounded-md transition-colors text-slate-500 dark:text-slate-400">3
+                            Tage</button>
+                        <button data-range="7d"
+                            class="range-btn px-3 py-1.5 rounded-md transition-colors bg-white dark:bg-card-dark text-primary shadow-sm">Woche</button>
+                    </div>
+                </div>
 
-                <!-- Tooltip -->
-                <div id="tooltip" class="chart-tooltip opacity-0 absolute pointer-events-none z-10
+                <!-- Legend -->
+                <div
+                    class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400 -mt-2">
+                    <span class="flex items-center gap-1"><span
+                            class="inline-block w-3 h-1 rounded-full bg-primary"></span>Gesamttarif</span>
+                    <span id="legend-ci" class="hidden flex items-center gap-1">
+                        <span class="inline-block w-3 h-2 rounded-sm bg-primary/20"></span>
+                        <span>95%-Bereich (<span id="legend-ci-value">–</span>)</span>
+                    </span>
+                    <span class="flex items-center gap-1"><span
+                            class="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-400/40"></span>Günstigfenster</span>
+                    <span class="flex items-center gap-1"><span
+                            class="inline-block w-2.5 h-2.5 rounded-sm bg-slate-400/30"></span>Nacht</span>
+                    <span id="zoom-hint" class="hidden ml-auto italic text-slate-400">↔ Zum Verschieben ziehen</span>
+                </div>
+
+                <!-- Chart area -->
+                <div class="relative select-none" id="chart-wrap">
+                    <!-- Skeleton while loading -->
+                    <div id="chart-skeleton" class="skeleton h-52 rounded-xl"></div>
+
+                    <!-- SVG chart -->
+                    <svg id="chart-svg" class="hidden w-full" style="height:220px" viewBox="0 0 800 180"
+                        preserveAspectRatio="none">
+                        <defs>
+                            <linearGradient id="areaGrad" x1="0" x2="0" y1="0" y2="1">
+                                <stop offset="0%" stop-color="#137fec" stop-opacity="0.18" />
+                                <stop offset="100%" stop-color="#137fec" stop-opacity="0" />
+                            </linearGradient>
+                            <clipPath id="clip-plot">
+                                <rect x="0" y="0" width="800" height="160" />
+                            </clipPath>
+                        </defs>
+                        <!-- Background price bands -->
+                        <g id="price-bands" clip-path="url(#clip-plot)"></g>
+                        <!-- Night shading (22:00 – 06:00) -->
+                        <g id="night-bands" clip-path="url(#clip-plot)"></g>
+                        <!-- Cheap window highlights -->
+                        <g id="cheap-highlights" clip-path="url(#clip-plot)"></g>
+                        <!-- Day separators -->
+                        <g id="day-lines"></g>
+                        <!-- "Jetzt" marker -->
+                        <line id="now-line" x1="0" y1="0" x2="0" y2="160" stroke="#137fec" stroke-width="1.5"
+                            stroke-dasharray="4,3" opacity="0.7" />
+                        <!-- Price area fill -->
+                        <path id="chart-area" fill="url(#areaGrad)" clip-path="url(#clip-plot)" />
+                        <!-- 95% confidence band (drawn beneath the line) -->
+                        <path id="chart-ci-band" fill="#137fec" fill-opacity="0.15" stroke="none"
+                            clip-path="url(#clip-plot)" />
+                        <!-- Price line -->
+                        <path id="chart-line" fill="none" stroke="#137fec" stroke-width="2" stroke-linejoin="round"
+                            clip-path="url(#clip-plot)" />
+                        <!-- Day labels (bottom) -->
+                        <g id="day-labels" font-size="9" fill="#94a3b8" text-anchor="middle"></g>
+                        <!-- Y-axis labels -->
+                        <g id="y-labels" font-size="9" fill="#94a3b8"></g>
+                        <!-- Hover crosshair -->
+                        <line id="hover-line" x1="0" y1="0" x2="0" y2="160" stroke="#64748b" stroke-width="1"
+                            stroke-dasharray="3,2" opacity="0" clip-path="url(#clip-plot)" />
+                        <circle id="hover-dot" cx="0" cy="0" r="4" fill="#137fec" stroke="white" stroke-width="1.5"
+                            opacity="0" />
+                    </svg>
+
+                    <!-- Tooltip -->
+                    <div id="tooltip" class="chart-tooltip opacity-0 absolute pointer-events-none z-10
                                          bg-white dark:bg-slate-800 border border-slate-200 dark:border-border-dark
                                          rounded-xl shadow-lg px-3 py-2 text-xs min-w-[130px]">
-                    <p id="tt-time" class="font-bold text-slate-700 dark:text-slate-200 mb-1">–</p>
-                    <div class="flex justify-between gap-4">
-                        <span class="text-slate-400">Netz</span>
-                        <span id="tt-netz" class="font-semibold">–</span>
-                    </div>
-                    <div class="flex justify-between gap-4">
-                        <span class="text-slate-400">Energie</span>
-                        <span id="tt-energie" class="font-semibold">–</span>
-                    </div>
-                    <div class="flex justify-between gap-4 border-t border-slate-100 dark:border-border-dark mt-1 pt-1">
-                        <span class="text-slate-600 dark:text-slate-300 font-medium">Gesamt</span>
-                        <span id="tt-gesamt" class="font-bold text-primary">–</span>
-                    </div>
-                    <div id="tt-ci-row" class="flex justify-between gap-4 hidden">
-                        <span class="text-slate-400">95% CI</span>
-                        <span id="tt-ci" class="text-slate-500 italic">–</span>
+                        <p id="tt-time" class="font-bold text-slate-700 dark:text-slate-200 mb-1">–</p>
+                        <div class="flex justify-between gap-4">
+                            <span class="text-slate-400">Netz</span>
+                            <span id="tt-netz" class="font-semibold">–</span>
+                        </div>
+                        <div class="flex justify-between gap-4">
+                            <span class="text-slate-400">Energie</span>
+                            <span id="tt-energie" class="font-semibold">–</span>
+                        </div>
+                        <div
+                            class="flex justify-between gap-4 border-t border-slate-100 dark:border-border-dark mt-1 pt-1">
+                            <span class="text-slate-600 dark:text-slate-300 font-medium">Gesamt</span>
+                            <span id="tt-gesamt" class="font-bold text-primary">–</span>
+                        </div>
+                        <div id="tt-ci-row" class="flex justify-between gap-4 hidden">
+                            <span class="text-slate-400">95% CI</span>
+                            <span id="tt-ci" class="text-slate-500 italic">–</span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Row 2: Cheapest windows -->
-    <div class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-5">
-        <div class="flex items-center gap-2 mb-4">
-            <span class="material-symbols-outlined text-primary text-xl">schedule_send</span>
-            <h2 class="font-bold text-base">Beste Nutzungszeiten (nächste 7 Tage)</h2>
-            <span class="ml-auto text-[10px] text-slate-400">Günstigste 2-Stunden-Fenster</span>
+        <!-- Row 2: Device Recommendations -->
+        <div class="mb-2 flex items-center gap-2 px-2">
+            <span class="material-symbols-outlined text-primary text-xl">smart_toy</span>
+            <h2 class="font-bold text-base">Ideale Startzeiten für deine Geräte</h2>
         </div>
-        <div id="windows-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <!-- Skeleton cards while loading -->
-            <div class="skeleton h-20 rounded-xl"></div>
-            <div class="skeleton h-20 rounded-xl"></div>
-            <div class="skeleton h-20 rounded-xl"></div>
-            <div class="skeleton h-20 rounded-xl hidden sm:block"></div>
-            <div class="skeleton h-20 rounded-xl hidden lg:block"></div>
-            <div class="skeleton h-20 rounded-xl hidden lg:block"></div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <div id="dev-card-0"
+                class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-4 flex items-center gap-3 opacity-60">
+                <div class="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl">
+                    <span class="material-symbols-outlined">dishwasher_gen</span>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-[10px] text-slate-400 font-medium truncate">Waschmaschine / Spüler</p>
+                    <p id="dev0-time" class="text-sm font-bold text-slate-500 truncate">Wird geladen…</p>
+                </div>
+            </div>
+            <div id="dev-card-1"
+                class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-4 flex items-center gap-3 opacity-60">
+                <div class="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl">
+                    <span class="material-symbols-outlined">ev_station</span>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-[10px] text-slate-400 font-medium truncate">EV Ladestation</p>
+                    <p id="dev1-time" class="text-sm font-bold text-slate-500 truncate">Wird geladen…</p>
+                </div>
+            </div>
+            <div id="dev-card-2"
+                class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-4 flex items-center gap-3 opacity-60">
+                <div class="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl">
+                    <span class="material-symbols-outlined">heat_pump</span>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-[10px] text-slate-400 font-medium truncate">Wärmepumpe</p>
+                    <p id="dev2-time" class="text-sm font-bold text-slate-500 truncate">Wird geladen…</p>
+                </div>
+            </div>
+            <div id="dev-card-3"
+                class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-4 flex items-center gap-3 opacity-60">
+                <div class="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl">
+                    <span class="material-symbols-outlined">water_heater</span>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-[10px] text-slate-400 font-medium truncate">Boiler / Warmwasser</p>
+                    <p id="dev3-time" class="text-sm font-bold text-slate-500 truncate">Wird geladen…</p>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <!-- Row 3: Device recommendations (derived from cheapest windows) -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <!-- Generated dynamically by JS -->
-        <div id="dev-card-0" class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-4 flex items-center gap-3 opacity-60">
-            <div class="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl">
-                <span class="material-symbols-outlined">dishwasher_gen</span>
+        <!-- Row 3: Stromnetz-Wissen (Schon gewusst?) -->
+        <div
+            class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-800/80 rounded-2xl border border-blue-100 dark:border-slate-700 shadow-sm p-5 flex gap-4 items-start">
+            <div
+                class="flex items-center justify-center w-10 h-10 bg-white dark:bg-slate-700 rounded-full shadow-sm shrink-0 text-amber-500">
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">lightbulb</span>
             </div>
-            <div class="min-w-0">
-                <p class="text-[10px] text-slate-400 font-medium truncate">Waschmaschine / Spüler</p>
-                <p id="dev0-time" class="text-sm font-bold text-slate-500 truncate">Wird geladen…</p>
-            </div>
-        </div>
-        <div id="dev-card-1" class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-4 flex items-center gap-3 opacity-60">
-            <div class="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl">
-                <span class="material-symbols-outlined">ev_station</span>
-            </div>
-            <div class="min-w-0">
-                <p class="text-[10px] text-slate-400 font-medium truncate">EV Ladestation</p>
-                <p id="dev1-time" class="text-sm font-bold text-slate-500 truncate">Wird geladen…</p>
+            <div>
+                <h3 class="font-bold text-sm text-slate-800 dark:text-slate-200 mb-1">Schon gewusst?</h3>
+                <p id="grid-tip-text"
+                    class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed transition-opacity duration-500">
+                    Stromnetz-Wissen wird geladen...
+                </p>
             </div>
         </div>
-        <div id="dev-card-2" class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-4 flex items-center gap-3 opacity-60">
-            <div class="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl">
-                <span class="material-symbols-outlined">heat_pump</span>
-            </div>
-            <div class="min-w-0">
-                <p class="text-[10px] text-slate-400 font-medium truncate">Wärmepumpe</p>
-                <p id="dev2-time" class="text-sm font-bold text-slate-500 truncate">Wird geladen…</p>
-            </div>
-        </div>
-        <div id="dev-card-3" class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-border-dark shadow-sm p-4 flex items-center gap-3 opacity-60">
-            <div class="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl">
-                <span class="material-symbols-outlined">water_heater</span>
-            </div>
-            <div class="min-w-0">
-                <p class="text-[10px] text-slate-400 font-medium truncate">Boiler / Warmwasser</p>
-                <p id="dev3-time" class="text-sm font-bold text-slate-500 truncate">Wird geladen…</p>
-            </div>
-        </div>
-    </div>
-</main>
 
-<!-- ── Mobile nav ─────────────────────────────────────────────────────────────── -->
-<nav class="sticky bottom-0 w-full bg-white/80 dark:bg-card-dark/80 backdrop-blur-md
+    </main>
+
+    <!-- ── Mobile nav ─────────────────────────────────────────────────────────────── -->
+    <nav class="sticky bottom-0 w-full bg-white/80 dark:bg-card-dark/80 backdrop-blur-md
             border-t border-slate-200 dark:border-border-dark px-6 py-2.5 block md:hidden">
-    <div class="flex justify-around items-center">
-        <button class="flex flex-col items-center gap-1 text-primary">
-            <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">dashboard</span>
-            <span class="text-[9px] font-bold">Tarif</span>
-        </button>
-        <a href="/" class="flex flex-col items-center gap-1 text-slate-400">
-            <span class="material-symbols-outlined">admin_panel_settings</span>
-            <span class="text-[9px] font-medium">Admin</span>
-        </a>
-        <a href="/docs" class="flex flex-col items-center gap-1 text-slate-400">
-            <span class="material-symbols-outlined">api</span>
-            <span class="text-[9px] font-medium">API</span>
-        </a>
-    </div>
-</nav>
+        <div class="flex justify-around items-center">
+            <button class="flex flex-col items-center gap-1 text-primary">
+                <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">dashboard</span>
+                <span class="text-[9px] font-bold">Tarif</span>
+            </button>
+            <a href="/" class="flex flex-col items-center gap-1 text-slate-400">
+                <span class="material-symbols-outlined">admin_panel_settings</span>
+                <span class="text-[9px] font-medium">Admin</span>
+            </a>
+            <a href="/docs" class="flex flex-col items-center gap-1 text-slate-400">
+                <span class="material-symbols-outlined">api</span>
+                <span class="text-[9px] font-medium">API</span>
+            </a>
+        </div>
+    </nav>
 
-<script>
-// ── Dark mode ──────────────────────────────────────────────────────────────────
-(function () {
-    const saved = localStorage.getItem('theme');
-    if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-    }
-})();
-document.getElementById('dark-toggle').addEventListener('click', () => {
-    const isDark = document.documentElement.classList.toggle('dark');
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    document.getElementById('dark-icon').textContent = isDark ? 'light_mode' : 'dark_mode';
-});
-(function () {
-    const isDark = document.documentElement.classList.contains('dark');
-    document.getElementById('dark-icon').textContent = isDark ? 'light_mode' : 'dark_mode';
-})();
-
-// ── Clock ──────────────────────────────────────────────────────────────────────
-function updateClock() {
-    document.getElementById('clock-time').textContent =
-        new Date().toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
-}
-updateClock();
-setInterval(updateClock, 30_000);
-
-// ── Traffic-light configuration ────────────────────────────────────────────────
-const LEVELS = {
-    low: {
-        bg: 'bg-emerald-500', pulse: 'bg-emerald-500',
-        icon: 'energy_savings_leaf',
-        label: 'GÜNSTIG', labelColor: 'text-emerald-600 dark:text-emerald-400',
-        phase: 'Günstiger Tarif – jetzt Geräte starten!',
-        why: 'Hohe erneuerbare Einspeisung trifft auf moderate Nachfrage. Ideal für energieintensive Haushaltsgeräte.',
-    },
-    medium: {
-        bg: 'bg-amber-400', pulse: 'bg-amber-400',
-        icon: 'electric_bolt',
-        label: 'NORMAL', labelColor: 'text-amber-600 dark:text-amber-400',
-        phase: 'Normaler Tarif – warten wenn möglich.',
-        why: 'Die Stromnachfrage ist durchschnittlich. Nicht-dringende Verbraucher besser auf günstigere Stunden verschieben.',
-    },
-    high: {
-        bg: 'bg-red-500', pulse: 'bg-red-500',
-        icon: 'priority_high',
-        label: 'SPITZENTARIF', labelColor: 'text-red-600 dark:text-red-400',
-        phase: 'Hoher Tarif – Verbrauch reduzieren!',
-        why: 'Hohe Stromnachfrage bei geringer erneuerbarer Einspeisung. Nicht-essenzielle Geräte ausschalten.',
-    },
-};
-
-const ALL_BG_CLASSES = ['bg-emerald-500','bg-amber-400','bg-red-500'];
-
-function applyLevel(level, netz, energie, gesamt) {
-    const cfg = LEVELS[level] || LEVELS.medium;
-    const tl  = document.getElementById('traffic-light');
-    const pr  = document.getElementById('pulse-ring');
-    ALL_BG_CLASSES.forEach(c => { tl.classList.remove(c); pr.classList.remove(c); });
-    tl.classList.add(cfg.bg);
-    pr.classList.add(cfg.pulse);
-    document.getElementById('traffic-icon').textContent = cfg.icon;
-    document.getElementById('price-label').textContent  = cfg.label;
-
-    const phaseEl = document.getElementById('price-phase');
-    phaseEl.textContent = cfg.phase;
-    phaseEl.className = `text-sm font-medium mb-4 ${cfg.labelColor}`;
-
-    document.getElementById('why-text').textContent = cfg.why;
-
-    // Tariff breakdown
-    if (netz    !== undefined) document.getElementById('netz-value').textContent    = netz.toFixed(2) + ' Rp/kWh';
-    if (energie !== undefined) document.getElementById('energie-value').textContent = energie.toFixed(2) + ' Rp/kWh';
-    if (gesamt  !== undefined) document.getElementById('price-value').textContent   = gesamt.toFixed(1);
-}
-
-// ── Date/time helpers ──────────────────────────────────────────────────────────
-const DE_DAYS  = ['So','Mo','Di','Mi','Do','Fr','Sa'];
-const DE_MONTHS = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
-
-function fmtTime(iso) {
-    const d = new Date(iso);
-    return d.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
-}
-function fmtDateShort(iso) {
-    const d = new Date(iso);
-    return `${DE_DAYS[d.getDay()]} ${d.getDate()}. ${DE_MONTHS[d.getMonth()]}`;
-}
-function fmtWindowLabel(iso) {
-    const d = new Date(iso);
-    return `${DE_DAYS[d.getDay()]} ${d.getDate()}.${d.getMonth()+1}. ${fmtTime(iso)}`;
-}
-
-// ── SVG chart ──────────────────────────────────────────────────────────────────
-let _chartData = null;  // { times, netzpreis, energiepreis, gesamttarif, price_level, cheapest_windows }
-
-const CHART_W  = 800;
-const PLOT_H   = 160;
-const AXIS_H   = 20;   // space for day labels below plot
-const PAD_L    = 28;   // y-axis label space
-const PRICE_LO = 0;
-const PRICE_HI = 35;   // fixed Y range in Rp/kWh
-
-function priceToY(p) {
-    return PLOT_H - Math.max(0, Math.min(1, (p - PRICE_LO) / (PRICE_HI - PRICE_LO))) * PLOT_H;
-}
-
-function renderChart(data) {
-    _chartData = data;
-    const { times, netzpreis, energiepreis, gesamttarif, price_level, cheapest_windows } = data;
-    const n = gesamttarif.length;
-    if (!n) return;
-
-    const svg    = document.getElementById('chart-svg');
-    const toX    = i => PAD_L + (i / (n - 1)) * (CHART_W - PAD_L);
-
-    // ── Y-axis labels ─────────────────────────────────────────────────────────
-    const yLabels = document.getElementById('y-labels');
-    yLabels.innerHTML = '';
-    [5, 10, 15, 20, 25, 30].forEach(v => {
-        const y = priceToY(v);
-        if (y < 0 || y > PLOT_H) return;
-        const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        t.setAttribute('x', PAD_L - 3);
-        t.setAttribute('y', y + 3);
-        t.setAttribute('text-anchor', 'end');
-        t.textContent = v;
-        yLabels.appendChild(t);
-        // Horizontal grid line
-        const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        l.setAttribute('x1', PAD_L);
-        l.setAttribute('y1', y);
-        l.setAttribute('x2', CHART_W);
-        l.setAttribute('y2', y);
-        l.setAttribute('stroke', '#e2e8f0');
-        l.setAttribute('stroke-width', '0.5');
-        l.setAttribute('class', 'dark:stroke-border-dark');
-        yLabels.appendChild(l);
-    });
-
-    // ── Price bands (horizontal zones) ────────────────────────────────────────
-    const bandsG = document.getElementById('price-bands');
-    bandsG.innerHTML = '';
-    const bands = [
-        { lo: 0,  hi: 15, fill: '#10b98115' },  // green zone
-        { lo: 22, hi: 35, fill: '#ef444415' },  // red zone
-    ];
-    bands.forEach(({ lo, hi, fill }) => {
-        const yTop = priceToY(hi);
-        const yBot = priceToY(lo);
-        if (yTop >= yBot) return;
-        const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        r.setAttribute('x', PAD_L);
-        r.setAttribute('y', yTop);
-        r.setAttribute('width', CHART_W - PAD_L);
-        r.setAttribute('height', yBot - yTop);
-        r.setAttribute('fill', fill);
-        bandsG.appendChild(r);
-    });
-
-    // ── Cheap window highlights ───────────────────────────────────────────────
-    const cheapG = document.getElementById('cheap-highlights');
-    cheapG.innerHTML = '';
-    if (cheapest_windows) {
-        const firstTime = new Date(times[0]).getTime();
-        const lastTime  = new Date(times[n - 1]).getTime();
-        const timeRange = lastTime - firstTime || 1;
-        cheapest_windows.forEach(w => {
-            const ws = new Date(w.start).getTime();
-            const we = new Date(w.end).getTime();
-            const x1 = PAD_L + ((ws - firstTime) / timeRange) * (CHART_W - PAD_L);
-            const x2 = PAD_L + ((we - firstTime) / timeRange) * (CHART_W - PAD_L);
-            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            rect.setAttribute('x',      Math.max(PAD_L, x1));
-            rect.setAttribute('y',      0);
-            rect.setAttribute('width',  Math.max(0, Math.min(x2, CHART_W) - Math.max(PAD_L, x1)));
-            rect.setAttribute('height', PLOT_H);
-            rect.setAttribute('fill',   '#10b98120');
-            rect.setAttribute('rx',     '2');
-            cheapG.appendChild(rect);
-        });
-    }
-
-    // ── Day separators + labels ───────────────────────────────────────────────
-    const dayLinesG  = document.getElementById('day-lines');
-    const dayLabelsG = document.getElementById('day-labels');
-    dayLinesG.innerHTML = '';
-    dayLabelsG.innerHTML = '';
-
-    let lastDay = null;
-    times.forEach((t, i) => {
-        const d = new Date(t).toLocaleDateString('de-CH');
-        if (d !== lastDay) {
-            lastDay = d;
-            const x = toX(i);
-            if (i > 0) {
-                const sep = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                sep.setAttribute('x1', x); sep.setAttribute('y1', 0);
-                sep.setAttribute('x2', x); sep.setAttribute('y2', PLOT_H);
-                sep.setAttribute('stroke', '#cbd5e1');
-                sep.setAttribute('stroke-width', '0.8');
-                sep.setAttribute('stroke-dasharray', '3,3');
-                dayLinesG.appendChild(sep);
+    <script>
+        // ── Dark mode ──────────────────────────────────────────────────────────────────
+        (function () {
+            const saved = localStorage.getItem('theme');
+            if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
             }
-            const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            lbl.setAttribute('x', Math.min(x + 4, CHART_W - 20));
-            lbl.setAttribute('y', PLOT_H + 12);
-            lbl.textContent = fmtDateShort(t);
-            lbl.style.fontFamily = 'Inter, sans-serif';
-            dayLabelsG.appendChild(lbl);
+        })();
+        document.getElementById('dark-toggle').addEventListener('click', () => {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            document.getElementById('dark-icon').textContent = isDark ? 'light_mode' : 'dark_mode';
+        });
+        (function () {
+            const isDark = document.documentElement.classList.contains('dark');
+            document.getElementById('dark-icon').textContent = isDark ? 'light_mode' : 'dark_mode';
+        })();
+
+        // ── Clock ──────────────────────────────────────────────────────────────────────
+        function updateClock() {
+            document.getElementById('clock-time').textContent =
+                new Date().toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
         }
-    });
+        updateClock();
+        setInterval(updateClock, 30_000);
 
-    // ── Price line + area ─────────────────────────────────────────────────────
-    const pts = gesamttarif.map((p, i) => `${toX(i).toFixed(1)},${priceToY(p).toFixed(1)}`).join(' L ');
-    const linePath = `M ${pts}`;
-    const areaPath = `${linePath} L ${toX(n-1)},${PLOT_H} L ${toX(0)},${PLOT_H} Z`;
-    document.getElementById('chart-line').setAttribute('d', linePath);
-    document.getElementById('chart-area').setAttribute('d', areaPath);
+        // ── Traffic-light configuration ────────────────────────────────────────────────
+        const LEVELS = {
+            low: {
+                bg: 'bg-emerald-500', pulse: 'bg-emerald-500',
+                icon: 'energy_savings_leaf',
+                label: 'GÜNSTIG', labelColor: 'text-emerald-600 dark:text-emerald-400',
+                phase: 'Günstiger Tarif – jetzt Geräte starten!',
+                why: 'Hohe erneuerbare Einspeisung trifft auf moderate Nachfrage. Ideal für energieintensive Haushaltsgeräte.',
+            },
+            medium: {
+                bg: 'bg-amber-400', pulse: 'bg-amber-400',
+                icon: 'electric_bolt',
+                label: 'NORMAL', labelColor: 'text-amber-600 dark:text-amber-400',
+                phase: 'Normaler Tarif – warten wenn möglich.',
+                why: 'Die Stromnachfrage ist durchschnittlich. Nicht-dringende Verbraucher besser auf günstigere Stunden verschieben.',
+            },
+            high: {
+                bg: 'bg-red-500', pulse: 'bg-red-500',
+                icon: 'priority_high',
+                label: 'SPITZENTARIF', labelColor: 'text-red-600 dark:text-red-400',
+                phase: 'Hoher Tarif – Verbrauch reduzieren!',
+                why: 'Hohe Stromnachfrage bei geringer erneuerbarer Einspeisung. Nicht-essenzielle Geräte ausschalten.',
+            },
+        };
 
-    // ── 95% CI band (skipped if API didn't return bounds) ────────────────────
-    const ciBand = document.getElementById('chart-ci-band');
-    const lo = data.gesamttarif_ci_lower;
-    const hi = data.gesamttarif_ci_upper;
-    if (Array.isArray(lo) && Array.isArray(hi)
-        && lo.length === n && hi.length === n
-        && lo.every(v => v != null) && hi.every(v => v != null)) {
-        const upper = hi.map((p, i) => `${toX(i).toFixed(1)},${priceToY(p).toFixed(1)}`).join(' L ');
-        const lower = lo.map((p, i) => `${toX(i).toFixed(1)},${priceToY(p).toFixed(1)}`)
-                        .reverse().join(' L ');
-        ciBand.setAttribute('d', `M ${upper} L ${lower} Z`);
-    } else {
-        ciBand.setAttribute('d', '');
-    }
+        const ALL_BG_CLASSES = ['bg-emerald-500', 'bg-amber-400', 'bg-red-500'];
 
-    // ── "Jetzt" marker (at start of forecast = index 0) ──────────────────────
-    document.getElementById('now-line').setAttribute('x1', toX(0));
-    document.getElementById('now-line').setAttribute('x2', toX(0));
+        function applyLevel(level, netz, energie, gesamt) {
+            const cfg = LEVELS[level] || LEVELS.medium;
+            const tl = document.getElementById('traffic-light');
+            const pr = document.getElementById('pulse-ring');
+            ALL_BG_CLASSES.forEach(c => { tl.classList.remove(c); pr.classList.remove(c); });
+            tl.classList.add(cfg.bg);
+            pr.classList.add(cfg.pulse);
+            document.getElementById('traffic-icon').textContent = cfg.icon;
+            document.getElementById('price-label').textContent = cfg.label;
 
-    // ── Show chart, hide skeleton ─────────────────────────────────────────────
-    document.getElementById('chart-skeleton').classList.add('hidden');
-    document.getElementById('chart-svg').classList.remove('hidden');
+            const phaseEl = document.getElementById('price-phase');
+            phaseEl.textContent = cfg.phase;
+            phaseEl.className = `text-sm font-medium mb-4 ${cfg.labelColor}`;
 
-    // ── Hover interaction ─────────────────────────────────────────────────────
-    setupHover(data, toX, n);
-}
+            document.getElementById('why-text').textContent = cfg.why;
 
-function setupHover(data, toX, n) {
-    const svgEl    = document.getElementById('chart-svg');
-    const hLine    = document.getElementById('hover-line');
-    const hDot     = document.getElementById('hover-dot');
-    const tooltip  = document.getElementById('tooltip');
-    const wrap     = document.getElementById('chart-wrap');
-
-    function getIdx(clientX) {
-        const rect = svgEl.getBoundingClientRect();
-        const relX = clientX - rect.left;
-        const frac = (relX / rect.width * CHART_W - PAD_L) / (CHART_W - PAD_L);
-        return Math.max(0, Math.min(n - 1, Math.round(frac * (n - 1))));
-    }
-
-    function showTooltip(clientX, clientY, idx) {
-        const t  = data.times[idx];
-        const g  = data.gesamttarif[idx];
-        const nz = data.netzpreis[idx];
-        const en = data.energiepreis[idx];
-
-        const svgRect = svgEl.getBoundingClientRect();
-        const x  = toX(idx);
-        const y  = priceToY(g);
-        const cx = (x / CHART_W) * svgRect.width + svgRect.left;
-        const cy = (y / 180)     * svgRect.height + svgRect.top;
-
-        hLine.setAttribute('x1', x); hLine.setAttribute('x2', x);
-        hDot.setAttribute('cx', x);  hDot.setAttribute('cy', y);
-        hLine.setAttribute('opacity', '1');
-        hDot.setAttribute('opacity', '1');
-
-        document.getElementById('tt-time').textContent   = fmtDateShort(t) + ' ' + fmtTime(t);
-        document.getElementById('tt-netz').textContent    = nz.toFixed(2) + ' Rp';
-        document.getElementById('tt-energie').textContent = en.toFixed(2) + ' Rp';
-        document.getElementById('tt-gesamt').textContent  = g.toFixed(2) + ' Rp/kWh';
-
-        const ciRow = document.getElementById('tt-ci-row');
-        const ciLo  = data.gesamttarif_ci_lower && data.gesamttarif_ci_lower[idx];
-        const ciHi  = data.gesamttarif_ci_upper && data.gesamttarif_ci_upper[idx];
-        if (ciLo != null && ciHi != null) {
-            const half = ((ciHi - ciLo) / 2).toFixed(1);
-            document.getElementById('tt-ci').textContent = '± ' + half + ' Rp/kWh';
-            ciRow.classList.remove('hidden');
-        } else {
-            ciRow.classList.add('hidden');
+            // Tariff breakdown
+            if (netz !== undefined) document.getElementById('netz-value').textContent = netz.toFixed(2) + ' Rp/kWh';
+            if (energie !== undefined) document.getElementById('energie-value').textContent = energie.toFixed(2) + ' Rp/kWh';
+            if (gesamt !== undefined) document.getElementById('price-value').textContent = gesamt.toFixed(1);
         }
 
-        const wrapRect = wrap.getBoundingClientRect();
-        let left = cx - wrapRect.left + 12;
-        let top  = cy - wrapRect.top  - 60;
-        if (left + 145 > wrap.offsetWidth) left -= 155;
-        if (top < 0) top = 4;
-        tooltip.style.left    = left + 'px';
-        tooltip.style.top     = top  + 'px';
-        tooltip.style.opacity = '1';
-    }
+        // ── Date/time helpers ──────────────────────────────────────────────────────────
+        const DE_DAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+        const DE_MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 
-    function hideTooltip() {
-        hLine.setAttribute('opacity', '0');
-        hDot.setAttribute('opacity', '0');
-        tooltip.style.opacity = '0';
-    }
+        function fmtTime(iso) {
+            const d = new Date(iso);
+            return d.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+        }
+        function fmtDateShort(iso) {
+            const d = new Date(iso);
+            return `${DE_DAYS[d.getDay()]} ${d.getDate()}. ${DE_MONTHS[d.getMonth()]}`;
+        }
+        function fmtWindowLabel(iso) {
+            const d = new Date(iso);
+            return `${DE_DAYS[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}. ${fmtTime(iso)}`;
+        }
 
-    svgEl.addEventListener('mousemove', e => showTooltip(e.clientX, e.clientY, getIdx(e.clientX)));
-    svgEl.addEventListener('mouseleave', hideTooltip);
-    svgEl.addEventListener('touchmove', e => {
-        e.preventDefault();
-        const t = e.touches[0];
-        showTooltip(t.clientX, t.clientY, getIdx(t.clientX));
-    }, { passive: false });
-    svgEl.addEventListener('touchend', hideTooltip);
-}
+        // ── SVG chart ──────────────────────────────────────────────────────────────────
+        let _chartData = null;  // { times, netzpreis, energiepreis, gesamttarif, price_level, cheapest_windows }
 
-// ── Cheapest windows grid ──────────────────────────────────────────────────────
-const WINDOW_ICONS = ['🌙','⚡','🌅','💧','🔋','☀️'];
+        const CHART_W = 800;
+        const PLOT_H = 160;
+        const AXIS_H = 20;   // space for day labels below plot
+        const PAD_L = 28;   // y-axis label space
+        let PRICE_LO = 0;
+        let PRICE_HI = 35;   // dynamic Y range in Rp/kWh
 
-function renderCheapWindows(windows) {
-    const grid = document.getElementById('windows-grid');
-    if (!windows || !windows.length) {
-        grid.innerHTML = '<p class="col-span-full text-xs text-slate-400 text-center py-4">Keine Daten verfügbar</p>';
-        return;
-    }
-    grid.innerHTML = windows.map((w, i) => {
-        const startLabel = fmtWindowLabel(w.start);
-        const endTime    = fmtTime(w.end);
-        const priceLabel = w.avg_gesamttarif.toFixed(1) + ' Rp';
-        const icon = WINDOW_ICONS[i] || '⚡';
-        return `<div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800
+        // Visible window state (zoom + pan).
+        // startIdx/endIdx are inclusive indices into the *full* data arrays.
+        // `range` is "today" | "24h" | "3d" | "7d" — controls reset behaviour.
+        const RANGE_SLOTS = { '24h': 96, '3d': 96 * 3, '7d': 96 * 7 };
+        const _view = { range: '7d', startIdx: 0, endIdx: 0 };
+
+        function priceToY(p) {
+            return PLOT_H - Math.max(0, Math.min(1, (p - PRICE_LO) / (PRICE_HI - PRICE_LO))) * PLOT_H;
+        }
+
+        // Compute startIdx/endIdx for the given range tag against `times`.
+        function computeWindow(range, times) {
+            const n = times.length;
+            if (n === 0) return { startIdx: 0, endIdx: 0 };
+            if (range === '7d') return { startIdx: 0, endIdx: n - 1 };
+            if (range === 'today') {
+                const today = new Date(times[0]);
+                const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+                let endIdx = 0;
+                for (let i = 0; i < n; i++) {
+                    if (new Date(times[i]) <= endOfDay) endIdx = i;
+                    else break;
+                }
+                return { startIdx: 0, endIdx };
+            }
+            const slots = RANGE_SLOTS[range] || n;
+            return { startIdx: 0, endIdx: Math.min(n - 1, slots - 1) };
+        }
+
+        function renderChart(data, opts = {}) {
+            _chartData = data;
+            const { times, gesamttarif, cheapest_windows } = data;
+            const total = gesamttarif.length;
+            if (!total) return;
+
+            // Sync view window. On a fresh data load, recompute from current range tag;
+            // on pan/zoom, caller passes preserveWindow:true.
+            if (!opts.preserveWindow) {
+                const w = computeWindow(_view.range, times);
+                _view.startIdx = w.startIdx;
+                _view.endIdx = w.endIdx;
+            }
+            const sIdx = _view.startIdx;
+            const eIdx = _view.endIdx;
+            const n = eIdx - sIdx + 1;
+            if (n < 2) return;
+
+            const svg = document.getElementById('chart-svg');
+            // Map an index *into the visible slice* to chart x-coordinate.
+            const toX = i => PAD_L + (i / (n - 1)) * (CHART_W - PAD_L);
+            // Map a full-data index to chart x (used for cheap-window highlights).
+            const toXFull = i => {
+                if (i < sIdx || i > eIdx) return null;
+                return toX(i - sIdx);
+            };
+
+            const allPrices = gesamttarif.slice(sIdx, eIdx + 1);
+            let minP = Math.min(...allPrices);
+            let maxP = Math.max(...allPrices);
+            let rng = maxP - minP;
+            if (rng < 5) rng = 5;
+            PRICE_LO = Math.max(0, Math.floor(minP - rng * 0.15));
+            PRICE_HI = Math.ceil(maxP + rng * 0.15);
+
+            // ── Y-axis labels ─────────────────────────────────────────────────────────
+            const yLabels = document.getElementById('y-labels');
+            yLabels.innerHTML = '';
+
+            let step = 5;
+            if (PRICE_HI - PRICE_LO <= 15) step = 2;
+            if (PRICE_HI - PRICE_LO <= 6) step = 1;
+            if (PRICE_HI - PRICE_LO >= 40) step = 10;
+
+            const ticks = [];
+            for (let v = Math.ceil(PRICE_LO / step) * step; v < PRICE_HI; v += step) {
+                ticks.push(v);
+            }
+
+            ticks.forEach(v => {
+                const y = priceToY(v);
+                if (y < 0 || y > PLOT_H) return;
+                const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                t.setAttribute('x', PAD_L - 3);
+                t.setAttribute('y', y + 3);
+                t.setAttribute('text-anchor', 'end');
+                t.textContent = v;
+                yLabels.appendChild(t);
+                // Horizontal grid line
+                const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                l.setAttribute('x1', PAD_L);
+                l.setAttribute('y1', y);
+                l.setAttribute('x2', CHART_W);
+                l.setAttribute('y2', y);
+                l.setAttribute('stroke', '#e2e8f0');
+                l.setAttribute('stroke-width', '0.5');
+                l.setAttribute('class', 'dark:stroke-border-dark');
+                yLabels.appendChild(l);
+            });
+
+            // ── Price bands (horizontal zones) ────────────────────────────────────────
+            const bandsG = document.getElementById('price-bands');
+            bandsG.innerHTML = '';
+            const bands = [
+                { lo: 0, hi: 15, fill: '#10b98115' },  // green zone
+                { lo: 22, hi: 35, fill: '#ef444415' },  // red zone
+            ];
+            bands.forEach(({ lo, hi, fill }) => {
+                const yTop = priceToY(hi);
+                const yBot = priceToY(lo);
+                if (yTop >= yBot) return;
+                const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                r.setAttribute('x', PAD_L);
+                r.setAttribute('y', yTop);
+                r.setAttribute('width', CHART_W - PAD_L);
+                r.setAttribute('height', yBot - yTop);
+                r.setAttribute('fill', fill);
+                bandsG.appendChild(r);
+            });
+
+            // ── Cheap window highlights ───────────────────────────────────────────────
+            const cheapG = document.getElementById('cheap-highlights');
+            cheapG.innerHTML = '';
+            if (cheapest_windows) {
+                const firstTime = new Date(times[sIdx]).getTime();
+                const lastTime = new Date(times[eIdx]).getTime();
+                const timeRange = lastTime - firstTime || 1;
+                cheapest_windows.forEach(w => {
+                    const ws = new Date(w.start).getTime();
+                    const we = new Date(w.end).getTime();
+                    if (we < firstTime || ws > lastTime) return;
+                    const x1 = PAD_L + ((ws - firstTime) / timeRange) * (CHART_W - PAD_L);
+                    const x2 = PAD_L + ((we - firstTime) / timeRange) * (CHART_W - PAD_L);
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('x', Math.max(PAD_L, x1));
+                    rect.setAttribute('y', 0);
+                    rect.setAttribute('width', Math.max(0, Math.min(x2, CHART_W) - Math.max(PAD_L, x1)));
+                    rect.setAttribute('height', PLOT_H);
+                    rect.setAttribute('fill', '#10b98120');
+                    rect.setAttribute('rx', '2');
+                    cheapG.appendChild(rect);
+                });
+            }
+
+            // ── Night shading (22:00 – 06:00) ─────────────────────────────────────────
+            const nightG = document.getElementById('night-bands');
+            nightG.innerHTML = '';
+            {
+                const firstTime = new Date(times[sIdx]).getTime();
+                const lastTime = new Date(times[eIdx]).getTime();
+                const timeRange = lastTime - firstTime || 1;
+                const isNight = h => h >= 22 || h < 6;
+                let nightStart = null;
+                for (let i = sIdx; i <= eIdx; i++) {
+                    const d = new Date(times[i]);
+                    const night = isNight(d.getHours());
+                    if (night && nightStart == null) nightStart = d.getTime();
+                    if ((!night || i === eIdx) && nightStart != null) {
+                        const endT = (!night ? d.getTime() : new Date(times[i]).getTime() + 15 * 60_000);
+                        const x1 = PAD_L + ((nightStart - firstTime) / timeRange) * (CHART_W - PAD_L);
+                        const x2 = PAD_L + ((endT - firstTime) / timeRange) * (CHART_W - PAD_L);
+                        const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                        r.setAttribute('x', Math.max(PAD_L, x1));
+                        r.setAttribute('y', 0);
+                        r.setAttribute('width', Math.max(0, Math.min(x2, CHART_W) - Math.max(PAD_L, x1)));
+                        r.setAttribute('height', PLOT_H);
+                        r.setAttribute('fill', '#94a3b818');
+                        nightG.appendChild(r);
+                        nightStart = null;
+                    }
+                }
+            }
+
+            // ── Day separators + labels ───────────────────────────────────────────────
+            const dayLinesG = document.getElementById('day-lines');
+            const dayLabelsG = document.getElementById('day-labels');
+            dayLinesG.innerHTML = '';
+            dayLabelsG.innerHTML = '';
+
+            let lastDay = null;
+            for (let i = sIdx; i <= eIdx; i++) {
+                const t = times[i];
+                const d = new Date(t).toLocaleDateString('de-CH');
+                if (d !== lastDay) {
+                    lastDay = d;
+                    const x = toX(i - sIdx);
+                    if (i > sIdx) {
+                        const sep = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        sep.setAttribute('x1', x); sep.setAttribute('y1', 0);
+                        sep.setAttribute('x2', x); sep.setAttribute('y2', PLOT_H);
+                        sep.setAttribute('stroke', '#cbd5e1');
+                        sep.setAttribute('stroke-width', '0.8');
+                        sep.setAttribute('stroke-dasharray', '3,3');
+                        dayLinesG.appendChild(sep);
+                    }
+                    const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    lbl.setAttribute('x', Math.min(x + 4, CHART_W - 20));
+                    lbl.setAttribute('y', PLOT_H + 12);
+                    lbl.textContent = fmtDateShort(t);
+                    lbl.style.fontFamily = 'Inter, sans-serif';
+                    dayLabelsG.appendChild(lbl);
+                }
+            }
+
+            // ── Price line + area ─────────────────────────────────────────────────────
+            const sliceXY = (arr) => arr.slice(sIdx, eIdx + 1)
+                .map((p, i) => `${toX(i).toFixed(1)},${priceToY(p).toFixed(1)}`).join(' L ');
+            const linePath = `M ${sliceXY(gesamttarif)}`;
+            const areaPath = `${linePath} L ${toX(n - 1)},${PLOT_H} L ${toX(0)},${PLOT_H} Z`;
+            document.getElementById('chart-line').setAttribute('d', linePath);
+            document.getElementById('chart-area').setAttribute('d', areaPath);
+
+            // ── 95% CI band (skipped if API didn't return bounds) ────────────────────
+            const ciBand = document.getElementById('chart-ci-band');
+            const lo = data.gesamttarif_ci_lower;
+            const hi = data.gesamttarif_ci_upper;
+            if (Array.isArray(lo) && Array.isArray(hi)
+                && lo.length === total && hi.length === total
+                && lo.slice(sIdx, eIdx + 1).every(v => v != null)
+                && hi.slice(sIdx, eIdx + 1).every(v => v != null)) {
+                const upper = sliceXY(hi);
+                const lower = lo.slice(sIdx, eIdx + 1)
+                    .map((p, i) => `${toX(i).toFixed(1)},${priceToY(p).toFixed(1)}`)
+                    .reverse().join(' L ');
+                ciBand.setAttribute('d', `M ${upper} L ${lower} Z`);
+            } else {
+                ciBand.setAttribute('d', '');
+            }
+
+            // ── "Jetzt" marker — only visible if index 0 (forecast start) is in the
+            // current view, otherwise hide the line.
+            const nowLine = document.getElementById('now-line');
+            if (sIdx === 0) {
+                nowLine.setAttribute('x1', toX(0));
+                nowLine.setAttribute('x2', toX(0));
+                nowLine.setAttribute('opacity', '0.7');
+            } else {
+                nowLine.setAttribute('opacity', '0');
+            }
+
+            // ── Show chart, hide skeleton ─────────────────────────────────────────────
+            document.getElementById('chart-skeleton').classList.add('hidden');
+            document.getElementById('chart-svg').classList.remove('hidden');
+
+            // ── Hover interaction ─────────────────────────────────────────────────────
+            setupHover(data, toX, sIdx, eIdx);
+
+            // ── Pan hint visibility ───────────────────────────────────────────────────
+            document.getElementById('zoom-hint').classList.toggle('hidden', _view.range === '7d');
+        }
+
+        // `_hoverBound` ensures we only attach hover listeners to the chart once;
+        // renderChart re-runs on every range change and we don't want stacked listeners.
+        let _hoverBound = false;
+
+        function setupHover(data, toX, sIdx, eIdx) {
+            const svgEl = document.getElementById('chart-svg');
+            const hLine = document.getElementById('hover-line');
+            const hDot = document.getElementById('hover-dot');
+            const tooltip = document.getElementById('tooltip');
+            const wrap = document.getElementById('chart-wrap');
+            const n = eIdx - sIdx + 1;
+
+            // Stash latest slice info so the bound listeners use it.
+            setupHover._ctx = { data, toX, sIdx, eIdx, n };
+
+            function ctx() { return setupHover._ctx; }
+
+            function getIdx(clientX) {
+                const c = ctx();
+                const rect = svgEl.getBoundingClientRect();
+                const relX = clientX - rect.left;
+                const frac = (relX / rect.width * CHART_W - PAD_L) / (CHART_W - PAD_L);
+                const local = Math.max(0, Math.min(c.n - 1, Math.round(frac * (c.n - 1))));
+                return c.sIdx + local;
+            }
+
+            function showTooltip(clientX, clientY, idx) {
+                const c = ctx();
+                const t = c.data.times[idx];
+                const g = c.data.gesamttarif[idx];
+                const nz = c.data.netzpreis[idx];
+                const en = c.data.energiepreis[idx];
+
+                const svgRect = svgEl.getBoundingClientRect();
+                const x = c.toX(idx - c.sIdx);
+                const y = priceToY(g);
+                const cx = (x / CHART_W) * svgRect.width + svgRect.left;
+                const cy = (y / 180) * svgRect.height + svgRect.top;
+
+                hLine.setAttribute('x1', x); hLine.setAttribute('x2', x);
+                hDot.setAttribute('cx', x); hDot.setAttribute('cy', y);
+                hLine.setAttribute('opacity', '1');
+                hDot.setAttribute('opacity', '1');
+
+                document.getElementById('tt-time').textContent = fmtDateShort(t) + ' ' + fmtTime(t);
+                document.getElementById('tt-netz').textContent = nz.toFixed(2) + ' Rp';
+                document.getElementById('tt-energie').textContent = en.toFixed(2) + ' Rp';
+                document.getElementById('tt-gesamt').textContent = g.toFixed(2) + ' Rp/kWh';
+
+                const ciRow = document.getElementById('tt-ci-row');
+                const ciLo = c.data.gesamttarif_ci_lower && c.data.gesamttarif_ci_lower[idx];
+                const ciHi = c.data.gesamttarif_ci_upper && c.data.gesamttarif_ci_upper[idx];
+                if (ciLo != null && ciHi != null) {
+                    const half = ((ciHi - ciLo) / 2).toFixed(1);
+                    document.getElementById('tt-ci').textContent = '± ' + half + ' Rp/kWh';
+                    ciRow.classList.remove('hidden');
+                } else {
+                    ciRow.classList.add('hidden');
+                }
+
+                const wrapRect = wrap.getBoundingClientRect();
+                let left = cx - wrapRect.left + 12;
+                let top = cy - wrapRect.top - 60;
+                if (left + 145 > wrap.offsetWidth) left -= 155;
+                if (top < 0) top = 4;
+                tooltip.style.left = left + 'px';
+                tooltip.style.top = top + 'px';
+                tooltip.style.opacity = '1';
+            }
+
+            function hideTooltip() {
+                hLine.setAttribute('opacity', '0');
+                hDot.setAttribute('opacity', '0');
+                tooltip.style.opacity = '0';
+            }
+
+            if (_hoverBound) return;
+            _hoverBound = true;
+
+            svgEl.addEventListener('mousemove', e => {
+                if (_pan.dragging) return;  // suppress hover while panning
+                showTooltip(e.clientX, e.clientY, getIdx(e.clientX));
+            });
+            svgEl.addEventListener('mouseleave', hideTooltip);
+            svgEl.addEventListener('touchmove', e => {
+                if (_pan.dragging) return;
+                e.preventDefault();
+                const t = e.touches[0];
+                showTooltip(t.clientX, t.clientY, getIdx(t.clientX));
+            }, { passive: false });
+            svgEl.addEventListener('touchend', hideTooltip);
+        }
+
+        // ── Cheapest windows grid ──────────────────────────────────────────────────────
+        const WINDOW_ICONS = ['🌙', '⚡', '🌅', '💧', '🔋', '☀️'];
+
+        function renderCheapWindows(windows) {
+            const grid = document.getElementById('windows-grid');
+            if (!grid) return;  // element may not exist in current layout
+            if (!windows || !windows.length) {
+                grid.innerHTML = '<p class="col-span-full text-xs text-slate-400 text-center py-4">Keine Daten verfügbar</p>';
+                return;
+            }
+            grid.innerHTML = windows.map((w, i) => {
+                const startLabel = fmtWindowLabel(w.start);
+                const endTime = fmtTime(w.end);
+                const priceLabel = w.avg_gesamttarif.toFixed(1) + ' Rp';
+                const icon = WINDOW_ICONS[i] || '⚡';
+                return `<div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800
                            rounded-xl p-3 flex flex-col gap-1.5 cursor-default hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors">
                     <div class="flex items-center justify-between">
                         <span class="text-lg">${icon}</span>
@@ -647,204 +883,602 @@ function renderCheapWindows(windows) {
                     <p class="text-[10px] font-bold text-slate-700 dark:text-slate-200 leading-tight">${startLabel}</p>
                     <p class="text-[10px] text-slate-400 leading-tight">bis ${endTime}</p>
                 </div>`;
-    }).join('');
-}
-
-// ── Device recommendation cards ────────────────────────────────────────────────
-const DEVICES = [
-    { id: 0, key: 'washer',   name: 'Waschmaschine / Spüler' },
-    { id: 1, key: 'ev',       name: 'EV Ladestation' },
-    { id: 2, key: 'heatpump', name: 'Wärmepumpe' },
-    { id: 3, key: 'boiler',   name: 'Boiler / Warmwasser' },
-];
-
-function updateDeviceCards(windows) {
-    const CARD_BG_ACTIVE   = 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800';
-    const CARD_BG_DEFAULT  = 'bg-white dark:bg-card-dark border-slate-200 dark:border-border-dark';
-    const CARD_BG_DISABLED = 'bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-border-dark';
-    const ICON_BG_ACTIVE   = 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600';
-    const ICON_BG_DEFAULT  = 'bg-slate-100 dark:bg-slate-800 text-slate-400';
-
-    const savedConfig = obLoad();
-
-    DEVICES.forEach(({ id, key }) => {
-        const card    = document.getElementById(`dev-card-${id}`);
-        const timeEl  = document.getElementById(`dev${id}-time`);
-        const iconDiv = card.querySelector('div.p-2\\.5');
-        const win     = windows && windows[id];
-
-        card.classList.remove('opacity-60');
-        card.className = card.className.replace(/bg-\S+/g, '').replace(/border-\S+/g, '').trim();
-
-        // Device explicitly disabled in onboarding
-        const devConfig = savedConfig?.devices?.[key];
-        if (devConfig && devConfig.enabled === false) {
-            timeEl.textContent = 'Nicht konfiguriert';
-            timeEl.className = 'text-sm font-medium text-slate-400 truncate';
-            card.classList.add(...CARD_BG_DISABLED.split(' '), 'opacity-50');
-            return;
+            }).join('');
         }
 
-        if (win) {
-            const label = fmtWindowLabel(win.start) + ' – ' + fmtTime(win.end);
-            timeEl.textContent = label;
-            timeEl.classList.remove('text-slate-500');
-            timeEl.classList.add('text-emerald-600', 'dark:text-emerald-400');
-            card.classList.add(...CARD_BG_ACTIVE.split(' '));
-            if (iconDiv) {
-                ICON_BG_DEFAULT.split(' ').forEach(c => iconDiv.classList.remove(c));
-                ICON_BG_ACTIVE.split(' ').forEach(c => iconDiv.classList.add(c));
+        // ── Device recommendation cards ────────────────────────────────────────────────
+        const DEVICES = [
+            { id: 0, key: 'washer', name: 'Waschmaschine / Spüler' },
+            { id: 1, key: 'ev', name: 'EV Ladestation' },
+            { id: 2, key: 'heatpump', name: 'Wärmepumpe' },
+            { id: 3, key: 'boiler', name: 'Boiler / Warmwasser' },
+        ];
+
+        // ── Smart scheduling engine ────────────────────────────────────────────────────
+        // Find the cheapest contiguous window of `slotCount` 15-min slots in a time range
+        function findCheapestSlots(gesamttarif, times, startSlot, endSlot, slotCount) {
+            if (endSlot - startSlot + 1 < slotCount) return null;
+            let bestSum = Infinity, bestStart = startSlot;
+            for (let i = startSlot; i + slotCount <= endSlot + 1; i++) {
+                let sum = 0;
+                for (let j = 0; j < slotCount; j++) sum += gesamttarif[i + j];
+                if (sum < bestSum) { bestSum = sum; bestStart = i; }
             }
-        } else {
-            timeEl.textContent = 'Keine Daten';
-            card.classList.add(...CARD_BG_DEFAULT.split(' '));
+            return {
+                start: times[bestStart],
+                end: times[Math.min(bestStart + slotCount, times.length - 1)],
+                avg: bestSum / slotCount,
+                startSlot: bestStart,
+            };
         }
-    });
-}
 
-// ── Main data load ─────────────────────────────────────────────────────────────
-async function loadDashboard() {
-    let usedFallback = false;
+        // Find one cheapest window per 24h block (for daily devices like heatpump/boiler)
+        function findDailyWindows(gesamttarif, times, durationH) {
+            const slotsNeeded = Math.max(1, Math.round(durationH * 4)); // 15-min slots
+            const slotsPerDay = 96;
+            const results = [];
+            for (let dayStart = 0; dayStart + slotsNeeded <= gesamttarif.length; dayStart += slotsPerDay) {
+                const dayEnd = Math.min(dayStart + slotsPerDay - 1, gesamttarif.length - 1);
+                const w = findCheapestSlots(gesamttarif, times, dayStart, dayEnd, slotsNeeded);
+                if (w) results.push(w);
+            }
+            return results;
+        }
 
-    try {
-        const resp = await fetch('/api/forecast/week');
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
-        if (data.error) throw new Error(data.error);
+        // Find N best non-overlapping windows across the week (for washer)
+        function findWeeklyWindows(gesamttarif, times, durationH, count) {
+            const slotsNeeded = Math.max(1, Math.round(durationH * 4));
+            const used = new Set();
+            const results = [];
 
-        // Current price = first point of forecast (≈ "now")
-        const netz    = data.netzpreis[0];
-        const energie = data.energiepreis[0];
-        const gesamt  = data.gesamttarif[0];
-        const level   = data.price_level[0];
-        applyLevel(level, netz, energie, gesamt);
+            for (let n = 0; n < count && n < 7; n++) {
+                let bestSum = Infinity, bestStart = -1;
+                for (let i = 0; i + slotsNeeded <= gesamttarif.length; i++) {
+                    // Check overlap with already-used slots
+                    let overlap = false;
+                    for (let j = 0; j < slotsNeeded; j++) {
+                        if (used.has(i + j)) { overlap = true; break; }
+                    }
+                    if (overlap) continue;
+                    let sum = 0;
+                    for (let j = 0; j < slotsNeeded; j++) sum += gesamttarif[i + j];
+                    if (sum < bestSum) { bestSum = sum; bestStart = i; }
+                }
+                if (bestStart < 0) break;
+                for (let j = 0; j < slotsNeeded; j++) used.add(bestStart + j);
+                results.push({
+                    start: times[bestStart],
+                    end: times[Math.min(bestStart + slotsNeeded, times.length - 1)],
+                    avg: bestSum / slotsNeeded,
+                });
+            }
+            // Sort chronologically
+            return results.sort((a, b) => new Date(a.start) - new Date(b.start));
+        }
 
-        document.getElementById('last-update').textContent =
-            new Date(data.generated_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+        // Find cheapest EV charging window based on kWh needed and charge power
+        function findEvWindow(gesamttarif, times, kwNeeded, kw) {
+            const hoursNeeded = kwNeeded / kw;
+            const slotsNeeded = Math.max(1, Math.round(hoursNeeded * 4));
+            return findCheapestSlots(gesamttarif, times, 0, gesamttarif.length - 1, slotsNeeded);
+        }
 
-        renderChart(data);
-        renderCheapWindows(data.cheapest_windows);
-        updateDeviceCards(data.cheapest_windows);
+        function computeDeviceRecommendations(data) {
+            const config = obLoad();
+            if (!config?.devices) return {};
+            const { gesamttarif, times } = data;
+            if (!gesamttarif || !times || gesamttarif.length < 2) return {};
 
-    } catch (err) {
-        usedFallback = true;
+            const recs = {};
 
-        // Fallback: try /api/forecast for current price at least
-        try {
-            const r2 = await fetch('/api/forecast');
-            if (r2.ok) {
-                const d2 = await r2.json();
-                if (!d2.error) {
-                    applyLevel(d2.price_level ?? 'medium',
-                               d2.netzpreis_rp_kwh, d2.energiepreis_rp_kwh, d2.gesamttarif_rp_kwh);
-                    if (d2.time) {
-                        document.getElementById('last-update').textContent =
-                            new Date(d2.time).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+            // Washer: N times per week
+            const washer = config.devices.washer;
+            if (washer?.enabled) {
+                const dur = washer.duration_h || 2;
+                const freq = washer.per_week || 2;
+                const wins = findWeeklyWindows(gesamttarif, times, dur, freq);
+                if (wins.length) {
+                    // Show the next upcoming one
+                    const now = Date.now();
+                    const next = wins.find(w => new Date(w.start).getTime() > now) || wins[0];
+                    recs.washer = { ...next, allWindows: wins, freq };
+                }
+            }
+
+            // EV: based on charge amount and frequency
+            const ev = config.devices.ev;
+            if (ev?.enabled) {
+                const kw = ev.kw || 7.4;
+                const kwh = ev.kwh_per_charge || 20;
+                const w = findEvWindow(gesamttarif, times, kwh, kw);
+                if (w) recs.ev = w;
+            }
+
+            // Heatpump: daily cycle
+            const hp = config.devices.heatpump;
+            if (hp?.enabled) {
+                const dur = hp.daily_hours || 4;
+                const wins = findDailyWindows(gesamttarif, times, dur);
+                if (wins.length) {
+                    const now = Date.now();
+                    const next = wins.find(w => new Date(w.start).getTime() > now) || wins[0];
+                    recs.heatpump = { ...next, allWindows: wins };
+                }
+            }
+
+            // Boiler: daily cycle
+            const boiler = config.devices.boiler;
+            if (boiler?.enabled) {
+                const dur = boiler.heat_hours || 1.5;
+                const wins = findDailyWindows(gesamttarif, times, dur);
+                if (wins.length) {
+                    const now = Date.now();
+                    const next = wins.find(w => new Date(w.start).getTime() > now) || wins[0];
+                    recs.boiler = { ...next, allWindows: wins };
+                }
+            }
+
+            return recs;
+        }
+
+        function updateDeviceCards(windows) {
+            const CARD_BG_ACTIVE = 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800';
+            const CARD_BG_DEFAULT = 'bg-white dark:bg-card-dark border-slate-200 dark:border-border-dark';
+            const CARD_BG_DISABLED = 'bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-border-dark';
+            const ICON_BG_ACTIVE = 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600';
+            const ICON_BG_DEFAULT = 'bg-slate-100 dark:bg-slate-800 text-slate-400';
+
+            const savedConfig = obLoad();
+
+            // Compute smart recommendations from full forecast data
+            const recs = _chartData ? computeDeviceRecommendations(_chartData) : {};
+
+            DEVICES.forEach(({ id, key }) => {
+                const card = document.getElementById(`dev-card-${id}`);
+                const timeEl = document.getElementById(`dev${id}-time`);
+                const iconDiv = card.querySelector('div.p-2\\.5');
+
+                card.classList.remove('opacity-60');
+                card.className = card.className.replace(/bg-\S+/g, '').replace(/border-\S+/g, '').trim();
+
+                // Device explicitly disabled or not configured
+                const devConfig = savedConfig?.devices?.[key];
+                if (!devConfig || devConfig.enabled === false) {
+                    timeEl.textContent = 'Nicht konfiguriert';
+                    timeEl.className = 'text-sm font-medium text-slate-400 truncate';
+                    card.classList.add(...CARD_BG_DISABLED.split(' '), 'opacity-50');
+                    return;
+                }
+
+                const rec = recs[key];
+                if (rec) {
+                    const label = fmtWindowLabel(rec.start) + ' – ' + fmtTime(rec.end);
+                    const priceInfo = rec.avg != null ? ` (⌀ ${rec.avg.toFixed(1)} Rp)` : '';
+                    timeEl.textContent = label + priceInfo;
+                    timeEl.className = 'text-sm font-medium text-emerald-600 dark:text-emerald-400 truncate';
+                    card.classList.add(...CARD_BG_ACTIVE.split(' '));
+                    if (iconDiv) {
+                        ICON_BG_DEFAULT.split(' ').forEach(c => iconDiv.classList.remove(c));
+                        ICON_BG_ACTIVE.split(' ').forEach(c => iconDiv.classList.add(c));
+                    }
+                } else {
+                    timeEl.textContent = 'Berechnung…';
+                    card.classList.add(...CARD_BG_DEFAULT.split(' '));
+                }
+            });
+        }
+
+        // ── Range buttons (zoom presets) ───────────────────────────────────────────────
+        function setRange(range) {
+            _view.range = range;
+            document.querySelectorAll('.range-btn').forEach(btn => {
+                const active = btn.dataset.range === range;
+                btn.classList.toggle('bg-white', active);
+                btn.classList.toggle('dark:bg-card-dark', active);
+                btn.classList.toggle('text-primary', active);
+                btn.classList.toggle('shadow-sm', active);
+                btn.classList.toggle('text-slate-500', !active);
+                btn.classList.toggle('dark:text-slate-400', !active);
+            });
+            if (_chartData) renderChart(_chartData);  // recomputes window from new range
+        }
+        document.querySelectorAll('.range-btn').forEach(btn => {
+            btn.addEventListener('click', () => setRange(btn.dataset.range));
+        });
+
+        // ── Drag-to-pan when zoomed ────────────────────────────────────────────────────
+        const _pan = { dragging: false, startX: 0, startWindow: null, moved: false };
+
+        function panStart(clientX) {
+            if (_view.range === '7d' || !_chartData) return;
+            _pan.dragging = true;
+            _pan.moved = false;
+            _pan.startX = clientX;
+            _pan.startWindow = { s: _view.startIdx, e: _view.endIdx };
+            document.getElementById('chart-svg').style.cursor = 'grabbing';
+        }
+        function panMove(clientX) {
+            if (!_pan.dragging) return;
+            const total = _chartData.times.length;
+            const winLen = _pan.startWindow.e - _pan.startWindow.s + 1;
+            const svgRect = document.getElementById('chart-svg').getBoundingClientRect();
+            const dxPx = clientX - _pan.startX;
+            const slotsPerPx = winLen / Math.max(1, svgRect.width - PAD_L * (svgRect.width / CHART_W));
+            const slotShift = Math.round(-dxPx * slotsPerPx);
+            if (Math.abs(slotShift) < 1) return;
+            _pan.moved = true;
+            let newS = _pan.startWindow.s + slotShift;
+            newS = Math.max(0, Math.min(total - winLen, newS));
+            _view.startIdx = newS;
+            _view.endIdx = newS + winLen - 1;
+            renderChart(_chartData, { preserveWindow: true });
+        }
+        function panEnd() {
+            if (!_pan.dragging) return;
+            _pan.dragging = false;
+            document.getElementById('chart-svg').style.cursor = '';
+        }
+        {
+            const svgEl = document.getElementById('chart-svg');
+            svgEl.addEventListener('mousedown', e => panStart(e.clientX));
+            window.addEventListener('mousemove', e => panMove(e.clientX));
+            window.addEventListener('mouseup', panEnd);
+            svgEl.addEventListener('touchstart', e => panStart(e.touches[0].clientX), { passive: true });
+            svgEl.addEventListener('touchmove', e => { if (_pan.dragging) panMove(e.touches[0].clientX); }, { passive: true });
+            svgEl.addEventListener('touchend', panEnd);
+        }
+
+        // ── Next-cheap-window countdown ────────────────────────────────────────────────
+        let _countdownTimer = null;
+
+        function fmtCountdown(ms) {
+            if (ms <= 0) return 'jetzt';
+            const total = Math.round(ms / 1000);
+            const days = Math.floor(total / 86400);
+            const hrs = Math.floor((total % 86400) / 3600);
+            const mins = Math.floor((total % 3600) / 60);
+            if (days >= 1) return `in ${days} T ${hrs} h`;
+            if (hrs >= 1) return `in ${hrs} h ${mins} min`;
+            return `in ${mins} min`;
+        }
+
+        function updateNextWindowCard(windows) {
+            const card = document.getElementById('next-window-card');
+            if (!Array.isArray(windows) || !windows.length) {
+                card.classList.add('hidden');
+                return;
+            }
+            const now = Date.now();
+            // Pick the cheapest window that hasn't started yet, or the active one.
+            const future = windows
+                .map(w => ({ ...w, _start: new Date(w.start).getTime(), _end: new Date(w.end).getTime() }))
+                .filter(w => w._end >= now)
+                .sort((a, b) => a.avg_gesamttarif - b.avg_gesamttarif);
+            const w = future[0];
+            if (!w) { card.classList.add('hidden'); return; }
+
+            const active = w._start <= now;
+            const head = active
+                ? 'Jetzt günstig – läuft noch ' + fmtCountdown(w._end - now)
+                : fmtCountdown(w._start - now) + ' wird\'s günstig';
+            document.getElementById('next-window-headline').textContent = head;
+            document.getElementById('next-window-sub').textContent =
+                fmtWindowLabel(w.start) + ' – ' + fmtTime(w.end) + ' (2 h Fenster)';
+            document.getElementById('next-window-price').textContent = w.avg_gesamttarif.toFixed(1);
+            card.classList.remove('hidden');
+        }
+
+        function startCountdownTicker() {
+            if (_countdownTimer) clearInterval(_countdownTimer);
+            _countdownTimer = setInterval(() => {
+                if (_chartData?.cheapest_windows) updateNextWindowCard(_chartData.cheapest_windows);
+            }, 30_000);
+        }
+
+        // ── Best-vs-worst savings hint + CI badge ──────────────────────────────────────
+        function maxAvgWindow(prices, winSlots = 8) {
+            let best = -Infinity;
+            for (let i = 0; i + winSlots <= prices.length; i++) {
+                let sum = 0;
+                for (let j = 0; j < winSlots; j++) sum += prices[i + j];
+                const avg = sum / winSlots;
+                if (avg > best) best = avg;
+            }
+            return best === -Infinity ? null : best;
+        }
+
+        function updateSavingsHint(data) {
+            const hint = document.getElementById('savings-hint');
+            const spacer = document.getElementById('savings-spacer');
+            if (!hint || !spacer) return;  // elements may not exist in current layout
+            const cheapest = data.cheapest_windows?.[0]?.avg_gesamttarif;
+            const peak = maxAvgWindow(data.gesamttarif);
+            if (cheapest == null || peak == null || peak - cheapest < 0.5) {
+                hint.classList.add('hidden');
+                spacer.classList.remove('hidden');
+                return;
+            }
+            const gap = peak - cheapest;
+            const txt = document.getElementById('savings-text');
+            if (txt) txt.textContent =
+                `Mit Verschiebung in ein Günstigfenster sparst du bis zu ${gap.toFixed(1)} Rp/kWh ` +
+                `(ca. ${(gap / peak * 100).toFixed(0)}% gegenüber Spitze).`;
+            hint.classList.remove('hidden');
+            spacer.classList.add('hidden');
+        }
+
+        function updateCiBadges(data) {
+            const lo = data.gesamttarif_ci_lower;
+            const hi = data.gesamttarif_ci_upper;
+            const legendCi = document.getElementById('legend-ci');
+            const priceSig = document.getElementById('price-sigma');
+
+            if (!Array.isArray(lo) || !Array.isArray(hi) || !lo.length || lo[0] == null) {
+                legendCi.classList.add('hidden');
+                priceSig.classList.add('hidden');
+                return;
+            }
+            // Use the half-width at index 0 (current hour) as the displayed sigma.
+            const half = (hi[0] - lo[0]) / 2;
+            document.getElementById('legend-ci-value').textContent = '± ' + half.toFixed(1) + ' Rp/kWh';
+            document.getElementById('price-sigma-value').textContent = '± ' + half.toFixed(1) + ' Rp/kWh';
+            legendCi.classList.remove('hidden');
+            legendCi.classList.add('flex');
+            priceSig.classList.remove('hidden');
+        }
+
+        // ── "Schon gewusst?" tips ──────────────────────────────────────────────────────
+        const GRID_TIPS = [
+            'Strom wird in der Schweiz zu über 60% aus Wasserkraft erzeugt – deshalb schwanken die Preise mit dem Wasserstand in den Stauseen.',
+            'Nachts (22–06 Uhr) ist der Strompreis meist am tiefsten, weil die Nachfrage gering ist. Ideal für Waschmaschine & Geschirrspüler!',
+            'Der EPEX-Spotmarkt in Paris bestimmt den europäischen Day-Ahead Strompreis – auch für die Schweiz.',
+            'Wind- und Solarstrom aus Deutschland und Frankreich beeinflussen den Schweizer Preis direkt über die Grenzkuppelstellen.',
+            'An kalten Wintertagen steigt der Strompreis, weil Wärmepumpen und Heizungen die Nachfrage erhöhen.',
+            'Die Schweiz importiert im Winter bis zu 10% ihres Stroms – exportiert aber im Sommer dank Wasserkraft.',
+            'Zwischen 11:00 und 14:00 Uhr sinkt der Preis oft, wenn europäische Solaranlagen viel Strom einspeisen (Mittagsdelle).',
+            'Der Netzpreis (ca. 10 Rp/kWh) ist fix und unabhängig vom Marktpreis – er deckt die Kosten für Leitungen und Transformatoren.',
+            'Ein Schweizer Haushalt verbraucht im Schnitt 4\'500 kWh pro Jahr. Schon 2 Rp/kWh Differenz machen CHF 90 Unterschied!',
+            'Pumpspeicherkraftwerke (z.B. Linth-Limmern) pumpen nachts Wasser hoch und erzeugen tagsüber teuren Spitzenstrom.',
+            'Die Netzfrequenz in Europa beträgt exakt 50 Hz. Weicht sie ab, wird sofort mehr oder weniger Strom eingespeist.',
+            'Elektroautos laden am günstigsten zwischen 2:00 und 5:00 Uhr. Die meisten Wallboxen haben einen Timer dafür.',
+            'Der Strompreis reagiert sogar auf Wetter-Vorhersagen: Wird für morgen Wind erwartet, sinkt schon heute der Day-Ahead Preis.',
+            'An Feiertagen ist der Strompreis oft besonders tief, weil Industrie und Gewerbe kaum Strom abnehmen.',
+            'Die Energiestrategie 2050 der Schweiz sieht vor, die AKW schrittweise durch erneuerbare Quellen zu ersetzen.',
+        ];
+        let _tipIdx = Math.floor(Math.random() * GRID_TIPS.length);
+
+        function rotateTip() {
+            const el = document.getElementById('grid-tip-text');
+            if (!el) return;
+            el.style.opacity = '0';
+            setTimeout(() => {
+                _tipIdx = (_tipIdx + 1) % GRID_TIPS.length;
+                el.textContent = GRID_TIPS[_tipIdx];
+                el.style.opacity = '1';
+            }, 500);
+        }
+
+        // Show first tip immediately, then rotate every 20 seconds
+        document.getElementById('grid-tip-text').textContent = GRID_TIPS[_tipIdx];
+        setInterval(rotateTip, 20_000);
+
+        // ── Client-side forecast cache ─────────────────────────────────────────────────
+        const CACHE_MAX_AGE_MS = 5 * 60 * 1000;  // 5 minutes
+        let _dashCache = null;   // last successful /api/forecast/week response
+        let _dashCacheTime = 0;      // timestamp of last success
+
+        // ── Main data load ─────────────────────────────────────────────────────────────
+        async function loadDashboard() {
+            let freshData = null;
+
+            try {
+                const resp = await fetch('/api/forecast/week');
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+                freshData = data;
+
+                // Update cache
+                _dashCache = data;
+                _dashCacheTime = Date.now();
+            } catch (err) {
+                console.warn('[loadDashboard] API error, checking cache…', err.message);
+            }
+
+            // If no fresh data, try the cache (within 5 min window)
+            if (!freshData && _dashCache && (Date.now() - _dashCacheTime) < CACHE_MAX_AGE_MS) {
+                console.info('[loadDashboard] Using cached data (' +
+                    Math.round((Date.now() - _dashCacheTime) / 1000) + 's old)');
+                freshData = _dashCache;
+            }
+
+            // Happy path: we have data (either fresh or cached)
+            if (freshData) {
+                const data = freshData;
+                // Hide error banner if previously shown
+                document.getElementById('error-banner').classList.add('hidden');
+                document.getElementById('error-banner').classList.remove('flex');
+
+                const netz = data.netzpreis[0];
+                const energie = data.energiepreis[0];
+                const gesamt = data.gesamttarif[0];
+                const level = data.price_level[0];
+                applyLevel(level, netz, energie, gesamt);
+
+                document.getElementById('last-update').textContent =
+                    new Date(data.generated_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+
+                renderChart(data);
+                renderCheapWindows(data.cheapest_windows);
+                updateDeviceCards(data.cheapest_windows);
+                updateNextWindowCard(data.cheapest_windows);
+                updateSavingsHint(data);
+                updateCiBadges(data);
+                startCountdownTicker();
+                return;
+            }
+
+            // ── Fallback: cache older than 5 min AND API unreachable ───────────────────
+            // Try /api/forecast for current price at least
+            try {
+                const r2 = await fetch('/api/forecast');
+                if (r2.ok) {
+                    const d2 = await r2.json();
+                    if (!d2.error) {
+                        applyLevel(d2.price_level ?? 'medium',
+                            d2.netzpreis_rp_kwh, d2.energiepreis_rp_kwh, d2.gesamttarif_rp_kwh);
+                        if (d2.time) {
+                            document.getElementById('last-update').textContent =
+                                new Date(d2.time).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+                        }
                     }
                 }
-            }
-        } catch (_) { /* ignore */ }
+            } catch (_) { /* ignore */ }
 
-        // Fallback chart: fetch price history for the last 24h
-        try {
-            const rh = await fetch('/api/price-history?hours=24');
-            if (rh.ok) {
-                const dh = await rh.json();
-                if (dh.prices && dh.prices.length > 1) {
-                    const CONV = 0.095;  // rough EUR/MWh → Rp/kWh (display only)
-                    const fallbackData = {
-                        times:           dh.times,
-                        netzpreis:       dh.prices.map(() => 10.0),
-                        energiepreis:    dh.prices.map(p => Math.max(3, Math.min(13, p * CONV))),
-                        gesamttarif:     dh.prices.map(p => Math.max(13, Math.min(23, p * CONV + 10))),
-                        price_level:     dh.prices.map(p => p * CONV + 10 < 15 ? 'low' : (p * CONV + 10 > 22 ? 'high' : 'medium')),
-                        cheapest_windows: [],
-                    };
-                    renderChart(fallbackData);
+            // Fallback chart: fetch price history for the last 24h
+            try {
+                const rh = await fetch('/api/price-history?hours=24');
+                if (rh.ok) {
+                    const dh = await rh.json();
+                    if (dh.prices && dh.prices.length > 1) {
+                        const CONV = 0.095;
+                        const fallbackData = {
+                            times: dh.times,
+                            netzpreis: dh.prices.map(() => 10.0),
+                            energiepreis: dh.prices.map(p => Math.max(3, Math.min(13, p * CONV))),
+                            gesamttarif: dh.prices.map(p => Math.max(13, Math.min(23, p * CONV + 10))),
+                            price_level: dh.prices.map(p => p * CONV + 10 < 15 ? 'low' : (p * CONV + 10 > 22 ? 'high' : 'medium')),
+                            cheapest_windows: [],
+                        };
+                        renderChart(fallbackData);
+                    }
                 }
+            } catch (_) { /* ignore */ }
+
+            const banner = document.getElementById('error-banner');
+            document.getElementById('error-text').textContent =
+                '7-Tage-Prognose seit über 5 Minuten nicht erreichbar – Fallback-Ansicht (letzte 24h) wird angezeigt.';
+            banner.classList.remove('hidden');
+            banner.classList.add('flex');
+            const devRecs = document.getElementById('device-recommendations');
+            if (devRecs) {
+                devRecs.innerHTML = '<p class="col-span-full text-xs text-slate-400 text-center py-4">Keine Prognosedaten für Empfehlungen verfügbar</p>';
             }
-        } catch (_) { /* ignore */ }
-    }
+        }
 
-    if (usedFallback) {
-        const banner = document.getElementById('error-banner');
-        document.getElementById('error-text').textContent =
-            '7-Tage-Prognose nicht verfügbar – Fallback-Ansicht (letzte 24h) wird angezeigt.';
-        banner.classList.remove('hidden');
-        banner.classList.add('flex');
-        // Clear skeleton in windows grid
-        document.getElementById('windows-grid').innerHTML =
-            '<p class="col-span-full text-xs text-slate-400 text-center py-4">Keine Prognosedaten verfügbar</p>';
-    }
-}
+        // Load on startup; refresh every 2 minutes (cache bridges gaps)
+        loadDashboard();
+        setInterval(loadDashboard, 2 * 60 * 1000);
 
-// Load on startup; refresh every 30 minutes
-loadDashboard();
-setInterval(loadDashboard, 30 * 60 * 1000);
+        // ── Onboarding ─────────────────────────────────────────────────────────────────
+        const OB_KEY = 'bdsp_appliances_v2';
 
-// ── Onboarding ─────────────────────────────────────────────────────────────────
-const OB_KEY = 'bdsp_appliances_v1';
+        const OB_DEVICES = [
+            {
+                key: 'washer', icon: 'dishwasher_gen',
+                name: 'Waschmaschine / Spüler',
+                q1: {
+                    label: 'Programmdauer', options: [
+                        { label: 'Kurz', sub: '~1.5 h', duration_h: 1.5 },
+                        { label: 'Standard', sub: '~2 h', duration_h: 2 },
+                        { label: 'Lang', sub: '~3 h', duration_h: 3 },
+                    ]
+                },
+                q2: {
+                    label: 'Wie oft pro Woche?', options: [
+                        { label: '1×', sub: '1× / Woche', per_week: 1 },
+                        { label: '2×', sub: '2× / Woche', per_week: 2 },
+                        { label: '3×', sub: '3× / Woche', per_week: 3 },
+                        { label: '5×', sub: '5× / Woche', per_week: 5 },
+                    ]
+                },
+            },
+            {
+                key: 'ev', icon: 'ev_station',
+                name: 'EV Ladestation',
+                q1: {
+                    label: 'Ladeleistung', options: [
+                        { label: '3,7 kW', sub: 'Steckdose', kw: 3.7 },
+                        { label: '7,4 kW', sub: 'Einphasig', kw: 7.4 },
+                        { label: '11 kW', sub: 'Dreiphasig', kw: 11 },
+                        { label: '22 kW', sub: 'Schnell', kw: 22 },
+                    ]
+                },
+                q2: {
+                    label: 'Energie pro Ladung', options: [
+                        { label: '10 kWh', sub: '~40 km', kwh_per_charge: 10 },
+                        { label: '20 kWh', sub: '~80 km', kwh_per_charge: 20 },
+                        { label: '40 kWh', sub: '~160 km', kwh_per_charge: 40 },
+                        { label: '60 kWh', sub: '~240 km', kwh_per_charge: 60 },
+                    ]
+                },
+            },
+            {
+                key: 'heatpump', icon: 'heat_pump',
+                name: 'Wärmepumpe',
+                q1: {
+                    label: 'Leistung', options: [
+                        { label: 'Klein', sub: '2 kW', kw: 2 },
+                        { label: 'Standard', sub: '5 kW', kw: 5 },
+                        { label: 'Gross', sub: '10 kW', kw: 10 },
+                    ]
+                },
+                q2: {
+                    label: 'Tägliche Laufzeit', options: [
+                        { label: '2 h', sub: 'Übergang', daily_hours: 2 },
+                        { label: '4 h', sub: 'Normal', daily_hours: 4 },
+                        { label: '6 h', sub: 'Kalt', daily_hours: 6 },
+                        { label: '8 h', sub: 'Winter', daily_hours: 8 },
+                    ]
+                },
+            },
+            {
+                key: 'boiler', icon: 'water_heater',
+                name: 'Boiler / Warmwasser',
+                q1: {
+                    label: 'Kapazität', options: [
+                        { label: '100 L', sub: '~1 h', kw: 2, heat_hours: 1 },
+                        { label: '200 L', sub: '~1.5 h', kw: 3, heat_hours: 1.5 },
+                        { label: '300 L', sub: '~2 h', kw: 6, heat_hours: 2 },
+                    ]
+                },
+                q2: {
+                    label: 'Aufheizen bevorzugt', options: [
+                        { label: 'Morgens', sub: '04–07 Uhr', pref_time: 'morning' },
+                        { label: 'Mittags', sub: '11–14 Uhr', pref_time: 'midday' },
+                        { label: 'Abends', sub: '19–22 Uhr', pref_time: 'evening' },
+                        { label: 'Flexibel', sub: 'Günstigste', pref_time: 'flex' },
+                    ]
+                },
+            },
+        ];
 
-const OB_DEVICES = [
-    {
-        key: 'washer', icon: 'dishwasher_gen',
-        name: 'Waschmaschine / Spüler',
-        desc: 'Wähle die ungefähre Kapazität deiner Geräte.',
-        options: [
-            { label: 'Klein',    sub: '1,5 kWh · ~2h',   kwh: 1.5, duration_h: 2   },
-            { label: 'Standard', sub: '2,0 kWh · ~2.5h', kwh: 2.0, duration_h: 2.5 },
-            { label: 'Gross',    sub: '2,5 kWh · ~3h',   kwh: 2.5, duration_h: 3   },
-        ],
-    },
-    {
-        key: 'ev', icon: 'ev_station',
-        name: 'EV Ladestation',
-        desc: 'Wie schnell lädt deine Ladestation?',
-        options: [
-            { label: 'Langsam',       sub: '3,7 kW', kw: 3.7 },
-            { label: 'Standard',      sub: '7,4 kW', kw: 7.4 },
-            { label: 'Schnell',       sub: '11 kW',  kw: 11  },
-            { label: 'Sehr schnell',  sub: '22 kW',  kw: 22  },
-        ],
-    },
-    {
-        key: 'heatpump', icon: 'heat_pump',
-        name: 'Wärmepumpe',
-        desc: 'Welche Leistung hat deine Wärmepumpe?',
-        options: [
-            { label: 'Klein',    sub: '2 kW',  kw: 2  },
-            { label: 'Standard', sub: '5 kW',  kw: 5  },
-            { label: 'Gross',    sub: '10 kW', kw: 10 },
-        ],
-    },
-    {
-        key: 'boiler', icon: 'water_heater',
-        name: 'Boiler / Warmwasser',
-        desc: 'Welche Kapazität hat dein Warmwasserboiler?',
-        options: [
-            { label: '100 Liter', sub: '2 kW', kw: 2 },
-            { label: '200 Liter', sub: '3 kW', kw: 3 },
-            { label: '300 Liter', sub: '6 kW', kw: 6 },
-        ],
-    },
-];
+        let obStep = 0;
+        const obSelections = {};
 
-let obStep = 0;
-const obSelections = {};
+        function obLoad() {
+            try { return JSON.parse(localStorage.getItem(OB_KEY)); } catch { return null; }
+        }
 
-function obLoad() {
-    try { return JSON.parse(localStorage.getItem(OB_KEY)); } catch { return null; }
-}
+        function obClose() {
+            document.getElementById('ob-overlay').classList.add('hidden');
+        }
 
-function obClose() {
-    document.getElementById('ob-overlay').classList.add('hidden');
-}
+        function _obBtn(o, isSel, onclick) {
+            return `<button onclick="${onclick}"
+        class="flex flex-col items-center justify-center text-center p-3 rounded-xl border-2 transition-all duration-150 ${isSel ? 'border-primary bg-primary/10 dark:bg-primary/15'
+                    : 'border-slate-200 dark:border-border-dark hover:border-primary/40 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                }">
+      <span class="font-bold text-xs ${isSel ? 'text-primary' : 'text-slate-700 dark:text-slate-200'}">${o.label}</span>
+      <span class="text-[10px] mt-0.5 leading-tight ${isSel ? 'text-primary/70' : 'text-slate-400'}">${o.sub}</span>
+    </button>`;
+        }
 
-function obRender() {
-    const card = document.getElementById('ob-card');
+        function obRender() {
+            const card = document.getElementById('ob-card');
 
-    if (obStep === 0) {
-        card.innerHTML = `
+            if (obStep === 0) {
+                card.innerHTML = `
           <div class="flex flex-col items-center text-center p-8 gap-6">
             <div class="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/30">
               <span class="material-symbols-outlined text-white text-[38px]" style="font-variation-settings:'FILL' 1">bolt</span>
@@ -867,13 +1501,13 @@ function obRender() {
               </button>
             </div>
           </div>`;
-        return;
-    }
+                return;
+            }
 
-    if (obStep === 5) {
-        const active  = OB_DEVICES.filter(d => obSelections[d.key]?.enabled);
-        const skipped = OB_DEVICES.filter(d => !obSelections[d.key]?.enabled);
-        card.innerHTML = `
+            if (obStep === 5) {
+                const active = OB_DEVICES.filter(d => obSelections[d.key]?.enabled);
+                const skipped = OB_DEVICES.filter(d => !obSelections[d.key]?.enabled);
+                card.innerHTML = `
           <div class="flex flex-col items-center text-center p-8 gap-6">
             <div class="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
               <span class="material-symbols-outlined text-white text-[38px]" style="font-variation-settings:'FILL' 1">check</span>
@@ -899,104 +1533,102 @@ function obRender() {
               Dashboard öffnen
             </button>
           </div>`;
-        return;
-    }
+                return;
+            }
 
-    // Steps 1–4: device configuration
-    const dev = OB_DEVICES[obStep - 1];
-    const sel = obSelections[dev.key];
-    const hasSelection = !!(sel && sel.enabled && sel.optionIdx !== undefined);
+            // Steps 1–4: two-question device config
+            const dev = OB_DEVICES[obStep - 1];
+            const sel = obSelections[dev.key] || {};
+            const hasQ1 = sel.q1idx !== undefined;
+            const hasQ2 = sel.q2idx !== undefined;
+            const canNext = hasQ1 && hasQ2;
 
-    const dots = OB_DEVICES.map((_, i) => {
-        if (i < obStep - 1)  return `<div class="w-2 h-2 rounded-full bg-primary/50"></div>`;
-        if (i === obStep - 1) return `<div class="w-6 h-2 rounded-full bg-primary transition-all duration-300"></div>`;
-        return `<div class="w-2 h-2 rounded-full bg-slate-200 dark:bg-slate-700"></div>`;
-    }).join('');
+            const dots = OB_DEVICES.map((_, i) => {
+                if (i < obStep - 1) return `<div class="w-2 h-2 rounded-full bg-primary/50"></div>`;
+                if (i === obStep - 1) return `<div class="w-6 h-2 rounded-full bg-primary transition-all duration-300"></div>`;
+                return `<div class="w-2 h-2 rounded-full bg-slate-200 dark:bg-slate-700"></div>`;
+            }).join('');
 
-    const gridCols = dev.options.length === 4 ? 'grid-cols-2' : 'grid-cols-3';
-    const opts = dev.options.map((opt, i) => {
-        const isSelected = hasSelection && sel.optionIdx === i;
-        return `
-          <button onclick="obSelect(${i})"
-                  class="flex flex-col items-center justify-center text-center p-3.5 rounded-xl border-2 transition-all duration-150 ${
-                    isSelected
-                      ? 'border-primary bg-primary/10 dark:bg-primary/15'
-                      : 'border-slate-200 dark:border-border-dark hover:border-primary/40 hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                  }">
-            <span class="material-symbols-outlined text-[16px] mb-1 ${isSelected ? 'text-primary' : 'text-slate-300 dark:text-slate-600'}"
-                  style="font-variation-settings:'FILL' ${isSelected ? 1 : 0}">
-              ${isSelected ? 'radio_button_checked' : 'radio_button_unchecked'}
-            </span>
-            <span class="font-bold text-sm ${isSelected ? 'text-primary' : 'text-slate-700 dark:text-slate-200'}">${opt.label}</span>
-            <span class="text-[11px] mt-0.5 leading-tight ${isSelected ? 'text-primary/70' : 'text-slate-400'}">${opt.sub}</span>
-          </button>`;
-    }).join('');
+            const cols1 = dev.q1.options.length === 4 ? 'grid-cols-4' : 'grid-cols-3';
+            const cols2 = dev.q2.options.length === 4 ? 'grid-cols-4' : 'grid-cols-3';
+            const q1btns = dev.q1.options.map((o, i) => _obBtn(o, hasQ1 && sel.q1idx === i, `obSetQ(1,${i})`)).join('');
+            const q2btns = dev.q2.options.map((o, i) => _obBtn(o, hasQ2 && sel.q2idx === i, `obSetQ(2,${i})`)).join('');
 
-    card.innerHTML = `
-      <div class="flex flex-col gap-5 p-6">
+            card.innerHTML = `
+      <div class="flex flex-col gap-4 p-6">
         <div class="flex items-center justify-center gap-1.5">${dots}</div>
-        <div class="flex flex-col items-center text-center gap-2">
-          <div class="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-200 dark:border-border-dark">
-            <span class="material-symbols-outlined text-primary text-3xl">${dev.icon}</span>
+        <div class="flex flex-col items-center text-center gap-1">
+          <div class="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-200 dark:border-border-dark">
+            <span class="material-symbols-outlined text-primary text-2xl">${dev.icon}</span>
           </div>
-          <div>
-            <h3 class="font-black text-lg text-slate-900 dark:text-white">${dev.name}</h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">${dev.desc}</p>
-          </div>
+          <h3 class="font-black text-lg text-slate-900 dark:text-white">${dev.name}</h3>
         </div>
-        <div class="grid ${gridCols} gap-2">${opts}</div>
-        <div class="flex flex-col gap-2">
-          <button onclick="obNext()" ${hasSelection ? '' : 'disabled'}
-                  class="w-full font-bold py-3 rounded-xl transition-colors ${
-                    hasSelection
-                      ? 'bg-primary hover:bg-primary-dark text-white shadow-sm cursor-pointer'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                  }">
+        <div>
+          <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide">${dev.q1.label}</p>
+          <div class="grid ${cols1} gap-1.5">${q1btns}</div>
+        </div>
+        <div>
+          <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide">${dev.q2.label}</p>
+          <div class="grid ${cols2} gap-1.5">${q2btns}</div>
+        </div>
+        <div class="flex flex-col gap-2 mt-1">
+          <button onclick="obNext()" ${canNext ? '' : 'disabled'}
+                  class="w-full font-bold py-3 rounded-xl transition-colors ${canNext ? 'bg-primary hover:bg-primary-dark text-white shadow-sm cursor-pointer'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                }">
             ${obStep < 4 ? 'Weiter →' : 'Fertig ✓'}
           </button>
           <button onclick="obSkipDevice()"
-                  class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors py-1.5">
+                  class="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors py-1">
             Ich habe dieses Gerät nicht
           </button>
         </div>
       </div>`;
-}
+        }
 
-function obSelect(idx) {
-    const dev = OB_DEVICES[obStep - 1];
-    obSelections[dev.key] = { enabled: true, optionIdx: idx, ...dev.options[idx] };
-    obRender();
-}
+        function obSetQ(qNum, idx) {
+            const dev = OB_DEVICES[obStep - 1];
+            const sel = obSelections[dev.key] || { enabled: true };
+            if (qNum === 1) { sel.q1idx = idx; Object.assign(sel, dev.q1.options[idx]); }
+            else { sel.q2idx = idx; Object.assign(sel, dev.q2.options[idx]); }
+            sel.enabled = true;
+            obSelections[dev.key] = sel;
+            obRender();
+        }
 
-function obNext() {
-    const dev = OB_DEVICES[obStep - 1];
-    if (!obSelections[dev.key]?.enabled) return;
-    obStep++;
-    obRender();
-}
+        function obNext() {
+            const dev = OB_DEVICES[obStep - 1];
+            const sel = obSelections[dev.key];
+            if (!sel?.enabled || sel.q1idx === undefined || sel.q2idx === undefined) return;
+            obStep++;
+            obRender();
+        }
 
-function obSkipDevice() {
-    const dev = OB_DEVICES[obStep - 1];
-    obSelections[dev.key] = { enabled: false };
-    obStep++;
-    obRender();
-}
+        function obSkipDevice() {
+            const dev = OB_DEVICES[obStep - 1];
+            obSelections[dev.key] = { enabled: false };
+            obStep++;
+            obRender();
+        }
 
-function obSkipAll() {
-    localStorage.setItem(OB_KEY, JSON.stringify({ configured: true, skipped: true, devices: {} }));
-    obClose();
-}
+        function obSkipAll() {
+            localStorage.setItem(OB_KEY, JSON.stringify({ configured: true, skipped: true, devices: {} }));
+            obClose();
+            if (_chartData) updateDeviceCards(_chartData.cheapest_windows);
+        }
 
-function obFinish() {
-    localStorage.setItem(OB_KEY, JSON.stringify({ configured: true, devices: obSelections }));
-    obClose();
-}
+        function obFinish() {
+            localStorage.setItem(OB_KEY, JSON.stringify({ configured: true, devices: obSelections }));
+            obClose();
+            if (_chartData) updateDeviceCards(_chartData.cheapest_windows);
+        }
 
-// Show onboarding if not yet configured
-if (!obLoad()) {
-    document.getElementById('ob-overlay').classList.remove('hidden');
-    obRender();
-}
-</script>
+        // Show onboarding if not yet configured
+        if (!obLoad()) {
+            document.getElementById('ob-overlay').classList.remove('hidden');
+            obRender();
+        }
+    </script>
 </body>
+
 </html>

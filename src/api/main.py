@@ -460,33 +460,36 @@ def forecast():
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
+import time
+_forecast_week_cache = None
+_forecast_week_cache_time = 0.0
+
 @app.get("/api/forecast/week")
 def forecast_week():
     """
     Return a 7-day price forecast in 15-min intervals (672 points).
-
-    Strategy (Wochenanker): for each future slot t the feature row from
-    t−168 h (same time last week) is used as template.  Lag features and
-    calendar fields are corrected for the actual future timestamp; future
-    weather data from weather_hourly overrides template weather when
-    available.  XGBoost Model B (EPEX energy) is always run; Model A
-    (Winterthur net load) is run when available and drives the netzpreis
-    component, otherwise DEFAULT_NETZ_STANDARD is used as fallback.
-
-    Returns parallel arrays plus the top-6 cheapest non-overlapping 2-h
-    windows for appliance-scheduling recommendations.
     """
+    global _forecast_week_cache, _forecast_week_cache_time
+    now_ts = time.time()
+    # Cache for 15 minutes (900 seconds)
+    if _forecast_week_cache is not None and now_ts - _forecast_week_cache_time < 900:
+        return _forecast_week_cache
+
     import datetime as _dt
     import math as _math
+    from modelling.predict import predict_from_dict
+    from processing.export_pipeline import FEATURE_COLS, LOAD_FEATURE_COLS
+    from processing.tariff_formulas import compute_tariff, energiepreis as _ep, gesamttarif as _gt, DEFAULT_NETZ_STANDARD
 
     HORIZON_DAYS = 7
     SLOT_MIN     = 15
     SLOTS_PER_DAY = 96
 
+    conn = None
     try:
         conn = _connect()
 
-        # ── 1. Forecast window ────────────────────────────────────────────────
+        # ── 1. Forecast window ──
         now = _dt.datetime.now(_dt.timezone.utc).replace(second=0, microsecond=0)
         rem = now.minute % SLOT_MIN
         forecast_start = now + _dt.timedelta(minutes=(SLOT_MIN - rem) % SLOT_MIN or SLOT_MIN)
@@ -495,34 +498,35 @@ def forecast_week():
         future_ts  = [forecast_start + _dt.timedelta(minutes=SLOT_MIN * i) for i in range(n_slots)]
         forecast_end = future_ts[-1] + _dt.timedelta(minutes=SLOT_MIN)
 
-        # ── 2. Historical energy features (last 14 days) ──────────────────────
+        # ── 2. Historical energy features ──
         hist_start = forecast_start - _dt.timedelta(days=14, hours=1)
         df_e = pd.read_sql(
             "SELECT * FROM training_features WHERE time >= %s AND time < %s ORDER BY time",
             conn, params=(hist_start, forecast_start), parse_dates=["time"],
         )
         if not df_e.empty:
+            df_e = df_e.drop_duplicates(subset=["time"], keep="last")
             if df_e["time"].dt.tz is None:
                 df_e["time"] = df_e["time"].dt.tz_localize("UTC")
             df_e = df_e.set_index("time")
 
-        # ── 3. Historical net load for Model A lag features ───────────────────
+        # ── 3. Historical net load ──
         df_nl: pd.DataFrame = pd.DataFrame()
         try:
             df_nl = pd.read_sql(
-                "SELECT time, net_load_kwh, load_rolling_avg_24h "
-                "FROM winterthur_net_load_features "
+                "SELECT time, net_load_kwh, load_rolling_avg_24h FROM winterthur_net_load_features "
                 "WHERE time >= %s AND time < %s ORDER BY time",
                 conn, params=(hist_start, forecast_start), parse_dates=["time"],
             )
             if not df_nl.empty:
+                df_nl = df_nl.drop_duplicates(subset=["time"], keep="last")
                 if df_nl["time"].dt.tz is None:
                     df_nl["time"] = df_nl["time"].dt.tz_localize("UTC")
                 df_nl = df_nl.set_index("time")
         except Exception:
             pass
 
-        # ── 4. Future weather (overrides template when available) ─────────────
+        # ── 4. Future weather ──
         df_wf: pd.DataFrame = pd.DataFrame()
         try:
             df_wf = pd.read_sql(
@@ -533,48 +537,65 @@ def forecast_week():
                 conn, params=(forecast_start, forecast_end), parse_dates=["time"],
             )
             if not df_wf.empty:
+                df_wf = df_wf.drop_duplicates(subset=["time"], keep="last")
                 if df_wf["time"].dt.tz is None:
                     df_wf["time"] = df_wf["time"].dt.tz_localize("UTC")
                 df_wf = df_wf.set_index("time")
         except Exception:
             pass
-        conn.close()
-
+            
         weather_fut: dict = {} if df_wf.empty else df_wf.to_dict("index")
 
-        # ── 5. Build feature rows ─────────────────────────────────────────────
-        from processing.export_pipeline import FEATURE_COLS, LOAD_FEATURE_COLS  # noqa: PLC0415
+        # ── 5. Setup Models & Buffers ──
+        energy_prefix = _best_prefix("energy", "xgb")
+        load_prefix   = _best_prefix("load", "model_load")
+        model_b       = _get_model(energy_prefix)
+        model_a       = _get_model(load_prefix) if load_prefix else None
+
+        epex_preds = []
+        net_load_preds = []
+        pred_buffer: dict[_dt.datetime, float] = {}
+        load_buffer: dict[_dt.datetime, float] = {}
 
         def _hist_price(ts: _dt.datetime) -> float:
-            if df_e.empty or ts not in df_e.index:
+            if ts in pred_buffer:
+                return pred_buffer[ts]
+            ts_h = ts.replace(minute=0, second=0, microsecond=0)
+            if df_e.empty or ts_h not in df_e.index:
                 return float("nan")
-            v = df_e.loc[ts, "price_eur_mwh"] if "price_eur_mwh" in df_e.columns else float("nan")
+            v = df_e.loc[ts_h, "price_eur_mwh"] if "price_eur_mwh" in df_e.columns else float("nan")
             return float(v)
 
         def _hist_load(ts: _dt.datetime) -> float:
-            if df_nl.empty or ts not in df_nl.index:
+            if ts in load_buffer:
+                return load_buffer[ts]
+            ts_h = ts.replace(minute=0, second=0, microsecond=0)
+            if df_nl.empty or ts_h not in df_nl.index:
                 return float("nan")
-            v = df_nl.loc[ts, "net_load_kwh"] if "net_load_kwh" in df_nl.columns else float("nan")
+            v = df_nl.loc[ts_h, "net_load_kwh"] if "net_load_kwh" in df_nl.columns else float("nan")
             return float(v)
 
-        energy_rows: list[dict] = []
-        load_rows:   list[dict] = []
-
+        # ── 6. Iterative Autoregressive Prediction ──
         for t in future_ts:
             t_168 = t - _dt.timedelta(hours=168)
             t_24  = t - _dt.timedelta(hours=24)
+            t_1h  = t - _dt.timedelta(hours=1)
             t_h   = t.replace(minute=0, second=0, microsecond=0)
+            t_168_h = t_168.replace(minute=0, second=0, microsecond=0)
 
-            # ── Energy (Model B) row ──────────────────────────────────────────
-            e_tmpl = df_e.loc[t_168].to_dict() if (not df_e.empty and t_168 in df_e.index) else {}
-            e_row  = dict(e_tmpl)
+            # ── Energy (Model B) row ──
+            if not df_e.empty and t_168_h in df_e.index:
+                e_tmpl = df_e.loc[t_168_h].to_dict()
+            elif not df_e.empty:
+                e_tmpl = df_e.iloc[-1].to_dict()
+            else:
+                e_tmpl = {}
+            e_row = dict(e_tmpl)
 
-            # Correct lag features for the future timestamp
             e_row["lag_168h"] = _hist_price(t_168)
             e_row["lag_24h"]  = _hist_price(t_24)
-            e_row["lag_1h"]   = float("nan")
+            e_row["lag_1h"]   = _hist_price(t_1h)
 
-            # Calendar features (deterministic)
             e_row["hour_of_day"]  = t.hour
             e_row["day_of_week"]  = t.weekday()
             e_row["month"]        = t.month
@@ -587,7 +608,6 @@ def forecast_week():
             e_row["month_sin"] = _math.sin(2 * _math.pi * (t.month - 1) / 12)
             e_row["month_cos"] = _math.cos(2 * _math.pi * (t.month - 1) / 12)
 
-            # Weather: prefer future forecast, fall back to template
             if t_h in weather_fut:
                 w = weather_fut[t_h]
                 for key in ("temperature_2m", "wind_speed_10m", "shortwave_radiation",
@@ -596,23 +616,35 @@ def forecast_week():
                     if v is not None:
                         e_row[key] = float(v)
 
-            energy_rows.append(e_row)
+            epex = predict_from_dict(model_b, e_row)
+            epex_preds.append(epex)
+            pred_buffer[t] = float(epex)
 
-            # ── Load (Model A) row ────────────────────────────────────────────
+            # ── Load (Model A) row ──
+            if not df_nl.empty and t_168_h in df_nl.index:
+                l_tmpl = df_nl.loc[t_168_h].to_dict()
+            elif not df_nl.empty:
+                l_tmpl = df_nl.iloc[-1].to_dict()
+            else:
+                l_tmpl = {}
+            l_row = dict(l_tmpl)
+
             load_lag_7d = _hist_load(t_168)
             load_lag_1d = _hist_load(t_24)
-            roll_avg    = (
-                float(df_nl.loc[t_168, "load_rolling_avg_24h"])
-                if (not df_nl.empty and t_168 in df_nl.index
-                    and "load_rolling_avg_24h" in df_nl.columns)
-                else float("nan")
-            )
+            
+            if not df_nl.empty and t_168_h in df_nl.index and "load_rolling_avg_24h" in df_nl.columns:
+                roll_avg = float(df_nl.loc[t_168_h, "load_rolling_avg_24h"])
+            elif not df_nl.empty and "load_rolling_avg_24h" in df_nl.columns:
+                roll_avg = float(df_nl.iloc[-1]["load_rolling_avg_24h"])
+            else:
+                roll_avg = float("nan")
+
             temp_c   = e_row.get("temperature_2m", float("nan"))
             temp_avg = e_row.get("temp_rolling_avg_24h", temp_c)
             temp_dev = (temp_c - temp_avg) if not (_math.isnan(temp_c) or _math.isnan(temp_avg)) else float("nan")
 
-            load_rows.append({
-                "load_lag_1h":          float("nan"),
+            l_row.update({
+                "load_lag_1h":          _hist_load(t_1h),
                 "load_lag_1d":          load_lag_1d,
                 "load_lag_7d":          load_lag_7d,
                 "load_rolling_avg_24h": roll_avg,
@@ -632,29 +664,14 @@ def forecast_week():
                 "pv_feed_in":           float("nan"),
             })
 
-        # ── 6. Model B: EPEX energy price forecast ────────────────────────────
-        from modelling.predict import predict_from_dict  # noqa: PLC0415
-        energy_prefix = _best_prefix("energy", "xgb")
-        load_prefix   = _best_prefix("load", "model_load")
-        model_b    = _get_model(energy_prefix)
-        epex_preds = [predict_from_dict(model_b, r) for r in energy_rows]
+            if model_a is not None:
+                ld = predict_from_dict(model_a, l_row)
+                net_load_preds.append(ld)
+                load_buffer[t] = float(ld)
+            else:
+                net_load_preds.append(None)
 
-        # ── 7. Model A: net load forecast (optional) ──────────────────────────
-        net_load_preds: list[float | None] = [None] * n_slots
-        try:
-            model_a       = _get_model(load_prefix)
-            net_load_preds = [predict_from_dict(model_a, r) for r in load_rows]
-        except Exception:
-            pass
-
-        # ── 8. Tariff formulas ────────────────────────────────────────────────
-        from processing.tariff_formulas import (  # noqa: PLC0415
-            compute_tariff,
-            energiepreis as _ep,
-            gesamttarif as _gt,
-            DEFAULT_NETZ_STANDARD,
-        )
-
+        # ── 7. Tariff formulas ──
         sigma_eur  = _residual_std("energy")
         sigma_load = _residual_std("load")
         ci_active  = sigma_eur is not None
@@ -664,6 +681,9 @@ def forecast_week():
         gesamt_hi_arr: list[float | None] = []
         net_load_lo_arr: list[float | None] = []
         net_load_hi_arr: list[float | None] = []
+        epex_lo_arr: list[float | None] = []
+        epex_hi_arr: list[float | None] = []
+        
         for epex, load in zip(epex_preds, net_load_preds):
             if load is not None:
                 tf      = compute_tariff(net_load=load, epex_eur_mwh=epex)
@@ -684,9 +704,13 @@ def forecast_week():
                 e_hi = _ep(epex + half)
                 gesamt_lo_arr.append(round(_gt(netz, e_lo), 2))
                 gesamt_hi_arr.append(round(_gt(netz, e_hi), 2))
+                epex_lo_arr.append(round(epex - half, 2))
+                epex_hi_arr.append(round(epex + half, 2))
             else:
                 gesamt_lo_arr.append(None)
                 gesamt_hi_arr.append(None)
+                epex_lo_arr.append(None)
+                epex_hi_arr.append(None)
 
             if load is not None and sigma_load is not None:
                 half_l = _CI_Z * sigma_load
@@ -696,10 +720,7 @@ def forecast_week():
                 net_load_lo_arr.append(None)
                 net_load_hi_arr.append(None)
 
-        # ── 8b. Traffic-light: dynamic quantile thresholds within the week ────
-        # p33 / p67 split the 672 forecast slots into thirds (low / medium /
-        # high) so the dashboard always shows a meaningful colour mix even
-        # when absolute prices are uniformly above or below the EKZ average.
+        # ── 8. Traffic-light ──
         sorted_g = sorted(gesamt_arr)
         q_lo = sorted_g[int(0.33 * (n_slots - 1))]
         q_hi = sorted_g[int(0.67 * (n_slots - 1))]
@@ -708,7 +729,7 @@ def forecast_week():
             for g in gesamt_arr
         ]
 
-        # ── 9. Cheapest non-overlapping 2-h windows ───────────────────────────
+        # ── 9. Cheapest windows ──
         WIN_SLOTS = 8  # 2 h × 4 slots/h
         scored = sorted(
             (sum(gesamt_arr[i : i + WIN_SLOTS]) / WIN_SLOTS, i)
@@ -729,7 +750,7 @@ def forecast_week():
             if len(cheap_windows) >= 6:
                 break
 
-        return {
+        resp = {
             "generated_at":       now.isoformat(),
             "horizon_days":       HORIZON_DAYS,
             "n_points":           n_slots,
@@ -748,8 +769,14 @@ def forecast_week():
             "gesamttarif_ci_upper": gesamt_hi_arr,
             "net_load_ci_lower":    net_load_lo_arr,
             "net_load_ci_upper":    net_load_hi_arr,
+            "epex_ci_lower":        epex_lo_arr,
+            "epex_ci_upper":        epex_hi_arr,
             "level_thresholds":     {"low_max": round(q_lo, 2), "high_min": round(q_hi, 2)},
         }
+        
+        _forecast_week_cache = resp
+        _forecast_week_cache_time = now_ts
+        return resp
 
     except FileNotFoundError:
         return JSONResponse(
@@ -758,6 +785,9 @@ def forecast_week():
         )
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 @app.get("/api/price-history")
