@@ -25,6 +25,7 @@ Serves:
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import time
 from decimal import Decimal
@@ -204,6 +205,71 @@ def _get_model(prefix: str = "xgb"):
     return _model_cache[prefix]
 
 
+# ── Best-model manifest (auto-selection after each training run) ──────────────
+
+_manifest_cache: dict = {"mtime": None, "data": {}}
+
+
+def _manifest_path() -> Path:
+    return Path(os.getenv("BDSP_MODELS_DIR", "models/")) / "best_models.json"
+
+
+def _load_manifest() -> dict:
+    """
+    Read ``best_models.json`` with mtime-based caching.
+
+    Returns ``{}`` when the file is missing or invalid so that callers can
+    fall back to hardcoded defaults instead of 500-ing.
+    """
+    path = _manifest_path()
+    try:
+        mtime = path.stat().st_mtime
+    except FileNotFoundError:
+        _manifest_cache["mtime"] = None
+        _manifest_cache["data"] = {}
+        return {}
+    if _manifest_cache["mtime"] == mtime:
+        return _manifest_cache["data"]
+    try:
+        with path.open("r") as fh:
+            data = json.load(fh) or {}
+    except (json.JSONDecodeError, OSError):
+        data = {}
+    _manifest_cache["mtime"] = mtime
+    _manifest_cache["data"] = data
+    return data
+
+
+def _best_prefix(target: str, default: str) -> str:
+    entry = _load_manifest().get(target) or {}
+    return entry.get("prefix") or default
+
+
+def _residual_std(target: str) -> float | None:
+    entry = _load_manifest().get(target) or {}
+    v = entry.get("residual_std")
+    if v is None:
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    if f != f or f <= 0:  # NaN or non-positive
+        return None
+    return f
+
+
+# 95% prediction interval (two-sided Gaussian assumption)
+_CI_Z = 1.96
+
+# Static traffic-light thresholds for the single-slot /api/forecast endpoint.
+# Calibrated on EKZ "integrated" tariff over the last 30 days:
+#   p33 = 18.25, p67 = 21.09 Rp/kWh (mean 19.78, range 12.2–29.0)
+# /api/forecast/week overrides this with dynamic per-week quantiles.
+_LEVEL_LOW_MAX  = 18.25
+_LEVEL_HIGH_MIN = 21.09
+
+
 # ── Auth endpoints ────────────────────────────────────────────────────────────
 
 
@@ -243,15 +309,16 @@ def predict_price(
     Body: ``{"features": {"lag_1h": 75.0, "temperature_2m": 8.5, ...}}``
     """
     from modelling.predict import predict_from_dict  # noqa: PLC0415
+    energy_prefix = _best_prefix("energy", "xgb")
     try:
-        model = _get_model("xgb")
+        model = _get_model(energy_prefix)
         price = predict_from_dict(model, request.features)
     except FileNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="No trained model available. Run the training pipeline first.",
         )
-    return {"prediction_eur_mwh": price, "model": "xgb"}
+    return {"prediction_eur_mwh": price, "model": energy_prefix}
 
 
 # ── Public forecast endpoints ─────────────────────────────────────────────────
@@ -295,18 +362,22 @@ def forecast():
 
         row = df_epex.iloc[0]
         feature_dict = {
-            col: float(row[col]) for col in FEATURE_COLS if col in df_epex.columns
+            col: (float(row[col]) if row[col] is not None else float("nan"))
+            for col in FEATURE_COLS
+            if col in df_epex.columns
         }
 
         # Model B: EPEX price prediction
-        model_epex = _get_model("xgb")
+        energy_prefix = _best_prefix("energy", "xgb")
+        model_epex = _get_model(energy_prefix)
         epex_price = predict_from_dict(model_epex, feature_dict)
 
         # Model A: net load prediction (optional)
         net_load: float | None = None
+        load_prefix = _best_prefix("load", "model_load")
         if not df_load.empty:
             try:
-                load_model = _get_model("model_load")
+                load_model = _get_model(load_prefix)
                 from processing.export_pipeline import LOAD_FEATURE_COLS  # noqa: PLC0415
                 load_row = df_load.iloc[0]
                 load_features = {
@@ -319,12 +390,14 @@ def forecast():
                 net_load = None
 
         # Compute tariff breakdown
+        from processing.tariff_formulas import (  # noqa: PLC0415
+            DEFAULT_NETZ_STANDARD,
+            energiepreis,
+            gesamttarif,
+        )
         if net_load is not None:
             tariff = compute_tariff(net_load=net_load, epex_eur_mwh=epex_price)
         else:
-            # Fallback: energy-only estimate (no network component)
-            from processing.tariff_formulas import energiepreis, gesamttarif  # noqa: PLC0415
-            from processing.tariff_formulas import DEFAULT_NETZ_STANDARD  # noqa: PLC0415
             energie = energiepreis(epex_price)
             tariff = {
                 "netzpreis_rp_kwh":    round(DEFAULT_NETZ_STANDARD, 2),
@@ -333,8 +406,40 @@ def forecast():
             }
 
         gesamt = tariff["gesamttarif_rp_kwh"]
-        # Traffic-light thresholds on gesamttarif (Rp./kWh)
-        level = "low" if gesamt < 15 else ("high" if gesamt > 22 else "medium")
+        # Traffic-light: static EKZ-integrated quantiles (p33 / p67)
+        level = (
+            "low"  if gesamt <= _LEVEL_LOW_MAX
+            else "high" if gesamt >= _LEVEL_HIGH_MIN
+            else "medium"
+        )
+
+        # 95% prediction interval — propagate epex residual std through
+        # energiepreis() at both endpoints because of clipping non-linearity.
+        sigma_eur = _residual_std("energy")
+        netz_const = tariff["netzpreis_rp_kwh"]
+        ci: dict = {}
+        if sigma_eur is not None:
+            half = _CI_Z * sigma_eur
+            lower_eur = epex_price - half
+            upper_eur = epex_price + half
+            energie_lo = energiepreis(lower_eur)
+            energie_hi = energiepreis(upper_eur)
+            gesamt_lo = round(gesamttarif(netz_const, energie_lo), 2)
+            gesamt_hi = round(gesamttarif(netz_const, energie_hi), 2)
+            ci = {
+                "predicted_price_ci_lower_eur_mwh": round(lower_eur, 2),
+                "predicted_price_ci_upper_eur_mwh": round(upper_eur, 2),
+                "energiepreis_ci_lower_rp_kwh":     round(energie_lo, 2),
+                "energiepreis_ci_upper_rp_kwh":     round(energie_hi, 2),
+                "gesamttarif_ci_lower_rp_kwh":      gesamt_lo,
+                "gesamttarif_ci_upper_rp_kwh":      gesamt_hi,
+            }
+
+        sigma_load = _residual_std("load")
+        if net_load is not None and sigma_load is not None:
+            half_l = _CI_Z * sigma_load
+            ci["net_load_ci_lower"] = round(net_load - half_l, 2)
+            ci["net_load_ci_upper"] = round(net_load + half_l, 2)
 
         return {
             "time":                   row["time"].isoformat(),
@@ -345,11 +450,344 @@ def forecast():
             "price_rp_kwh":           gesamt,   # backward-compat alias
             "price_level":            level,
             "net_load_available":     net_load is not None,
+            "model_energy":           energy_prefix,
+            "model_load":             load_prefix if net_load is not None else None,
+            **ci,
         }
     except FileNotFoundError:
         return JSONResponse({"error": "No trained model available"}, status_code=503)
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+import time
+_forecast_week_cache = None
+_forecast_week_cache_time = 0.0
+
+@app.get("/api/forecast/week")
+def forecast_week():
+    """
+    Return a 7-day price forecast in 15-min intervals (672 points).
+    """
+    global _forecast_week_cache, _forecast_week_cache_time
+    now_ts = time.time()
+    # Cache for 15 minutes (900 seconds)
+    if _forecast_week_cache is not None and now_ts - _forecast_week_cache_time < 900:
+        return _forecast_week_cache
+
+    import datetime as _dt
+    import math as _math
+    from modelling.predict import predict_from_dict
+    from processing.export_pipeline import FEATURE_COLS, LOAD_FEATURE_COLS
+    from processing.tariff_formulas import compute_tariff, energiepreis as _ep, gesamttarif as _gt, DEFAULT_NETZ_STANDARD
+
+    HORIZON_DAYS = 7
+    SLOT_MIN     = 15
+    SLOTS_PER_DAY = 96
+
+    conn = None
+    try:
+        conn = _connect()
+
+        # ── 1. Forecast window ──
+        now = _dt.datetime.now(_dt.timezone.utc).replace(second=0, microsecond=0)
+        rem = now.minute % SLOT_MIN
+        forecast_start = now + _dt.timedelta(minutes=(SLOT_MIN - rem) % SLOT_MIN or SLOT_MIN)
+        forecast_start = forecast_start.replace(second=0, microsecond=0)
+        n_slots    = HORIZON_DAYS * SLOTS_PER_DAY   # 672
+        future_ts  = [forecast_start + _dt.timedelta(minutes=SLOT_MIN * i) for i in range(n_slots)]
+        forecast_end = future_ts[-1] + _dt.timedelta(minutes=SLOT_MIN)
+
+        # ── 2. Historical energy features ──
+        hist_start = forecast_start - _dt.timedelta(days=14, hours=1)
+        df_e = pd.read_sql(
+            "SELECT * FROM training_features WHERE time >= %s AND time < %s ORDER BY time",
+            conn, params=(hist_start, forecast_start), parse_dates=["time"],
+        )
+        if not df_e.empty:
+            df_e = df_e.drop_duplicates(subset=["time"], keep="last")
+            if df_e["time"].dt.tz is None:
+                df_e["time"] = df_e["time"].dt.tz_localize("UTC")
+            df_e = df_e.set_index("time")
+
+        # ── 3. Historical net load ──
+        df_nl: pd.DataFrame = pd.DataFrame()
+        try:
+            df_nl = pd.read_sql(
+                "SELECT time, net_load_kwh, load_rolling_avg_24h FROM winterthur_net_load_features "
+                "WHERE time >= %s AND time < %s ORDER BY time",
+                conn, params=(hist_start, forecast_start), parse_dates=["time"],
+            )
+            if not df_nl.empty:
+                df_nl = df_nl.drop_duplicates(subset=["time"], keep="last")
+                if df_nl["time"].dt.tz is None:
+                    df_nl["time"] = df_nl["time"].dt.tz_localize("UTC")
+                df_nl = df_nl.set_index("time")
+        except Exception:
+            pass
+
+        # ── 4. Future weather ──
+        df_wf: pd.DataFrame = pd.DataFrame()
+        try:
+            df_wf = pd.read_sql(
+                "SELECT time, temperature_2m, wind_speed_10m, shortwave_radiation, "
+                "cloud_cover, precipitation_mm FROM weather_hourly "
+                "WHERE time >= %s AND time <= %s "
+                "AND latitude = 47.5001 AND longitude = 8.7502 ORDER BY time",
+                conn, params=(forecast_start, forecast_end), parse_dates=["time"],
+            )
+            if not df_wf.empty:
+                df_wf = df_wf.drop_duplicates(subset=["time"], keep="last")
+                if df_wf["time"].dt.tz is None:
+                    df_wf["time"] = df_wf["time"].dt.tz_localize("UTC")
+                df_wf = df_wf.set_index("time")
+        except Exception:
+            pass
+            
+        weather_fut: dict = {} if df_wf.empty else df_wf.to_dict("index")
+
+        # ── 5. Setup Models & Buffers ──
+        energy_prefix = _best_prefix("energy", "xgb")
+        load_prefix   = _best_prefix("load", "model_load")
+        model_b       = _get_model(energy_prefix)
+        model_a       = _get_model(load_prefix) if load_prefix else None
+
+        epex_preds = []
+        net_load_preds = []
+        pred_buffer: dict[_dt.datetime, float] = {}
+        load_buffer: dict[_dt.datetime, float] = {}
+
+        def _hist_price(ts: _dt.datetime) -> float:
+            if ts in pred_buffer:
+                return pred_buffer[ts]
+            ts_h = ts.replace(minute=0, second=0, microsecond=0)
+            if df_e.empty or ts_h not in df_e.index:
+                return float("nan")
+            v = df_e.loc[ts_h, "price_eur_mwh"] if "price_eur_mwh" in df_e.columns else float("nan")
+            return float(v)
+
+        def _hist_load(ts: _dt.datetime) -> float:
+            if ts in load_buffer:
+                return load_buffer[ts]
+            ts_h = ts.replace(minute=0, second=0, microsecond=0)
+            if df_nl.empty or ts_h not in df_nl.index:
+                return float("nan")
+            v = df_nl.loc[ts_h, "net_load_kwh"] if "net_load_kwh" in df_nl.columns else float("nan")
+            return float(v)
+
+        # ── 6. Iterative Autoregressive Prediction ──
+        for t in future_ts:
+            t_168 = t - _dt.timedelta(hours=168)
+            t_24  = t - _dt.timedelta(hours=24)
+            t_1h  = t - _dt.timedelta(hours=1)
+            t_h   = t.replace(minute=0, second=0, microsecond=0)
+            t_168_h = t_168.replace(minute=0, second=0, microsecond=0)
+
+            # ── Energy (Model B) row ──
+            if not df_e.empty and t_168_h in df_e.index:
+                e_tmpl = df_e.loc[t_168_h].to_dict()
+            elif not df_e.empty:
+                e_tmpl = df_e.iloc[-1].to_dict()
+            else:
+                e_tmpl = {}
+            e_row = dict(e_tmpl)
+
+            e_row["lag_168h"] = _hist_price(t_168)
+            e_row["lag_24h"]  = _hist_price(t_24)
+            e_row["lag_1h"]   = _hist_price(t_1h)
+
+            e_row["hour_of_day"]  = t.hour
+            e_row["day_of_week"]  = t.weekday()
+            e_row["month"]        = t.month
+            e_row["is_weekend"]   = int(t.weekday() >= 5)
+            e_row["is_peak_hour"] = int(7 <= t.hour <= 22)
+            e_row["hour_sin"]  = _math.sin(2 * _math.pi * t.hour / 24)
+            e_row["hour_cos"]  = _math.cos(2 * _math.pi * t.hour / 24)
+            e_row["dow_sin"]   = _math.sin(2 * _math.pi * t.weekday() / 7)
+            e_row["dow_cos"]   = _math.cos(2 * _math.pi * t.weekday() / 7)
+            e_row["month_sin"] = _math.sin(2 * _math.pi * (t.month - 1) / 12)
+            e_row["month_cos"] = _math.cos(2 * _math.pi * (t.month - 1) / 12)
+
+            if t_h in weather_fut:
+                w = weather_fut[t_h]
+                for key in ("temperature_2m", "wind_speed_10m", "shortwave_radiation",
+                            "cloud_cover", "precipitation_mm"):
+                    v = w.get(key)
+                    if v is not None:
+                        e_row[key] = float(v)
+
+            epex = predict_from_dict(model_b, e_row)
+            epex_preds.append(epex)
+            pred_buffer[t] = float(epex)
+
+            # ── Load (Model A) row ──
+            if not df_nl.empty and t_168_h in df_nl.index:
+                l_tmpl = df_nl.loc[t_168_h].to_dict()
+            elif not df_nl.empty:
+                l_tmpl = df_nl.iloc[-1].to_dict()
+            else:
+                l_tmpl = {}
+            l_row = dict(l_tmpl)
+
+            load_lag_7d = _hist_load(t_168)
+            load_lag_1d = _hist_load(t_24)
+            
+            if not df_nl.empty and t_168_h in df_nl.index and "load_rolling_avg_24h" in df_nl.columns:
+                roll_avg = float(df_nl.loc[t_168_h, "load_rolling_avg_24h"])
+            elif not df_nl.empty and "load_rolling_avg_24h" in df_nl.columns:
+                roll_avg = float(df_nl.iloc[-1]["load_rolling_avg_24h"])
+            else:
+                roll_avg = float("nan")
+
+            temp_c   = e_row.get("temperature_2m", float("nan"))
+            temp_avg = e_row.get("temp_rolling_avg_24h", temp_c)
+            temp_dev = (temp_c - temp_avg) if not (_math.isnan(temp_c) or _math.isnan(temp_avg)) else float("nan")
+
+            l_row.update({
+                "load_lag_1h":          _hist_load(t_1h),
+                "load_lag_1d":          load_lag_1d,
+                "load_lag_7d":          load_lag_7d,
+                "load_rolling_avg_24h": roll_avg,
+                "hour":                 t.hour,
+                "weekday":              t.weekday(),
+                "month":                t.month,
+                "quarter":              (t.month - 1) // 3 + 1,
+                "is_weekend":           int(t.weekday() >= 5),
+                "is_holiday_zh":        0,
+                "is_school_holiday":    0,
+                "temp_c":               temp_c,
+                "wind_speed_ms":        e_row.get("wind_speed_10m", float("nan")),
+                "ghi_wm2":              e_row.get("shortwave_radiation", float("nan")),
+                "cloud_cover_pct":      e_row.get("cloud_cover", float("nan")),
+                "precipitation_mm":     e_row.get("precipitation_mm", float("nan")),
+                "temp_deviation":       temp_dev,
+                "pv_feed_in":           float("nan"),
+            })
+
+            if model_a is not None:
+                ld = predict_from_dict(model_a, l_row)
+                net_load_preds.append(ld)
+                load_buffer[t] = float(ld)
+            else:
+                net_load_preds.append(None)
+
+        # ── 7. Tariff formulas ──
+        sigma_eur  = _residual_std("energy")
+        sigma_load = _residual_std("load")
+        ci_active  = sigma_eur is not None
+
+        netz_arr, energie_arr, gesamt_arr = [], [], []
+        gesamt_lo_arr: list[float | None] = []
+        gesamt_hi_arr: list[float | None] = []
+        net_load_lo_arr: list[float | None] = []
+        net_load_hi_arr: list[float | None] = []
+        epex_lo_arr: list[float | None] = []
+        epex_hi_arr: list[float | None] = []
+        
+        for epex, load in zip(epex_preds, net_load_preds):
+            if load is not None:
+                tf      = compute_tariff(net_load=load, epex_eur_mwh=epex)
+                netz    = tf["netzpreis_rp_kwh"]
+                energie = tf["energiepreis_rp_kwh"]
+                gesamt  = tf["gesamttarif_rp_kwh"]
+            else:
+                energie = round(_ep(epex), 2)
+                netz    = round(DEFAULT_NETZ_STANDARD, 2)
+                gesamt  = round(_gt(netz, energie), 2)
+            netz_arr.append(netz)
+            energie_arr.append(energie)
+            gesamt_arr.append(gesamt)
+
+            if ci_active:
+                half = _CI_Z * sigma_eur
+                e_lo = _ep(epex - half)
+                e_hi = _ep(epex + half)
+                gesamt_lo_arr.append(round(_gt(netz, e_lo), 2))
+                gesamt_hi_arr.append(round(_gt(netz, e_hi), 2))
+                epex_lo_arr.append(round(epex - half, 2))
+                epex_hi_arr.append(round(epex + half, 2))
+            else:
+                gesamt_lo_arr.append(None)
+                gesamt_hi_arr.append(None)
+                epex_lo_arr.append(None)
+                epex_hi_arr.append(None)
+
+            if load is not None and sigma_load is not None:
+                half_l = _CI_Z * sigma_load
+                net_load_lo_arr.append(round(load - half_l, 2))
+                net_load_hi_arr.append(round(load + half_l, 2))
+            else:
+                net_load_lo_arr.append(None)
+                net_load_hi_arr.append(None)
+
+        # ── 8. Traffic-light ──
+        sorted_g = sorted(gesamt_arr)
+        q_lo = sorted_g[int(0.33 * (n_slots - 1))]
+        q_hi = sorted_g[int(0.67 * (n_slots - 1))]
+        level_arr = [
+            "low" if g <= q_lo else ("high" if g >= q_hi else "medium")
+            for g in gesamt_arr
+        ]
+
+        # ── 9. Cheapest windows ──
+        WIN_SLOTS = 8  # 2 h × 4 slots/h
+        scored = sorted(
+            (sum(gesamt_arr[i : i + WIN_SLOTS]) / WIN_SLOTS, i)
+            for i in range(n_slots - WIN_SLOTS)
+        )
+        cheap_windows: list[dict] = []
+        used_slots: set[int] = set()
+        for avg_p, si in scored:
+            sl = set(range(si, si + WIN_SLOTS))
+            if sl & used_slots:
+                continue
+            used_slots |= sl
+            cheap_windows.append({
+                "start":           future_ts[si].isoformat(),
+                "end":             (future_ts[si] + _dt.timedelta(hours=2)).isoformat(),
+                "avg_gesamttarif": round(avg_p, 2),
+            })
+            if len(cheap_windows) >= 6:
+                break
+
+        resp = {
+            "generated_at":       now.isoformat(),
+            "horizon_days":       HORIZON_DAYS,
+            "n_points":           n_slots,
+            "times":              [t.isoformat() for t in future_ts],
+            "epex_eur_mwh":       [round(p, 2) for p in epex_preds],
+            "netzpreis":          netz_arr,
+            "energiepreis":       energie_arr,
+            "gesamttarif":        gesamt_arr,
+            "price_level":        level_arr,
+            "cheapest_windows":   cheap_windows,
+            "net_load_available": net_load_preds[0] is not None,
+            "model_energy":       energy_prefix,
+            "model_load":         load_prefix if net_load_preds[0] is not None else None,
+            "ci_available":       ci_active,
+            "gesamttarif_ci_lower": gesamt_lo_arr,
+            "gesamttarif_ci_upper": gesamt_hi_arr,
+            "net_load_ci_lower":    net_load_lo_arr,
+            "net_load_ci_upper":    net_load_hi_arr,
+            "epex_ci_lower":        epex_lo_arr,
+            "epex_ci_upper":        epex_hi_arr,
+            "level_thresholds":     {"low_max": round(q_lo, 2), "high_min": round(q_hi, 2)},
+        }
+        
+        _forecast_week_cache = resp
+        _forecast_week_cache_time = now_ts
+        return resp
+
+    except FileNotFoundError:
+        return JSONResponse(
+            {"error": "No trained model available. Run the training pipeline first."},
+            status_code=503,
+        )
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 @app.get("/api/price-history")
@@ -941,6 +1379,14 @@ def models_status():
         m = _re.search(r"(\d{8})", files[-1].name)
         return m.group(1) if m else None
 
+    def _latest_torch_date(prefix: str) -> str | None:
+        """Return the date portion (YYYYMMDD) from the newest matching .pt bundle."""
+        files = sorted(models_dir.glob(f"{prefix}_*.pt"))
+        if not files:
+            return None
+        m = _re.search(r"(\d{8})", files[-1].name)
+        return m.group(1) if m else None
+
     model_b_date = _latest_model_date("xgb")
     model_a_date = _latest_model_date("model_load")
 
@@ -956,17 +1402,36 @@ def models_status():
             "metrics": _latest_json("metrics_load"),
             "mape_threshold": 8.0,
         },
+        "lstm_energy": {
+            "description": "EPEX day-ahead price – LSTM (EUR/MWh)",
+            "latest_date": _latest_torch_date("lstm_energy"),
+            "metrics": _latest_json("metrics_lstm_energy"),
+        },
+        "lstm_load": {
+            "description": "Winterthur net grid load – LSTM (kWh)",
+            "latest_date": _latest_torch_date("lstm_load"),
+            "metrics": _latest_json("metrics_lstm_load"),
+            "mape_threshold": 8.0,
+        },
+        "transformer_load": {
+            "description": "Winterthur net grid load – Transformer (kWh)",
+            "latest_date": _latest_torch_date("transformer_load"),
+            "metrics": _latest_json("metrics_transformer_load"),
+            "mape_threshold": 8.0,
+        },
     }
 
 
 @app.get("/api/models/validation/{model_name}")
 def models_validation(model_name: str):
     """
-    Return validation-set predictions + XGBoost loss history for a trained model.
+    Return validation-set predictions + loss history for a trained model.
 
     model_name must be one of:
-      xgb, linear, naive            → data/energy/  (Model B, EPEX price)
-      model_load, linear_load, naive_load → data/load/  (Model A, net load)
+      xgb, linear, naive                      → data/energy/  (Model B, EPEX)
+      model_load, linear_load, naive_load      → data/load/   (Model A, load)
+      lstm_energy                              → data/energy/  (Model B, LSTM)
+      lstm_load, transformer_load              → data/load/   (Model A, DL)
 
     Returns:
       model_name, n_points, timestamps, y_true, y_pred, loss_history (or null)
@@ -974,8 +1439,11 @@ def models_validation(model_name: str):
     import json as _json
     import re as _re
 
-    _ENERGY_MODELS = {"xgb", "linear", "naive"}
-    _LOAD_MODELS   = {"model_load", "linear_load", "naive_load"}
+    _ENERGY_MODELS = {"xgb", "linear", "naive", "lstm_energy"}
+    _LOAD_MODELS   = {"model_load", "linear_load", "naive_load",
+                      "lstm_load", "transformer_load"}
+    _TORCH_MODELS  = {"lstm_energy", "lstm_load", "transformer_load"}
+
     if model_name not in _ENERGY_MODELS | _LOAD_MODELS:
         return JSONResponse({"error": f"Unknown model '{model_name}'"}, status_code=400)
 
@@ -989,20 +1457,6 @@ def models_validation(model_name: str):
                   default_data_dir)
     )
 
-    # ── Load model ────────────────────────────────────────────────────────────
-    model_files = sorted(models_dir.glob(f"{model_name}_*.joblib"))
-    if not model_files:
-        return JSONResponse(
-            {"error": f"No trained model found for '{model_name}' in {models_dir}"},
-            status_code=404,
-        )
-    try:
-        import joblib as _joblib
-        model = _joblib.load(model_files[-1])
-    except Exception as exc:
-        return JSONResponse({"error": f"Failed to load model: {exc}"}, status_code=500)
-
-    # ── Load validation parquets ──────────────────────────────────────────────
     x_path  = data_dir / "X_val.parquet"
     y_path  = data_dir / "y_val.parquet"
     ts_path = data_dir / "timestamps_val.parquet"
@@ -1015,17 +1469,55 @@ def models_validation(model_name: str):
         )
 
     try:
-        X_val  = pd.read_parquet(x_path)
-        y_val  = pd.read_parquet(y_path)
-        X_filled = X_val.fillna(X_val.median(numeric_only=True)).fillna(0)
-        y_pred_arr = model.predict(X_filled)
+        y_val = pd.read_parquet(y_path)
         y_true_list = y_val.values.ravel().tolist()
-        y_pred_list = [float(v) for v in y_pred_arr]
 
+        # ── Torch sequence models (LSTM / Transformer) ────────────────────────
+        if model_name in _TORCH_MODELS:
+            pt_files = sorted(models_dir.glob(f"{model_name}_*.pt"))
+            if not pt_files:
+                return JSONResponse(
+                    {"error": f"No trained torch model found for '{model_name}' in {models_dir}. "
+                              "Trigger the training DAG first."},
+                    status_code=404,
+                )
+            from modelling.predict import predict_sequence_val  # noqa: PLC0415
+
+            X_val = pd.read_parquet(x_path).fillna(0)
+            x_train_path = data_dir / "X_train.parquet"
+            if not x_train_path.exists():
+                return JSONResponse(
+                    {"error": "X_train.parquet not found – needed as context for sequence inference."},
+                    status_code=404,
+                )
+            X_train = pd.read_parquet(x_train_path).fillna(0)
+            y_pred_arr = predict_sequence_val(pt_files[-1], X_train, X_val)
+            y_pred_list = [float(v) for v in y_pred_arr]
+
+        # ── Sklearn / XGBoost (joblib) models ─────────────────────────────────
+        else:
+            model_files = sorted(models_dir.glob(f"{model_name}_*.joblib"))
+            if not model_files:
+                return JSONResponse(
+                    {"error": f"No trained model found for '{model_name}' in {models_dir}"},
+                    status_code=404,
+                )
+            import joblib as _joblib  # noqa: PLC0415
+            model  = _joblib.load(model_files[-1])
+            X_val  = pd.read_parquet(x_path)
+            X_filled = X_val.fillna(X_val.median(numeric_only=True)).fillna(0)
+            y_pred_arr = model.predict(X_filled)
+            y_pred_list = [float(v) for v in y_pred_arr]
+
+        # ── Align lengths (torch models may produce fewer points due to lookback) ──
+        min_len = min(len(y_true_list), len(y_pred_list))
+        y_true_list = y_true_list[-min_len:]
+        y_pred_list = y_pred_list[-min_len:]
+
+        # ── Timestamps ────────────────────────────────────────────────────────
         if ts_path.exists():
-            ts_df = pd.read_parquet(ts_path)
-            raw_ts = ts_df.iloc[:, 0]
-            # Ensure tz-aware timestamps → ISO 8601
+            ts_df  = pd.read_parquet(ts_path)
+            raw_ts = ts_df.iloc[:, 0].iloc[-min_len:]
             if hasattr(raw_ts.dtype, "tz") and raw_ts.dtype.tz is not None:
                 timestamps = raw_ts.dt.strftime("%Y-%m-%dT%H:%M:%SZ").tolist()
             else:
@@ -1033,7 +1525,7 @@ def models_validation(model_name: str):
                     "%Y-%m-%dT%H:%M:%S"
                 ).tolist()
         else:
-            timestamps = list(range(len(y_true_list)))
+            timestamps = list(range(min_len))
 
         # Downsample to ≤ 500 points for chart performance
         n = len(y_true_list)
@@ -1044,7 +1536,7 @@ def models_validation(model_name: str):
             y_pred_list = [y_pred_list[i] for i in indices]
             timestamps  = [timestamps[i]  for i in indices]
 
-        # ── Loss history (XGBoost only, when val was used during training) ───
+        # ── Loss history (XGBoost / LSTM / Transformer when val was used) ────
         loss_history = None
         loss_files = sorted(
             f for f in models_dir.glob(f"{model_name}_loss_*.json")

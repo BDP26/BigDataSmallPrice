@@ -1,0 +1,72 @@
+# Cyclical Encoding Migration - Current State
+# Generated: $(date)
+
+## Feature Count Summary
+
+### FEATURE_COLS (EPEX Price Prediction)
+Total lines: 31
+
+Features list:
+- lag_1h
+- lag_24h
+- lag_168h
+- rolling_avg_24h
+- rolling_avg_7d
+- hour_of_day
+- day_of_week
+- month
+- is_weekend
+- is_peak_hour
+- temperature_2m
+- wind_speed_10m
+- shortwave_radiation
+- cloud_cover
+- precipitation_mm
+- temp_rolling_avg_24h
+- wind_speed_de_nord
+- solar_de_nord
+- solar_de_sued
+- wind_speed_de_sued
+- hydro_ror_ch_lag_24h
+- hydro_ror_ch_lag_168h
+- solar_gen_ch_lag_24h
+- solar_gen_ch_lag_168h
+- wind_gen_de_lag_24h
+- wind_gen_de_lag_168h
+- actual_load_ch_lag_24h
+- actual_load_ch_lag_168h
+- net_position_ch_lag_24h
+- net_position_ch_lag_168h
+- load_forecast_ch
+
+### LOAD_FEATURE_COLS (Load Prediction)
+Total lines: 18
+
+Features list:
+- load_lag_1h
+- load_lag_1d
+- load_lag_7d
+- load_rolling_avg_24h
+- hour
+- weekday
+- month
+- quarter
+- is_weekend
+- is_holiday_zh
+- is_school_holiday
+- temp_c
+- wind_speed_ms
+- ghi_wm2
+- cloud_cover_pct
+- precipitation_mm
+- temp_deviation
+- pv_feed_in
+
+## Files Backed Up
+- infra/db/features.sql → infra/db/features.sql.backup
+- infra/db/init.sql → infra/db/init.sql.backup
+- src/processing/export_pipeline.py → src/processing/export_pipeline.py.backup
+
+## Database Schema
+Note: pg_dump not available in PATH. Schema backup skipped.
+Use: pg_dump -h localhost -p 5433 -U bdsp -d bdsp --schema-only > backups/schema_backup_$(date +%Y%m%d_%H%M).sql

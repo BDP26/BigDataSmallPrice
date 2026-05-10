@@ -253,7 +253,13 @@ WITH
       EXTRACT(dow   FROM time)::INT                                          AS day_of_week,
       EXTRACT(month FROM time)::INT                                          AS month,
       CASE WHEN EXTRACT(dow  FROM time) IN (0, 6)        THEN 1 ELSE 0 END  AS is_weekend,
-      CASE WHEN EXTRACT(hour FROM time) BETWEEN 7 AND 22 THEN 1 ELSE 0 END  AS is_peak_hour
+      CASE WHEN EXTRACT(hour FROM time) BETWEEN 7 AND 22 THEN 1 ELSE 0 END  AS is_peak_hour,
+      SIN(2 * PI() * EXTRACT(hour  FROM time) / 24)                         AS hour_sin,
+      COS(2 * PI() * EXTRACT(hour  FROM time) / 24)                         AS hour_cos,
+      SIN(2 * PI() * EXTRACT(dow   FROM time) / 7)                          AS dow_sin,
+      COS(2 * PI() * EXTRACT(dow   FROM time) / 7)                          AS dow_cos,
+      SIN(2 * PI() * (EXTRACT(month FROM time) - 1) / 12)                   AS month_sin,
+      COS(2 * PI() * (EXTRACT(month FROM time) - 1) / 12)                   AS month_cos
     FROM entsoe_day_ahead_prices
     WHERE domain = '10YCH-SWISSGRIDZ'
   ),
@@ -315,6 +321,12 @@ SELECT
   pf.month,
   pf.is_weekend,
   pf.is_peak_hour,
+  pf.hour_sin,
+  pf.hour_cos,
+  pf.dow_sin,
+  pf.dow_cos,
+  pf.month_sin,
+  pf.month_cos,
   -- Weather CH (Winterthur, 47.5001 / 8.7502)
   w_ch.temperature_2m,
   w_ch.wind_speed_10m,

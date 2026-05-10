@@ -11,6 +11,23 @@ from datetime import datetime, timedelta
 import httpx
 import pendulum
 
+# ENTSO-E API accepts multi-day ranges in a single call.
+# Batching 30 days per call reduces API calls ~30x vs day-by-day fetching.
+# At 400 calls/day limit: 14 tasks × ceil(730/30)=25 batches = 350 calls → full 2-year backfill in one run.
+_BACKFILL_BATCH_DAYS = 30
+
+
+def _batch_dates(dates: list[str], batch_size: int) -> list[tuple[datetime, datetime]]:
+    """Group date strings into (period_start, period_end) tuples for batched ENTSO-E API calls."""
+    batches = []
+    for i in range(0, len(dates), batch_size):
+        batch = dates[i : i + batch_size]
+        start = datetime.fromisoformat(batch[0]).replace(tzinfo=pendulum.UTC)
+        end = datetime.fromisoformat(batch[-1]).replace(tzinfo=pendulum.UTC) + timedelta(days=1)
+        batches.append((start, end))
+    return batches
+
+
 _TABLES = [
     "entsoe_day_ahead_prices",
     "entsoe_actual_load",
@@ -27,102 +44,100 @@ _TABLES = [
 ]
 
 
-def _entsoe_skip_404(date_str: str, exc: Exception) -> bool:
-    """Return True and log a warning if *exc* is an ENTSOE 404 (no data published)."""
+def _entsoe_skip_404(label: str, exc: Exception) -> bool:
+    """Return True and log a warning if *exc* is an ENTSO-E 404 (no data published for range)."""
     if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 404:
-        print(f"ENTSO-E {date_str}: no data published (404) – skipping.")
+        print(f"ENTSO-E {label}: no data published (404) – skipping.")
         return True
     return False
 
 
-def fetch_entsoe(dates: list[str], sleep_s: float = 0) -> None:
+def fetch_entsoe(dates: list[str], sleep_s: float = 0, batch_days: int = _BACKFILL_BATCH_DAYS) -> None:
     from data_collection.entsoe_collector import EntsoeCollector
     from db.timescale_client import upsert_entsoe
 
-    for date_str in dates:
-        period_start = datetime.fromisoformat(date_str).replace(tzinfo=pendulum.UTC)
-        period_end = period_start + timedelta(days=1)
+    for period_start, period_end in _batch_dates(dates, batch_days):
+        label = f"{period_start.date()}→{(period_end - timedelta(days=1)).date()}"
         try:
             records = EntsoeCollector(period_start=period_start, period_end=period_end).run()
         except Exception as exc:
-            if _entsoe_skip_404(date_str, exc):
+            if _entsoe_skip_404(label, exc):
                 continue
             raise
         inserted = upsert_entsoe(records)
-        print(f"ENTSO-E {date_str}: {len(records)} fetched, {inserted} inserted.")
+        print(f"ENTSO-E {label}: {len(records)} fetched, {inserted} inserted.")
         if sleep_s:
             time.sleep(sleep_s)
 
 
-def fetch_entsoe_actual_load(dates: list[str], sleep_s: float = 0) -> None:
+def fetch_entsoe_actual_load(dates: list[str], sleep_s: float = 0, batch_days: int = _BACKFILL_BATCH_DAYS) -> None:
     from data_collection.entsoe_collector import EntsoeActualLoadCollector
     from db.timescale_client import upsert_entsoe_actual_load
 
-    for date_str in dates:
-        period_start = datetime.fromisoformat(date_str).replace(tzinfo=pendulum.UTC)
-        period_end = period_start + timedelta(days=1)
+    for period_start, period_end in _batch_dates(dates, batch_days):
+        label = f"{period_start.date()}→{(period_end - timedelta(days=1)).date()}"
         try:
             records = EntsoeActualLoadCollector(period_start=period_start, period_end=period_end).run()
         except Exception as exc:
-            if _entsoe_skip_404(date_str, exc):
+            if _entsoe_skip_404(label, exc):
                 continue
             raise
         inserted = upsert_entsoe_actual_load(records)
-        print(f"ENTSO-E ActualLoad {date_str}: {len(records)} fetched, {inserted} inserted.")
+        print(f"ENTSO-E ActualLoad {label}: {len(records)} fetched, {inserted} inserted.")
         if sleep_s:
             time.sleep(sleep_s)
 
 
-def fetch_entsoe_generation(dates: list[str], domain: str, psr_type: str, sleep_s: float = 0) -> None:
+def fetch_entsoe_generation(dates: list[str], domain: str, psr_type: str, sleep_s: float = 0, batch_days: int = _BACKFILL_BATCH_DAYS) -> None:
     from data_collection.entsoe_collector import EntsoeGenerationCollector
     from db.timescale_client import upsert_entsoe_generation
-    for date_str in dates:
-        period_start = datetime.fromisoformat(date_str).replace(tzinfo=pendulum.UTC)
-        period_end = period_start + timedelta(days=1)
+
+    for period_start, period_end in _batch_dates(dates, batch_days):
+        label = f"{period_start.date()}→{(period_end - timedelta(days=1)).date()}"
         try:
             records = EntsoeGenerationCollector(domain=domain, psr_type=psr_type, period_start=period_start, period_end=period_end).run()
         except Exception as exc:
-            if _entsoe_skip_404(date_str, exc):
+            if _entsoe_skip_404(label, exc):
                 continue
             raise
         inserted = upsert_entsoe_generation(records)
-        print(f"ENTSO-E Generation {domain}/{psr_type} {date_str}: {len(records)} fetched, {inserted} inserted.")
+        print(f"ENTSO-E Generation {domain}/{psr_type} {label}: {len(records)} fetched, {inserted} inserted.")
         if sleep_s:
             time.sleep(sleep_s)
 
 
-def fetch_entsoe_crossborder(dates: list[str], in_domain: str, out_domain: str, sleep_s: float = 0) -> None:
+def fetch_entsoe_crossborder(dates: list[str], in_domain: str, out_domain: str, sleep_s: float = 0, batch_days: int = _BACKFILL_BATCH_DAYS) -> None:
     from data_collection.entsoe_collector import EntsoeCrossBorderFlowCollector
     from db.timescale_client import upsert_entsoe_crossborder_flows
-    for date_str in dates:
-        period_start = datetime.fromisoformat(date_str).replace(tzinfo=pendulum.UTC)
-        period_end = period_start + timedelta(days=1)
+
+    for period_start, period_end in _batch_dates(dates, batch_days):
+        label = f"{period_start.date()}→{(period_end - timedelta(days=1)).date()}"
         try:
             records = EntsoeCrossBorderFlowCollector(in_domain=in_domain, out_domain=out_domain, period_start=period_start, period_end=period_end).run()
         except Exception as exc:
-            if _entsoe_skip_404(date_str, exc):
+            if _entsoe_skip_404(label, exc):
                 continue
             raise
         inserted = upsert_entsoe_crossborder_flows(records)
-        print(f"ENTSO-E CrossBorder {in_domain}→{out_domain} {date_str}: {len(records)} fetched, {inserted} inserted.")
+        print(f"ENTSO-E CrossBorder {in_domain}→{out_domain} {label}: {len(records)} fetched, {inserted} inserted.")
         if sleep_s:
             time.sleep(sleep_s)
 
 
-def fetch_entsoe_load_forecast(dates: list[str], sleep_s: float = 0) -> None:
+def fetch_entsoe_load_forecast(dates: list[str], sleep_s: float = 0, batch_days: int = _BACKFILL_BATCH_DAYS) -> None:
     from data_collection.entsoe_collector import EntsoeLoadForecastCollector
     from db.timescale_client import upsert_entsoe_load_forecast
-    for date_str in dates:
-        period_start = datetime.fromisoformat(date_str).replace(tzinfo=pendulum.UTC)
-        period_end = period_start + timedelta(days=1)
+
+    for period_start, period_end in _batch_dates(dates, batch_days):
+        label = f"{period_start.date()}→{(period_end - timedelta(days=1)).date()}"
         try:
             records = EntsoeLoadForecastCollector(period_start=period_start, period_end=period_end).run()
         except Exception as exc:
-            if _entsoe_skip_404(date_str, exc):
+            if _entsoe_skip_404(label, exc):
                 continue
             raise
         inserted = upsert_entsoe_load_forecast(records)
-        print(f"ENTSO-E LoadForecast CH {date_str}: {len(records)} fetched, {inserted} inserted.")
+        print(f"ENTSO-E LoadForecast {label}: {len(records)} fetched, {inserted} inserted.")
         if sleep_s:
             time.sleep(sleep_s)
 

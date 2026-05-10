@@ -30,6 +30,32 @@ from sklearn.linear_model import LinearRegression
 from xgboost import XGBRegressor
 
 
+# ── Feature helpers ───────────────────────────────────────────────────────────
+
+
+_CYCLICAL_PAIRS: dict[str, tuple[str, str]] = {
+    "hour_of_day": ("hour_sin", "hour_cos"),
+    "day_of_week": ("dow_sin",  "dow_cos"),
+    "month":       ("month_sin", "month_cos"),
+}
+
+
+def _drop_redundant_calendar_cols(df: pd.DataFrame | None) -> pd.DataFrame | None:
+    """
+    Drop raw calendar cols (hour_of_day, day_of_week, month) when both their
+    sin/cos counterparts are present. Sequence models overfit when fed both
+    encodings; XGBoost/Linear are unaffected because they read the original
+    parquets unchanged. No-op when cyclical features are absent.
+    """
+    if df is None:
+        return None
+    drop = [
+        raw for raw, (s, c) in _CYCLICAL_PAIRS.items()
+        if raw in df.columns and s in df.columns and c in df.columns
+    ]
+    return df.drop(columns=drop) if drop else df
+
+
 # ── Training functions ────────────────────────────────────────────────────────
 
 
@@ -189,7 +215,13 @@ def run_load_training(
     Raises:
         FileNotFoundError: If the training parquet files are not found.
     """
-    from modelling.evaluate import check_load_quality, evaluate_all, save_metrics
+    from modelling.evaluate import (
+        check_load_quality,
+        evaluate_all,
+        save_metrics,
+        select_best_model,
+        write_best_models_manifest,
+    )
 
     data_path = Path(data_dir)
     x_path = data_path / "X_train.parquet"
@@ -243,6 +275,23 @@ def run_load_training(
         save_metrics(metrics, "metrics_load", models_dir)
         check_load_quality(metrics)
 
+        pick = select_best_model(
+            metrics, candidates=["linear_load", "model_load"], metric="rmse"
+        )
+        if pick is not None:
+            name, m = pick
+            entry = {
+                "prefix": name,
+                "rmse": m.get("rmse"),
+                "mae": m.get("mae"),
+                "mape": m.get("mape"),
+                "residual_std": m.get("residual_std"),
+                "n_residuals": m.get("n_residuals"),
+                "trained_on": datetime.now(timezone.utc).strftime("%Y%m%d"),
+            }
+            write_best_models_manifest(models_dir, {"load": entry})
+            print(f"Best load model by RMSE: {name} (rmse={m.get('rmse'):.3f})")
+
     return paths
 
 
@@ -273,7 +322,12 @@ def run_training(
     Raises:
         FileNotFoundError: If training parquet files are not found in *data_dir*.
     """
-    from modelling.evaluate import evaluate_all, save_metrics
+    from modelling.evaluate import (
+        evaluate_all,
+        save_metrics,
+        select_best_model,
+        write_best_models_manifest,
+    )
 
     data_path = Path(data_dir)
     x_path = data_path / "X_train.parquet"
@@ -327,6 +381,432 @@ def run_training(
         )
         save_metrics(metrics, "metrics", models_dir)
 
+        pick = select_best_model(
+            metrics, candidates=["linear", "xgb"], metric="rmse"
+        )
+        if pick is not None:
+            name, m = pick
+            entry = {
+                "prefix": name,
+                "rmse": m.get("rmse"),
+                "mae": m.get("mae"),
+                "mape": m.get("mape"),
+                "residual_std": m.get("residual_std"),
+                "n_residuals": m.get("n_residuals"),
+                "trained_on": datetime.now(timezone.utc).strftime("%Y%m%d"),
+            }
+            write_best_models_manifest(models_dir, {"energy": entry})
+            print(f"Best energy model by RMSE: {name} (rmse={m.get('rmse'):.3f})")
+
+    return paths
+
+
+# ── Sequence model training (LSTM / Transformer) ─────────────────────────────
+
+
+def _fit_scalers(
+    X: "pd.DataFrame",
+    y_col: "pd.DataFrame",
+) -> "tuple[np.ndarray, np.ndarray, float, float]":
+    """
+    Compute z-score parameters from training data.
+
+    Returns:
+        (X_mean, X_scale, y_mean, y_scale) – all computed on *X* / *y_col*.
+        Scale values that are near-zero are clamped to 1.0 to avoid division
+        by zero for constant features.
+    """
+    import numpy as np  # noqa: PLC0415
+
+    X_np = X.values.astype("float32")
+    X_mean = np.nanmean(X_np, axis=0)
+    X_scale = np.nanstd(X_np, axis=0)
+    X_scale[X_scale < 1e-8] = 1.0
+
+    y_np = y_col.values.ravel().astype("float32")
+    y_mean = float(np.nanmean(y_np))
+    y_scale = float(np.nanstd(y_np))
+    if y_scale < 1e-8:
+        y_scale = 1.0
+
+    return X_mean, X_scale, y_mean, y_scale
+
+
+def run_lstm_load_training(
+    data_dir: str = "data/load/",
+    models_dir: str = "models/",
+    lookback: int = 96,
+    max_train_seqs: int = 30_000,
+    epochs: int = 30,
+    batch_size: int = 512,
+) -> dict[str, Path]:
+    """
+    End-to-end LSTM training pipeline for Model A (Winterthur net-load forecasting).
+
+    Sequence design:
+      lookback = 96 steps at 15-min resolution = 24 h of history per input window.
+      Training rows are capped at *max_train_seqs* most-recent sequences so that
+      the training run completes in a few minutes on a CPU-only environment.
+
+    Steps:
+      1. Load parquet splits from *data_dir*.
+      2. Fit z-score scalers on the training split.
+      3. Build SequenceDataset (lazy sliding-window).
+      4. Train LSTMModel with early stopping on the validation MSE.
+      5. Evaluate on the test split and save metrics to ``metrics_lstm_load_<date>.json``.
+      6. Save model bundle to ``lstm_load_<date>.pt``.
+
+    Args:
+        data_dir:       Directory containing parquet files from run_load_export().
+        models_dir:     Output directory for model files and metrics.
+        lookback:       Sliding-window length in time steps (default 96 = 24 h).
+        max_train_seqs: Maximum number of training sequences (most-recent rows).
+        epochs:         Maximum training epochs.
+        batch_size:     Mini-batch size.
+
+    Returns:
+        Dict mapping ``"lstm_load"`` to the saved ``.pt`` path.
+    """
+    import numpy as np  # noqa: PLC0415
+
+    from modelling.evaluate import check_load_quality, compute_metrics, save_metrics  # noqa: PLC0415
+    from modelling.sequence_models import (  # noqa: PLC0415
+        LSTMModel,
+        predict_from_sequences,
+        save_torch_model,
+        seed_everything,
+        train_sequence_model,
+    )
+
+    data_path = Path(data_dir)
+    for fname in ("X_train.parquet", "y_train.parquet"):
+        if not (data_path / fname).exists():
+            raise FileNotFoundError(
+                f"{fname} not found in {data_dir!r}. Run run_load_export() first."
+            )
+
+    X_train = pd.read_parquet(data_path / "X_train.parquet").fillna(0)
+    y_train = pd.read_parquet(data_path / "y_train.parquet")
+    X_val   = pd.read_parquet(data_path / "X_val.parquet").fillna(0) if (data_path / "X_val.parquet").exists() else None
+    y_val   = pd.read_parquet(data_path / "y_val.parquet") if (data_path / "y_val.parquet").exists() else None
+    X_test  = pd.read_parquet(data_path / "X_test.parquet").fillna(0) if (data_path / "X_test.parquet").exists() else None
+    y_test  = pd.read_parquet(data_path / "y_test.parquet") if (data_path / "y_test.parquet").exists() else None
+
+    X_train = _drop_redundant_calendar_cols(X_train)
+    X_val   = _drop_redundant_calendar_cols(X_val)
+    X_test  = _drop_redundant_calendar_cols(X_test)
+
+    feature_cols = list(X_train.columns)
+    X_mean, X_scale, y_mean, y_scale = _fit_scalers(X_train, y_train)
+
+    X_tr_np = X_train.values.astype("float32")
+    y_tr_np = y_train.values.ravel().astype("float32")
+    X_tr_sc = (X_tr_np - X_mean) / X_scale
+    y_tr_sc = (y_tr_np - y_mean) / y_scale
+
+    # Validation context: prepend last `lookback` train rows so val seq 0 has context
+    X_val_ctx_sc: np.ndarray | None = None
+    y_val_ctx_sc: np.ndarray | None = None
+    if X_val is not None and y_val is not None:
+        X_val_np = X_val.values.astype("float32")
+        y_val_np = y_val.values.ravel().astype("float32")
+        X_val_ctx = np.concatenate([X_tr_np[-lookback:], X_val_np], axis=0)
+        y_val_ctx = np.concatenate([y_tr_np[-lookback:], y_val_np])
+        X_val_ctx_sc = (X_val_ctx - X_mean) / X_scale
+        y_val_ctx_sc = (y_val_ctx - y_mean) / y_scale
+
+    seed_everything(42)
+    model = LSTMModel(input_size=len(feature_cols), hidden_size=64, num_layers=2, dropout=0.2)
+    print(f"Training LSTM (Model A load), lookback={lookback}, max_seqs={max_train_seqs}")
+
+    model, val_losses = train_sequence_model(
+        model, X_tr_sc, y_tr_sc,
+        lookback=lookback,
+        X_val=X_val_ctx_sc, y_val=y_val_ctx_sc,
+        epochs=epochs, batch_size=batch_size,
+        max_train_seqs=max_train_seqs,
+    )
+
+    # Evaluate on test set
+    paths: dict[str, Path] = {}
+    if X_test is not None and y_test is not None:
+        X_test_np = X_test.values.astype("float32")
+        y_test_np = y_test.values.ravel().astype("float32")
+        X_val_np_last = (X_val.values.astype("float32") if X_val is not None else X_tr_np)
+        X_test_ctx = np.concatenate([X_val_np_last[-lookback:], X_test_np], axis=0)
+        X_test_ctx_sc = (X_test_ctx - X_mean) / X_scale
+        preds_sc = predict_from_sequences(model, X_test_ctx_sc, lookback)
+        preds = preds_sc * y_scale + y_mean
+
+        print("\n── LSTM Load evaluation on test set ──")
+        metrics = {"lstm_load": compute_metrics(y_test_np, preds)}
+        save_metrics(metrics, "metrics_lstm_load", models_dir)
+        m = metrics["lstm_load"]
+        print(f"lstm_load  MAE={m['mae']:.1f}  RMSE={m['rmse']:.1f}  MAPE={m['mape']:.2f}%")
+        check_load_quality({"model_load": m})
+
+    config = {
+        "model_type": "lstm",
+        "input_size": len(feature_cols),
+        "hidden_size": 64,
+        "num_layers": 2,
+        "dropout": 0.2,
+    }
+    paths["lstm_load"] = save_torch_model(
+        model, config, X_mean, X_scale, y_mean, y_scale,
+        feature_cols, lookback, name="lstm_load", models_dir=models_dir,
+        val_losses=val_losses,
+    )
+    print(f"Saved lstm_load: {paths['lstm_load']}")
+    return paths
+
+
+def run_lstm_energy_training(
+    data_dir: str = "data/energy/",
+    models_dir: str = "models/",
+    lookback: int = 48,
+    epochs: int = 30,
+    batch_size: int = 256,
+) -> dict[str, Path]:
+    """
+    End-to-end LSTM training pipeline for Model B (EPEX day-ahead price).
+
+    Sequence design:
+      lookback = 48 steps at hourly resolution = 48 h (2 days) of history.
+      The full training set is used (only ~13 k rows, so no subsampling needed).
+
+    Steps:
+      1. Load parquet splits from *data_dir*.
+      2. Fit z-score scalers on the training split.
+      3. Train LSTMModel with early stopping on the validation MSE.
+      4. Evaluate on the test split and save metrics to ``metrics_lstm_energy_<date>.json``.
+      5. Save model bundle to ``lstm_energy_<date>.pt``.
+
+    Args:
+        data_dir:   Directory containing parquet files from run_export().
+        models_dir: Output directory for model files and metrics.
+        lookback:   Sliding-window length in time steps (default 48 = 2 days).
+        epochs:     Maximum training epochs.
+        batch_size: Mini-batch size.
+
+    Returns:
+        Dict mapping ``"lstm_energy"`` to the saved ``.pt`` path.
+    """
+    import numpy as np  # noqa: PLC0415
+
+    from modelling.evaluate import compute_metrics, save_metrics  # noqa: PLC0415
+    from modelling.sequence_models import (  # noqa: PLC0415
+        LSTMModel,
+        predict_from_sequences,
+        save_torch_model,
+        seed_everything,
+        train_sequence_model,
+    )
+
+    data_path = Path(data_dir)
+    for fname in ("X_train.parquet", "y_train.parquet"):
+        if not (data_path / fname).exists():
+            raise FileNotFoundError(
+                f"{fname} not found in {data_dir!r}. Run run_export() first."
+            )
+
+    X_train = pd.read_parquet(data_path / "X_train.parquet").fillna(0)
+    y_train = pd.read_parquet(data_path / "y_train.parquet")
+    X_val   = pd.read_parquet(data_path / "X_val.parquet").fillna(0) if (data_path / "X_val.parquet").exists() else None
+    y_val   = pd.read_parquet(data_path / "y_val.parquet") if (data_path / "y_val.parquet").exists() else None
+    X_test  = pd.read_parquet(data_path / "X_test.parquet").fillna(0) if (data_path / "X_test.parquet").exists() else None
+    y_test  = pd.read_parquet(data_path / "y_test.parquet") if (data_path / "y_test.parquet").exists() else None
+
+    X_train = _drop_redundant_calendar_cols(X_train)
+    X_val   = _drop_redundant_calendar_cols(X_val)
+    X_test  = _drop_redundant_calendar_cols(X_test)
+
+    feature_cols = list(X_train.columns)
+    X_mean, X_scale, y_mean, y_scale = _fit_scalers(X_train, y_train)
+
+    X_tr_np = X_train.values.astype("float32")
+    y_tr_np = y_train.values.ravel().astype("float32")
+    X_tr_sc = (X_tr_np - X_mean) / X_scale
+    y_tr_sc = (y_tr_np - y_mean) / y_scale
+
+    X_val_ctx_sc: np.ndarray | None = None
+    y_val_ctx_sc: np.ndarray | None = None
+    if X_val is not None and y_val is not None:
+        X_val_np = X_val.values.astype("float32")
+        y_val_np = y_val.values.ravel().astype("float32")
+        X_val_ctx = np.concatenate([X_tr_np[-lookback:], X_val_np], axis=0)
+        y_val_ctx = np.concatenate([y_tr_np[-lookback:], y_val_np])
+        X_val_ctx_sc = (X_val_ctx - X_mean) / X_scale
+        y_val_ctx_sc = (y_val_ctx - y_mean) / y_scale
+
+    seed_everything(42)
+    model = LSTMModel(input_size=len(feature_cols), hidden_size=64, num_layers=2, dropout=0.2)
+    print(f"Training LSTM (Model B EPEX), lookback={lookback}")
+
+    model, val_losses = train_sequence_model(
+        model, X_tr_sc, y_tr_sc,
+        lookback=lookback,
+        X_val=X_val_ctx_sc, y_val=y_val_ctx_sc,
+        epochs=epochs, batch_size=batch_size,
+        max_train_seqs=None,  # use all data (only ~13 k rows)
+    )
+
+    paths: dict[str, Path] = {}
+    if X_test is not None and y_test is not None:
+        X_test_np = X_test.values.astype("float32")
+        y_test_np = y_test.values.ravel().astype("float32")
+        X_val_np_last = (X_val.values.astype("float32") if X_val is not None else X_tr_np)
+        X_test_ctx = np.concatenate([X_val_np_last[-lookback:], X_test_np], axis=0)
+        X_test_ctx_sc = (X_test_ctx - X_mean) / X_scale
+        preds_sc = predict_from_sequences(model, X_test_ctx_sc, lookback)
+        preds = preds_sc * y_scale + y_mean
+
+        print("\n── LSTM Energy evaluation on test set ──")
+        metrics = {"lstm_energy": compute_metrics(y_test_np, preds)}
+        save_metrics(metrics, "metrics_lstm_energy", models_dir)
+        m = metrics["lstm_energy"]
+        print(f"lstm_energy  MAE={m['mae']:.3f}  RMSE={m['rmse']:.3f}  MAPE={m['mape']:.2f}%")
+
+    config = {
+        "model_type": "lstm",
+        "input_size": len(feature_cols),
+        "hidden_size": 64,
+        "num_layers": 2,
+        "dropout": 0.2,
+    }
+    paths["lstm_energy"] = save_torch_model(
+        model, config, X_mean, X_scale, y_mean, y_scale,
+        feature_cols, lookback, name="lstm_energy", models_dir=models_dir,
+        val_losses=val_losses,
+    )
+    print(f"Saved lstm_energy: {paths['lstm_energy']}")
+    return paths
+
+
+def run_transformer_load_training(
+    data_dir: str = "data/load/",
+    models_dir: str = "models/",
+    lookback: int = 96,
+    max_train_seqs: int = 30_000,
+    epochs: int = 30,
+    batch_size: int = 512,
+) -> dict[str, Path]:
+    """
+    End-to-end Transformer training pipeline for Model A (Winterthur net-load).
+
+    Uses a compact encoder-only Transformer (Pre-LN, 2 layers, d_model=64, 4 heads)
+    with the same sliding-window design as the LSTM variant.  The same
+    *max_train_seqs* subsampling strategy is applied to keep CPU training time
+    manageable.
+
+    Steps:
+      1. Load parquet splits from *data_dir*.
+      2. Fit z-score scalers on the training split.
+      3. Train TransformerModel with early stopping on the validation MSE.
+      4. Evaluate on the test split and save ``metrics_transformer_load_<date>.json``.
+      5. Save model bundle to ``transformer_load_<date>.pt``.
+
+    Args:
+        data_dir:       Directory containing parquet files from run_load_export().
+        models_dir:     Output directory for model files and metrics.
+        lookback:       Sliding-window length (default 96 = 24 h at 15-min).
+        max_train_seqs: Maximum number of training sequences (most-recent rows).
+        epochs:         Maximum training epochs.
+        batch_size:     Mini-batch size.
+
+    Returns:
+        Dict mapping ``"transformer_load"`` to the saved ``.pt`` path.
+    """
+    import numpy as np  # noqa: PLC0415
+
+    from modelling.evaluate import check_load_quality, compute_metrics, save_metrics  # noqa: PLC0415
+    from modelling.sequence_models import (  # noqa: PLC0415
+        TransformerModel,
+        predict_from_sequences,
+        save_torch_model,
+        seed_everything,
+        train_sequence_model,
+    )
+
+    data_path = Path(data_dir)
+    for fname in ("X_train.parquet", "y_train.parquet"):
+        if not (data_path / fname).exists():
+            raise FileNotFoundError(
+                f"{fname} not found in {data_dir!r}. Run run_load_export() first."
+            )
+
+    X_train = pd.read_parquet(data_path / "X_train.parquet").fillna(0)
+    y_train = pd.read_parquet(data_path / "y_train.parquet")
+    X_val   = pd.read_parquet(data_path / "X_val.parquet").fillna(0) if (data_path / "X_val.parquet").exists() else None
+    y_val   = pd.read_parquet(data_path / "y_val.parquet") if (data_path / "y_val.parquet").exists() else None
+    X_test  = pd.read_parquet(data_path / "X_test.parquet").fillna(0) if (data_path / "X_test.parquet").exists() else None
+    y_test  = pd.read_parquet(data_path / "y_test.parquet") if (data_path / "y_test.parquet").exists() else None
+
+    X_train = _drop_redundant_calendar_cols(X_train)
+    X_val   = _drop_redundant_calendar_cols(X_val)
+    X_test  = _drop_redundant_calendar_cols(X_test)
+
+    feature_cols = list(X_train.columns)
+    X_mean, X_scale, y_mean, y_scale = _fit_scalers(X_train, y_train)
+
+    X_tr_np = X_train.values.astype("float32")
+    y_tr_np = y_train.values.ravel().astype("float32")
+    X_tr_sc = (X_tr_np - X_mean) / X_scale
+    y_tr_sc = (y_tr_np - y_mean) / y_scale
+
+    X_val_ctx_sc: np.ndarray | None = None
+    y_val_ctx_sc: np.ndarray | None = None
+    if X_val is not None and y_val is not None:
+        X_val_np = X_val.values.astype("float32")
+        y_val_np = y_val.values.ravel().astype("float32")
+        X_val_ctx = np.concatenate([X_tr_np[-lookback:], X_val_np], axis=0)
+        y_val_ctx = np.concatenate([y_tr_np[-lookback:], y_val_np])
+        X_val_ctx_sc = (X_val_ctx - X_mean) / X_scale
+        y_val_ctx_sc = (y_val_ctx - y_mean) / y_scale
+
+    seed_everything(42)
+    model = TransformerModel(input_size=len(feature_cols), d_model=64, nhead=4, num_layers=2, dropout=0.1)
+    print(f"Training Transformer (Model A load), lookback={lookback}, max_seqs={max_train_seqs}")
+
+    model, val_losses = train_sequence_model(
+        model, X_tr_sc, y_tr_sc,
+        lookback=lookback,
+        X_val=X_val_ctx_sc, y_val=y_val_ctx_sc,
+        epochs=epochs, batch_size=batch_size,
+        max_train_seqs=max_train_seqs,
+    )
+
+    paths: dict[str, Path] = {}
+    if X_test is not None and y_test is not None:
+        X_test_np = X_test.values.astype("float32")
+        y_test_np = y_test.values.ravel().astype("float32")
+        X_val_np_last = (X_val.values.astype("float32") if X_val is not None else X_tr_np)
+        X_test_ctx = np.concatenate([X_val_np_last[-lookback:], X_test_np], axis=0)
+        X_test_ctx_sc = (X_test_ctx - X_mean) / X_scale
+        preds_sc = predict_from_sequences(model, X_test_ctx_sc, lookback)
+        preds = preds_sc * y_scale + y_mean
+
+        print("\n── Transformer Load evaluation on test set ──")
+        metrics = {"transformer_load": compute_metrics(y_test_np, preds)}
+        save_metrics(metrics, "metrics_transformer_load", models_dir)
+        m = metrics["transformer_load"]
+        print(f"transformer_load  MAE={m['mae']:.1f}  RMSE={m['rmse']:.1f}  MAPE={m['mape']:.2f}%")
+        check_load_quality({"model_load": m})
+
+    config = {
+        "model_type": "transformer",
+        "input_size": len(feature_cols),
+        "d_model": 64,
+        "nhead": 4,
+        "num_layers": 2,
+        "dropout": 0.1,
+    }
+    paths["transformer_load"] = save_torch_model(
+        model, config, X_mean, X_scale, y_mean, y_scale,
+        feature_cols, lookback, name="transformer_load", models_dir=models_dir,
+        val_losses=val_losses,
+    )
+    print(f"Saved transformer_load: {paths['transformer_load']}")
     return paths
 
 
