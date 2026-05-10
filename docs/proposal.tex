@@ -1,0 +1,129 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+% babel not needed
+\usepackage[margin=2cm, top=2cm, bottom=2cm]{geometry}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[hyphens]{url}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{parskip}
+% microtype removed for compatibility
+\usepackage{fancyhdr}
+
+% --- Colors ---
+\definecolor{titlecolor}{HTML}{2D2D2D}
+\definecolor{rulecolor}{HTML}{999999}
+\definecolor{lightgray}{HTML}{F5F5F5}
+
+\definecolor{linkcolor}{HTML}{333333}
+
+% --- Formatting ---
+\titleformat{\section}{\Large\bfseries\color{titlecolor}}{}{0em}{}
+\titleformat{\subsection}{\normalsize\bfseries\color{titlecolor}}{}{0em}{}
+\titlespacing*{\section}{0pt}{1em}{0.4em}
+\titlespacing*{\subsection}{0pt}{0.6em}{0.2em}
+
+% --- Header/Footer ---
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[C]{\small\thepage\,/\,2}
+
+% --- Hyperlinks ---
+\hypersetup{colorlinks=true, linkcolor=black, urlcolor=linkcolor, citecolor=linkcolor}
+
+% --- Compact lists ---
+\setlist{nosep, leftmargin=1.5em}
+
+\begin{document}
+\sloppy
+
+% --- Title Block ---
+\begin{center}
+  {\LARGE\bfseries\color{titlecolor} Big Data Small Price}\\[0.3em]
+  {\normalsize Vorhersage dynamischer Strompreise unter Einbezug von\\Echtzeit-Wetterdaten und Day-Ahead-Preisen}\\[0.5em]
+  {\small\color{gray} Big Data Projekt DS23t PM4\quad|\quad Bachmann Ryan, Dinis Silva Miguel, Ruchti Gian}
+\end{center}
+
+\vspace{0.3em}
+
+\section{Problemstellung}
+
+Im Rahmen der Schweizer Energiewende sind Netzbetreiber ab 2026 verpflichtet, ihren Kunden dynamische Stromtarife anzubieten. Strompreise reagieren heute kurzfristig auf Angebots- und Nachfrageschwankungen, insbesondere auf erneuerbare Einspeisung (Photovoltaik, Wind) sowie Lastspitzen. Für Endverbraucher sind diese Preisfluktuationen jedoch nur eingeschränkt transparent und kaum prognostizierbar, obwohl sie ein erhebliches Potenzial zur Kostenoptimierung und zur Netzstabilisierung bieten.
+
+Ziel dieses Projekts ist die Entwicklung eines datengetriebenen Prognosemodells für dynamische Strompreise unter Einbezug von Day-Ahead-Marktpreisen (ENTSO-E), Echtzeit-Wetterdaten (MeteoSchweiz) und der API des Elektrizitätswerks Zürich (EKZ). Durch die Verknüpfung mehrerer grosser, heterogener Datenquellen und die Verarbeitung historischer sowie nahezu Echtzeit-Daten entsteht eine skalierbare Big-Data-Pipeline. Die Neuheit liegt in der Integration von Markt-, Wetter- und Zeitreihendaten in einem konsistenten Prognosesystem, der Ableitung konkreter Handlungsempfehlungen für Haushalte sowie der Visualisierung in einem interaktiven Dashboard für den Standort Winterthur.
+
+\section{Fragestellung und Ziel}
+
+\textit{Wie genau lassen sich kurzfristige Strompreise für den Standort Winterthur durch die Kombination von Day-Ahead-Preisen und meteorologischen Echtzeitdaten prognostizieren?}
+
+Daraus ergeben sich folgende Projektziele:
+\begin{itemize}
+  \item Aufbau einer automatisierten Datenpipeline zur Aggregation von ENTSO-E- und MeteoSchweiz-Daten
+  \item Entwicklung eines Zeitreihenmodells zur Vorhersage von Strompreisen für die nächsten 24\,Stunden
+  \item Quantitative Evaluation des Modells mit den dynamischen Preisen von EKZ
+  \item Onboarding-Prozess für Nutzer, um deren individuellen Stromverbrauch zu ermitteln
+  \item Visualisierung der Ergebnisse in einem interaktiven Dashboard für den Standort Winterthur
+\end{itemize}
+
+\section{Vorgehen, Methode und Daten}
+
+\subsection{Datenquellen}
+Die Daten umfassen historische Zeitreihen sowie laufend aktualisierte Werte und ergeben in Kombination mehrere Millionen Datenpunkte:
+\begin{itemize}
+  \item \textbf{ENTSO-E Transparency Platform}: Day-Ahead-Preise, Markt- und Lastdaten
+  \item \textbf{MeteoSchweiz API}: Temperatur, Globalstrahlung, Bewölkung, Wind, Niederschlag
+  \item \textbf{EKZ API}: dynamische Strompreise
+  \item \textbf{BAFU Hydrologiedaten}: Wasserpegel der Flüsse und Seen in der Schweiz
+\end{itemize}
+
+\subsection{Methodischer Ansatz}
+\begin{enumerate}
+  \item Aufbau einer ETL-Pipeline (Extraction, Transformation, Loading) mit Speicherung in einer Datenbank
+  \item Feature Engineering (z.\,B. Lag-Variablen, gleitende Mittelwerte, Interaktionen zwischen Wetter und Preis)
+  \item Erstellung einer Export-Pipeline für Big-Data-Formate (\texttt{.h5} oder \texttt{.parquet})
+  \item Modellierung mittels Machine-Learning-Verfahren (z.\,B. XGBoost, Random Forest, LSTM)
+  \item Evaluation der Modellgüte anhand historischer Testperioden
+\end{enumerate}
+
+\subsection{Geplantes Dashboard}
+Das Endprodukt umfasst eine Preisprognose mit Unsicherheitsintervall, die Markierung günstiger und teurer Zeitfenster, gerätespezifische Empfehlungen (z.\,B. Waschmaschine 13:00--15:00) sowie eine Erklärkomponente zur Preisentwicklung (z.\,B. hohe PV-Einspeisung).
+
+\subsection{Erwartete Herausforderungen}
+Datenlatenz und API-Limitierungen, die Integration heterogener Datenquellen, Datenqualität und fehlende Werte, komplexe Korrelationen zwischen Wetter und Marktpreisen sowie User-Management.
+
+\section{Zeitplan und Aufgabenverteilung}
+\vspace{-0.3em}\color{rulecolor}\rule{\linewidth}{0.4pt}\color{black}
+
+\vspace{0.2em}
+\begin{tabularx}{\textwidth}{@{}l X l@{}}
+  \toprule
+  \textbf{Phase} & \textbf{Aufgabe} & \textbf{Verantwortlich} \\
+  \midrule
+  Woche 2--3  & Proposal, Requirements \& API-Integration (ENTSO-E, MeteoSchweiz, EKZ, BAFU) & Alle \\
+  Woche 4--5  & ETL-Pipeline, Datenbank-Speicherung, EDA \& Datenbereinigung & Gian / Miguel \\
+  Woche 6--7  & Feature Engineering \& User Onboarding/Management & Miguel / Ryan \\
+  Woche 8--9  & Baseline- \& fortgeschrittene Modellierung (XGBoost, RF, LSTM) & Gian / Ryan \\
+  Woche 10--11 & Evaluation mit EKZ-Daten, Optimierung \& Backend-Entwicklung & Gian / Miguel \\
+  Woche 12--13 & Dashboard Frontend, Testing \& Integration & Gian \\
+  Woche 14    & Abschluss-Dokumentation \& Präsentation & Miguel / Ryan \\
+  \bottomrule
+\end{tabularx}
+
+\section{Quellenangaben}
+\vspace{-0.3em}\color{rulecolor}\rule{\linewidth}{0.4pt}\color{black}
+
+\begin{itemize}
+  \item ENTSO-E Transparency Platform: \url{https://transparency.entsoe.eu}
+  \item MeteoSchweiz Open Data / API: \url{https://www.meteoswiss.admin.ch}
+  \item EKZ API: \url{https://api.tariffs.ekz.ch/swagger/index.html?urls.primaryName=EKZ}
+  \item BAFU Hydrologiedaten: \url{https://www.bafu.admin.ch/de/datenservice-hydrologie-fuer-fliessgewaesser-und-seen}
+\end{itemize}
+
+\end{document}
