@@ -1,51 +1,81 @@
-# Plan: README.md erstellen für BigDataSmallPrice
+# Big Data Small Price
 
-## Context
-Das Projekt "BigDataSmallPrice" ist eine dynamische Strompreis-Prognose-Plattform für Winterthur (ZHAW PM4 Semesterprojekt).
+**Prognose dynamischer Strompreise für Winterthur** unter Einbezug von Day-Ahead-Marktpreisen (ENTSO-E), Echtzeit-Wetterdaten (MeteoSchweiz / Open-Meteo) und EKZ-Tariffstrukturen.
 
-## Empfohlene Struktur & Unterkategorien
+Big-Data-Projekt DS23t PM4 — ZHAW
+Team: Ryan Bachmann, Miguel Dinis Silva, Gian Ruchti
 
-### 1. Titel & Badges
+---
 
-### 2. Projektbeschreibung
+## Was das System tut
 
-### 3. Features / Funktionsübersicht
+Zwei dynamische Tarife für Winterthur in 15-Minuten-Auflösung werden bis zu 7 Tage im Voraus prognostiziert:
 
-### 4. Architektur / Systemübersicht
+- **Dynamischer Netzpreis** — Prognose der lokalen Netzlast (Bruttolastgang OGD seit 2013) kombiniert mit der EKZ-Netzpreisformel.
+- **Dynamischer Energiepreis** — EPEX-Day-Ahead-Spotpreis-Prognose kombiniert mit der EKZ-Energietarifformel.
 
-### 5. Tech Stack
+Endprodukt: ein Web-Dashboard mit 7-Tage-Vorschau, Konfidenzintervallen, Ampel für günstige Zeitfenster und einem Onboarding zur Verbrauchsschätzung.
 
-### 6. Voraussetzungen
+## Architektur
 
-### 7. Installation & Setup
+| Komponente | Stack |
+|---|---|
+| Datenquellen | ENTSO-E Transparency Platform, Open-Meteo, EKZ Tariff API, BAFU Hydro |
+| ETL / Orchestration | Apache Airflow (DAGs für Backfill, Pipeline, Training) |
+| Storage | TimescaleDB (Zeitreihen), PostgreSQL (Airflow-Metadaten) |
+| Modellierung | XGBoost, LSTM, Transformer (PyTorch) — Auto-Select des besten Modells pro Ziel |
+| API | FastAPI (`src/api/main.py`) |
+| Frontend | Static HTML + JS (User- und Admin-Dashboard), Nginx |
+| Compute | GPU (CUDA) für Sequenzmodelle |
 
-### 8. Verwendung
-- Airflow WebUI: http://localhost:8080
-- API: http://localhost:8001
-- ETL läuft täglich um 06:00 UTC
-- Training manuell auslösen
+## Quickstart
 
-### 9. API-Dokumentation (Kurzübersicht)
+Voraussetzungen: Docker + Docker Compose, NVIDIA Container Toolkit für GPU-Training.
 
-### 10. Projektstruktur
+```bash
+cp .env.example .env
+# .env editieren: ENTSOE_API_TOKEN, DB-Passwörter, JWT-Secret setzen
 
-### 11. Datenquellen
-- ENTSO-E Transparency Platform
-- Open-Meteo API
-- EKZ / CKW / Groupe E Tarife
-- BAFU Hydrodaten
-- Stadtwerk Winterthur
+docker compose up -d
+```
 
-### 12. ML-Modelle
-- Model A: Netzlast-Prognose
-- Model B: EPEX-Preisprognose
-- Trainingsansatz (chronologischer Split, Early Stopping)
+Endpoints nach dem Start:
 
-### 13. Tests
+- User-Dashboard: <http://localhost/>
+- Admin-Dashboard: <http://localhost/admin>
+- API: <http://localhost:8000/docs>
+- Airflow: <http://localhost:8080>
 
-### 14. Mitwirkende / Team
+Historischen Backfill auslösen:
 
-### 15. Lizenz
+```bash
+./scripts/trigger_historical_backfill.sh
+```
 
+## Repository-Struktur
 
+```
+airflow/         DAGs für ETL und Training
+data/            Rohdaten und Feature-Splits (gitignored)
+docs/            Proposal, technische Anforderungen, Tarif-Referenzen
+infra/db/        Schema und Migrationen für TimescaleDB
+models/          Trainierte Modelle (gitignored); best_models.json als Index
+scripts/         Operative Skripte (Backfill, DB-Backup)
+src/api/         FastAPI-Backend
+src/data_collection/  Collectors für ENTSO-E, Open-Meteo, EKZ, BAFU
+src/etl/         Fetch- und Transform-Tasks
+src/frontend/    Static Dashboards (User + Admin) + Nginx-Config
+src/modelling/   Training, Prediction, Evaluation
+src/processing/  Feature-Pipeline und Tarif-Formeln
+src/testing/     Unit-Tests
+```
 
+## Dokumentation
+
+- [`docs/Proposal.md`](docs/Proposal.md) — Projektantrag mit Fragestellung und Methodik
+- [`docs/req.md`](docs/req.md) — Technische Implementationsschritte und Architektur-Details
+- [`analysis/cyclical_migration_analysis.md`](analysis/cyclical_migration_analysis.md) — Hintergrund zur zyklischen Feature-Kodierung
+
+## Lizenz
+
+Siehe [`LICENSE`](LICENSE).
