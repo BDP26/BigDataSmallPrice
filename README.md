@@ -58,61 +58,35 @@ Nginx / statische Dashboards
 
 ## Datenquellen
 
+| Quelle | Zweck |
+| --- | --- |
+| ENTSO-E Transparency Platform | Day-Ahead-Preise, Last, Lastprognosen, Erzeugung, Grenzflüsse |
+| Open-Meteo | Wetterdaten für Winterthur sowie deutsche Wind-/Solar-Proxies |
+| EKZ | Dynamische Tarifdaten und Tarifformeln |
+| CKW / Groupe E | Vergleichbare dynamische Tarife |
+| BAFU | Hydrologische Daten |
+| Stadtwerk Winterthur | Lokale Bruttolast und PV-Einspeisung |
 
+## Modelle
 
+Das Projekt trennt zwei Vorhersageaufgaben:
 
+- **Model B / Energy:** prognostiziert den EPEX-Day-Ahead-Preis in EUR/MWh.
+- **Model A / Load:** prognostiziert die lokale Netto-Netzlast in kWh.
 
+Die API kombiniert beide Outputs mit den Tarifformeln aus
+`src/processing/tariff_formulas.py`. Falls noch kein Lastmodell verfügbar ist,
+fällt die Prognose auf einen Energiepreis-Only-Modus mit Standard-Netzpreis
+zurück.
 
+Trainierte Modelle und Metriken liegen unter `models/`. Das Manifest
+`models/best_models.json` steuert, welche Modelle die API bevorzugt verwendet.
 
+## Voraussetzungen
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+- Docker und Docker Compose
+- Python 3.11 oder neuer für lokale Entwicklung
+- ENTSO-E API Token
+- Optional: NVIDIA Container Toolkit für GPU-beschleunigtes Training
 
 
