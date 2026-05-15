@@ -179,11 +179,27 @@ ENTSO-E-Rate-Limits durch chunked Backfills.
 
 ## Wichtige API-Endpunkte
 
+| Endpoint | Beschreibung |
+| --- | --- |
+| `GET /api/forecast` | Aktuelle Tarifprognose mit Energie-, Netz- und Gesamttarif |
+| `GET /api/forecast/week` | Wochenprognose für günstige Zeitfenster |
+| `GET /api/price-history` | Letzte ENTSO-E-Preise |
+| `GET /api/db-status` | Tabellenstatistiken und Datenbankstatus |
+| `GET /api/db-explorer/schema` | Datenbankschema für das Admin-Dashboard |
+| `GET /api/feature-status` | Status der Trainingsfeatures |
+| `GET /api/airflow/dags` | Airflow-DAG-Status über API-Proxy |
+| `GET /api/rate-limits` | Aktuelle API-Call- und Rate-Limit-Übersicht |
+| `POST /api/backfill/estimate` | Schätzung für Backfill-Aufwand |
+| `POST /api/backfill/trigger` | Startet `bdsp_backfill` |
+| `GET /api/backfill/status/{dag_run_id}` | Status eines Backfill-Runs |
+| `GET /api/models/status` | Trainierte Modelle und Metriken |
+| `GET /api/models/validation/{model_name}` | Validierungsdaten für ein Modell |
+| `POST /api/training/trigger` | Startet `bdsp_training_daily` |
+| `GET /api/training/status/{dag_run_id}` | Status eines Trainings-Runs |
+| `POST /auth/register` | Test-User für JWT-Endpunkte erstellen |
+| `POST /auth/login` | JWT beziehen |
+| `POST /api/predict` | Direkte Modellinferenz mit Feature-Dict, JWT erforderlich |
 
-
-
-
-
-
+## Lokale Entwicklung
 
 
