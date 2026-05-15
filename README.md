@@ -24,3 +24,95 @@ Das Projekt entstand im Rahmen von PM4 an der ZHAW.
   Backfills, Trainingsjobs, Rate-Limits und Modellmetriken.
 
 ## Architektur
+
+```text
+Externe Datenquellen
+        |
+        v
+Apache Airflow DAGs  --->  TimescaleDB / PostgreSQL
+        |                         |
+        |                         v
+        +--------------->  Feature Views / Parquet Exports
+                                  |
+                                  v
+                          Modelltraining
+                                  |
+                                  v
+FastAPI Backend  <-------  Modellartefakte
+        |
+        v
+Nginx / statische Dashboards
+```
+
+| Bereich | Technologie / Pfad |
+| --- | --- |
+| Orchestrierung | Apache Airflow, `airflow/dags/` |
+| Datenbank | TimescaleDB für Projektdaten, PostgreSQL für Airflow-Metadaten |
+| Backend | FastAPI, `src/api/main.py` |
+| Frontend | Statische HTML/JS-Dashboards, Nginx, `src/frontend/` |
+| Datenbeschaffung | Collector in `src/data_collection/` und ETL-Tasks in `src/etl/` |
+| Feature Engineering | SQL-Views in `infra/db/init.sql`, Exporte in `src/processing/` |
+| Modellierung | scikit-learn, XGBoost, PyTorch, `src/modelling/` |
+| Deployment | Docker Compose |
+| Tests | pytest, `src/testing/` |
+
+## Datenquellen
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
