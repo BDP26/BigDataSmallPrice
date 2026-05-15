@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1778838888.16747 "c:/Users/migue/Github/BigDataSmallPrice/abschlussbericht/abschlussbericht.tex" "abschlussbericht.pdf" "abschlussbericht" 1778838893.71462 0
+["pdflatex"] 1778839676.29668 "c:/Users/migue/Github/BigDataSmallPrice/abschlussbericht/abschlussbericht.tex" "abschlussbericht.pdf" "abschlussbericht" 1778839682.3183 0
   "C:/Users/migue/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map" 1778836400 187664 65fa417f6850b604c49bfafe76826e39 ""
   "C:/Users/migue/AppData/Local/MiKTeX/miktex/data/le/pdftex/pdflatex.fmt" 1772364294 13333486 369dc11ac2f36a37cea1b2b2b10e8a50 ""
   "C:/Users/migue/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/inconsolata/i4-t1-4.enc" 1557958141 7693 0f2dce6d313c82989ec3a67fc24df2a0 ""
@@ -66,6 +66,7 @@
   "C:/Users/migue/AppData/Local/Programs/MiKTeX/fonts/type1/public/libertine/LinLibertineTZ.pfb" 1497089889 526513 6202ae88302da257d8876e2fd92620cb ""
   "C:/Users/migue/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/LibertineMathMI.pfb" 1736607166 35829 e5b81ebdef873b4e07e10dde7ac213f2 ""
   "C:/Users/migue/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/LibertineMathMI7.pfb" 1736607166 36894 5faa3d8244e2228f0a366635240ed4d4 ""
+  "C:/Users/migue/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/NewTXMI.pfb" 1736607166 32409 70669e52221234457749adcf327540bc ""
   "C:/Users/migue/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/txexs.pfb" 1736607166 33424 8b2b99d9d7571201cc7eece13c492c55 ""
   "C:/Users/migue/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/txmiaX.pfb" 1736607166 65081 1217ccf27de85b7db49806ee29c16745 ""
   "C:/Users/migue/AppData/Local/Programs/MiKTeX/fonts/type1/public/newtx/txsys.pfb" 1736607166 45985 fd5f8adcc4f0e93e9a95469e12126723 ""
@@ -323,10 +324,10 @@
   "C:/Users/migue/AppData/Local/Programs/MiKTeX/tex/latex/xcolor/xcolor.sty" 1729265222 55384 b454dec21c2d9f45ec0b793f0995b992 ""
   "C:/Users/migue/AppData/Local/Programs/MiKTeX/tex/latex/xkeyval/xkeyval.sty" 1656236919 4937 4ce600ce9bd4ec84d0250eb6892fcf4f ""
   "C:/Users/migue/AppData/Local/Programs/MiKTeX/tex/latex/xstring/xstring.sty" 1693735632 123 a302f2c651a95033260db60e51527ae8 ""
-  "abschlussbericht.aux" 1778838892 7917 785bdc9eb470942bf38302934e7dfbac "pdflatex"
-  "abschlussbericht.out" 1778838892 4935 b90c91d3a8525081c92d1461894e088e "pdflatex"
-  "abschlussbericht.tex" 1778838885 41433 a81377c1db79abb5e94ce58c74a7dbea ""
-  "c:/Users/migue/Github/BigDataSmallPrice/abschlussbericht/abschlussbericht.tex" 1778838885 41433 a81377c1db79abb5e94ce58c74a7dbea ""
+  "abschlussbericht.aux" 1778839680 7917 60804362ccc5fd8c31ae112ce3e29c65 "pdflatex"
+  "abschlussbericht.out" 1778839680 4935 b90c91d3a8525081c92d1461894e088e "pdflatex"
+  "abschlussbericht.tex" 1778839668 43515 b29c2315bac28b6c6be509ddba2680f9 ""
+  "c:/Users/migue/Github/BigDataSmallPrice/abschlussbericht/abschlussbericht.tex" 1778839668 43515 b29c2315bac28b6c6be509ddba2680f9 ""
   (generated)
   "abschlussbericht.aux"
   "abschlussbericht.log"

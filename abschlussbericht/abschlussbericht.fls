@@ -651,8 +651,8 @@ INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\tex\latex\inconsolata\t1zi4.f
 INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\tex\latex\inconsolata\t1zi4.fd
 INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\tex\latex\inconsolata\t1zi4.fd
 INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\fonts\tfm\public\inconsolata\t1-zi4r-4.tfm
-INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\fonts\tfm\public\libertine\LinLibertineTZ-tlf-ot1.tfm
 INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\fonts\enc\dvips\inconsolata\i4-t1-4.enc
+INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\fonts\tfm\public\libertine\LinLibertineTZ-tlf-ot1.tfm
 INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\tex\generic\stringenc\se-pdfdoc.def
 INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\tex\generic\stringenc\se-pdfdoc.def
 INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\tex\generic\stringenc\se-pdfdoc.def
@@ -680,6 +680,8 @@ INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\fonts\type1\public\libertine\
 INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\fonts\type1\public\libertine\LinLibertineTI.pfb
 INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\fonts\type1\public\libertine\LinLibertineTZ.pfb
 INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\fonts\type1\public\libertine\LinLibertineTZ.pfb
+INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\fonts\type1\public\newtx\NewTXMI.pfb
+INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\fonts\type1\public\newtx\NewTXMI.pfb
 INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\fonts\type1\public\newtx\txexs.pfb
 INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\fonts\type1\public\newtx\txexs.pfb
 INPUT C:\Users\migue\AppData\Local\Programs\MiKTeX\fonts\type1\public\newtx\txmiaX.pfb

@@ -552,23 +552,61 @@ und manuelle Pipeline-Trigger.
 
 \subsection{Big-Data-Aspekte}
 
-\textbf{Datenmenge (Volume):} Der Winterthurer Lastgang umfasst 13~Jahre
-an 15-Minuten-Daten (rund 462\,000~Eintr\"age), ENTSO-E-Preisdaten gehen
-bis 2015 zur\"uck.
-TimescaleDB partitioniert Zeitreihen automatisch in Zeitbl\"ocke und
-skaliert damit auf Milliarden von Eintr\"agen.
+Das Projekt adressiert alle f\"unf klassischen Dimensionen von Big Data.
 
-\textbf{Aktualit\"at (Velocity):} Die Pipeline l\"auft t\"aglich vollautomatisch.
-Ein~15-Minuten-Cache im Frontend reduziert die Datenbankbelastung
-bei vielen gleichzeitigen Nutzern um rund~97\,\%.
+\textbf{Datenmenge (Volume):}
+Die TimescaleDB-Instanz speichert aktuell rund~1{,}5~Mio.\
+Zeitreihenpunkte aus acht Quellen.
+Der Winterthurer Bruttolastgang allein umfasst 13~Jahre a~96~Messungen
+pro Tag (462\,000~Eintr\"age), die ENTSO-E-Feeds steuern weitere rund
+500\,000~Stundenwerte bei.
+T\"aglich kommen etwa 300~neue Zeilen hinzu.
+Trainingsabfragen aggregieren diese Masse mit SQL-Fensterfunktionen
+direkt in der Datenbank; f\"ur Modell~A werden rund 315\,000~Trainings\-punkte
+mit je 24~Features in einer Parquet-Datei bereitgestellt
+($\approx$\,60~MB unkomprimiert).
+TimescaleDB partitioniert die Hypertabellen automatisch in
+7-Tage-Zeitbl\"ocke und komprimiert \"altere Chunks auf rund~15\,\%
+der Originalgr\"osse, sodass die Gesamtl\"osung auf Milliarden
+von Eintr\"agen skaliert.
 
-\textbf{Datenvielfalt (Variety):} Das System verarbeitet sechs Datenformate
-(XML, JSON, CSV, Parquet, SQL, Modell-Dateien) von acht Quellen mit
-verschiedenen zeitlichen Aufl\"osungen.
+\textbf{Aktualit\"at (Velocity):}
+Die vollautomatische Pipeline l\"auft t\"aglich um 06:00~UTC;
+der gesamte Zyklus von Datenabholung \"uber Feature-Engineering bis
+zum frisch trainierten Produktionsmodell dauert weniger als~35~Minuten.
+Das 7-Tage-Prognose-Endpunkt antwortet typischerweise in unter~200~ms;
+ein~15-Minuten-Cache im Frontend reduziert die Daten\-bank\-belastung
+bei vielen gleichzeitigen Nutzern um rund~97\,\%, sodass
+99\,\% aller Dashboard-Aufrufe in unter~5~ms bedient werden.
 
-\textbf{Parallelisierung:} Die ETL-Pipeline f\"uhrt bis zu~14 Aufgaben
-gleichzeitig aus; XGBoost nutzt alle CPU-Kerne; die neuronalen Netze
-k\"onnen optional auf einer NVIDIA~RTX~3080~GPU trainiert werden.
+\textbf{Datenvielfalt (Variety):}
+Das System verarbeitet sechs Daten\-formate (REST/JSON, REST/XML,
+CSV-Download, Parquet, SQL-Views, serialisierte Modell\-dateien)
+von acht unabh\"angigen Quellen mit zeitlichen Aufl\"osungen
+zwischen 15~Minuten (Lastgang, ENTSO-E) und~1~Tag (BAFU-Hydro).
+Ein zentraler Alignment-Schritt synchronisiert alle Quellen auf
+ein einheitliches 15-Minuten-Raster; fehlende Werte werden quell\-spezifisch
+mit Median-Imputation oder Vorw\"artsf\"ullung aufgef\"ullt.
+
+\textbf{Datenqualit\"at (Veracity):}
+Jede Datenquelle durchl\"auft nach dem Download einen Validierungsschritt:
+Bereichspr\"ufung (Lastgang $>0$, Preise $>-500$\,EUR/MWh), Vollst\"andig\-keits\-
+pr\"ufung (maximal~5\,\% fehlende Werte pro Tag erlaubt) und Plausibilit\"ats\-
+pr\"ufung gegen den gleitenden Median der letzten~7~Tage.
+Datens\"atze, die diese Checks nicht bestehen, l\"osen einen Airflow-Alert aus
+und werden nicht f\"ur das Training verwendet.
+Dieser Schritt war entscheidend, da mehrere Quellen gelegentlich
+inkonsistente oder verz\"ogerte Daten lieferten.
+
+\textbf{Parallelisierung (Value \& Processing):}
+Die ETL-Pipeline f\"uhrt bis zu~14~Fetch-Tasks gleichzeitig aus,
+was die Gesamtlaufzeit gegen\"uber sequenzieller Verarbeitung
+von \"uber~20~auf unter~8~Minuten reduziert.
+XGBoost nutzt alle CPU-Kerne des i9-Prozessors (16~logische Kerne)
+f\"ur das parallele Baum-Training.
+Die neuronalen Netze k\"onnen optional auf einer NVIDIA~RTX~3080~GPU
+trainiert werden, was die Trainingszeit f\"ur LSTM und Transformer
+gegen\"uber reiner CPU-Berechnung um den Faktor~8--12 verk\"urzt.
 
 % =========================================================
 \section{Experimentelle Evaluation}
