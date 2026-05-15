@@ -82,11 +82,6 @@ zurück.
 Trainierte Modelle und Metriken liegen unter `models/`. Das Manifest
 `models/best_models.json` steuert, welche Modelle die API bevorzugt verwendet.
 
-## Voraussetzungen
 
-- Docker und Docker Compose
-- Python 3.11 oder neuer für lokale Entwicklung
-- ENTSO-E API Token
-- Optional: NVIDIA Container Toolkit für GPU-beschleunigtes Training
 
 
