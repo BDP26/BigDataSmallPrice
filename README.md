@@ -132,11 +132,41 @@ Beim ersten Start initialisiert Docker Compose die TimescaleDB, migriert die
 Airflow-Datenbank, erstellt den Airflow-Admin-User und richtet Airflow-Pools
 für API-Rate-Limits ein.
 
+## Verfügbare Services
 
+| Dienst | URL |
+| --- | --- |
+| User-Dashboard | http://localhost:8002 |
+| Admin-Dashboard | http://localhost:8002/admin |
+| API / Swagger | http://localhost:8001/docs |
+| Airflow Web UI | http://localhost:8080 |
+| TimescaleDB vom Host | `localhost:5433` |
 
+Hinweis: Die API läuft im Container auf Port `8000` und ist auf dem Host unter
+Port `8001` erreichbar.
 
+## Airflow DAGs
 
+| DAG | Zeitplan | Zweck |
+| --- | --- | --- |
+| `bdsp_etl_daily` | täglich 06:00 | Importiert aktuelle Daten aus allen Quellen in TimescaleDB |
+| `bdsp_feature_daily` | täglich 07:00 | Erstellt ML-Features und Parquet-Exporte |
+| `bdsp_training_daily` | manuell | Trainiert Energy- und Load-Modelle |
+| `bdsp_backfill` | manuell | Lädt historische Daten für einen Zeitraum nach |
 
+Die DAGs sind beim Erstellen standardmässig pausiert. Sie können in der
+Airflow Web UI oder über das Admin-Dashboard aktiviert bzw. gestartet werden.
+
+## Historischen Backfill starten
+
+Der Backfill kann über das Admin-Dashboard oder direkt über die API gestartet
+werden:
+
+```bash
+curl -X POST http://localhost:8001/api/backfill/trigger \
+  -H "Content-Type: application/json" \
+  -d '{"start_date": "2024-01-01", "end_date": "2024-01-31"}'
+```
 
 
 
