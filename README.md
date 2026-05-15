@@ -202,4 +202,35 @@ ENTSO-E-Rate-Limits durch chunked Backfills.
 
 ## Lokale Entwicklung
 
+Eine lokale Python-Umgebung kann so eingerichtet werden:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Unter Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+Die Tests können ohne laufende Docker-Services gestartet werden, solange keine
+Integrationstests gegen die Datenbank benötigt werden:
+
+```bash
+python -m pytest src/testing/unittests
+```
+
+Alle Tests:
+
+```bash
+python -m pytest src/testing
+```
+
+## Projektstruktur
+
 
