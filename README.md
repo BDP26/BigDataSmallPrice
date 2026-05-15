@@ -168,6 +168,22 @@ curl -X POST http://localhost:8001/api/backfill/trigger \
   -d '{"start_date": "2024-01-01", "end_date": "2024-01-31"}'
 ```
 
+Alternativ gibt es ein Hilfsskript:
+
+```bash
+./scripts/trigger_historical_backfill.sh --from 2024-01-01
+```
+
+Das Skript ist für Bash/Linux-Umgebungen geschrieben und beachtet die
+ENTSO-E-Rate-Limits durch chunked Backfills.
+
+## Wichtige API-Endpunkte
+
+
+
+
+
+
 
 
 
