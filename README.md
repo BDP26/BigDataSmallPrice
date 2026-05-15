@@ -233,4 +233,44 @@ python -m pytest src/testing
 
 ## Projektstruktur
 
+```text
+BigDataSmallPrice/
+|-- airflow/
+|   |-- dags/                  # ETL-, Feature-, Training- und Backfill-DAGs
+|   `-- Dockerfile
+|-- analysis/                  # Technische Analysen
+|-- data/                      # Lokale Daten und Parquet-Exporte
+|-- docs/                      # Proposal, Anforderungen, Tarifdokumente, Slides
+|-- infra/db/                  # TimescaleDB-Schema und Migrationen
+|-- models/                    # Modellartefakte und best_models.json
+|-- scripts/                   # Backfill- und Backup-Hilfsskripte
+|-- src/
+|   |-- api/                   # FastAPI-Anwendung
+|   |-- data_collection/       # Collector für externe APIs
+|   |-- data_cleaning/         # Transformationen und Validierungen
+|   |-- etl/                   # Fetch-Tasks für Airflow
+|   |-- frontend/              # Dashboards und Nginx-Konfiguration
+|   |-- modelling/             # Training, Evaluation und Prediction
+|   |-- processing/            # Feature-Export und Tarifformeln
+|   `-- testing/               # Unit- und Integrationstests
+|-- docker-compose.yml
+|-- pyproject.toml
+|-- requirements.txt
+`-- README.md
+```
+
+weiter mit 
+-wichitige dateien
+-datenbank
+usw
+
+
+
+
+
+
+
+
+
+
 
