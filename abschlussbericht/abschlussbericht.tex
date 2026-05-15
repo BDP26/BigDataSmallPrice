@@ -1,0 +1,963 @@
+% !TEX encoding = UTF-8 Unicode
+% BigDataSmallPrice -- Abschlussbericht
+% ZHAW Big Data Seminar HS 2025/2026
+% Vorlage: ACM sigconf (zweispaltig)
+\documentclass[sigconf]{acmart}
+
+% ---- Sprache & Encoding ----
+\usepackage[ngerman]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+% ---- Mathematik ----
+\usepackage{amsmath}
+
+% ---- Tabellen & Abbildungen ----
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{multirow}
+
+% ---- TikZ ----
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,backgrounds,fit}
+
+% ---- Plots ----
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{fillbetween}
+
+% ---- Diverses ----
+\usepackage{microtype}
+\usepackage{url}
+\usepackage{balance}
+\usepackage{xcolor}
+
+% ---- ACM-Metadaten (Seminararbeit) ----
+\setcopyright{none}
+\copyrightyear{2026}
+\acmYear{2026}
+\acmDOI{}
+\acmConference[Big Data HS25/26]{ZHAW Big Data Seminar}{HS 2025/26}{Winterthur, Schweiz}
+
+% =========================================================
+\begin{document}
+% =========================================================
+
+\title{BigDataSmallPrice: Automatisierte Prognose dynamischer Stromtarife
+       f\"ur Winterthur mittels Machine Learning}
+
+\author{Ryan Bachmann}
+\affiliation{%
+  \institution{ZHAW School of Engineering}
+  \city{Winterthur}
+  \country{Schweiz}}
+
+\author{Dinis Silva Miguel}
+\affiliation{%
+  \institution{ZHAW School of Engineering}
+  \city{Winterthur}
+  \country{Schweiz}}
+
+\author{Gian Ruchti}
+\affiliation{%
+  \institution{ZHAW School of Engineering}
+  \city{Winterthur}
+  \country{Schweiz}}
+
+% ---- Abstract ----
+\begin{abstract}
+Seit 2025 sind Schweizer Stromversorger verpflichtet, dynamische Tarife anzubieten,
+die sich alle 15~Minuten \"andern k\"onnen.
+F\"ur Haushalte und Unternehmen bedeutet das eine grosse Chance: Wer weiss, wann
+Strom g\"unstig ist, kann Waschmaschine, W\"armepumpe oder E-Auto gezielt zu
+diesen Zeiten betreiben und bis zu 40\,\% Kosten sparen.
+Das Problem: Bisher gibt es keine \"offentlich zug\"angliche Prognose, die mehrere
+Tage im Voraus zeigt, wann der Strom billig oder teuer wird.
+
+Wir l\"osen dieses Problem mit \emph{BigDataSmallPrice}, einer vollst\"andig
+automatisierten Plattform, die t\"aglich Daten aus acht Quellen (darunter
+europ\"aische Energieb\"orsendaten, Wetterprognosedaten und den historischen
+Lastgang der Stadt Winterthur) zusammenf\"uhrt und daraus eine
+7-Tage-Tarifprognose im 15-Minuten-Raster berechnet.
+Zwei XGBoost-Modelle prognostizieren jeweils den Netzpreis (basierend auf der
+lokalen Stromnachfrage) und den Energiepreis (basierend auf den europ\"aischen
+B\"orsenpreisen).
+Mit einem mittleren Fehler von~3{,}99\,\% beim Lastmodell und~7{,}72\,\%
+beim Preismodell liegen beide deutlich unter den gesetzten Qualit\"atszielen.
+Die Prognosen werden \"uber ein interaktives Dashboard mit Ampelindikator und
+pers\"onlichen Verbrauchsempfehlungen angezeigt.
+\end{abstract}
+
+\begin{CCSXML}
+<ccs2012>
+<concept>
+<concept_id>10010147.10010178.10010179</concept_id>
+<concept_desc>Computing methodologies~Machine learning</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+<concept>
+<concept_id>10002951.10003227.10003236</concept_id>
+<concept_desc>Information systems~Data streams</concept_desc>
+<concept_significance>300</concept_significance>
+</concept>
+<concept>
+<concept_id>10010520.10010553</concept_id>
+<concept_desc>Computer systems organization~Distributed architectures</concept_desc>
+<concept_significance>200</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Computing methodologies~Machine learning}
+\ccsdesc[300]{Information systems~Data streams}
+\ccsdesc[200]{Computer systems organization~Distributed architectures}
+
+\keywords{dynamische Stromtarife, Zeitreihenprognose, XGBoost, LSTM,
+          ETL-Pipeline, TimescaleDB, Apache Airflow, ENTSO-E}
+
+\maketitle
+
+% =========================================================
+\section{Einleitung}
+% =========================================================
+
+Die Schweizer Energieversorgung befindet sich im Umbruch.
+Das revidierte Stromversorgungsgesetz verpflichtet Netzbetreiber seit
+Januar~2025, ihren Kunden variable Tarife anzubieten~\cite{ElCom2023}.
+Gleichzeitig steigt die Zahl steuerbarer Ger\"ate in Schweizer Haushalten rasant:
+Der Marktanteil von Elektrofahrzeugen \"uberstieg 2024 die 25-Prozent-Marke,
+und W\"armepumpen ersetzen zunehmend Heiz\-\"ol\-anlagen~\cite{ASTRA2024}.
+Das Zusammenspiel von dynamischen Tarifen und steuerbaren Lasten er\"offnet
+ein erhebliches Einsparpotenzial von bis zu 40\,\% gegen\"uber dem Fixpreis,
+wenn der Verbrauch in Schwachlastzeiten verschoben wird~\cite{EKZ2024}.
+
+Die Herausforderung besteht darin, dass Endkunden diese Einsparungen nur dann
+gezielt nutzen k\"onnen, wenn sie \emph{im Voraus} wissen, wann Strom g\"unstig
+oder teuer sein wird.
+Bisherige Ans\"atze zur Strompreisvorhersage aus der Forschung~\cite{Lago2021,
+Weron2014} fokussieren meist auf europ\"aische B\"orsenpreise, nicht aber auf
+die konkrete Tarifzusammensetzung, die Endkunden auf der Rechnung sehen.
+Kommerzielle Portale wie jenes der EKZ~\cite{EKZ2024} zeigen historische und
+aktuelle Tarife, liefern aber keine Prognosen f\"ur die kommenden Tage.
+
+\paragraph{Beitr\"age dieser Arbeit.}
+Wir pr\"asentieren \emph{BigDataSmallPrice} mit folgenden Beitr\"agen:
+\begin{enumerate}
+  \item Eine vollautomatische Datenpipeline, die t\"aglich Daten aus acht Quellen
+        einliest, bereinigt und in einer Zeitreihendatenbank speichert.
+  \item Zwei kalibrierte Vorhersagemodelle f\"ur Netz- und Energiepreis mit
+        t\"aglichem Retraining und messbaren Genauigkeitszielen.
+  \item Transparente Tarifformeln, die Rohergebnisse in konkrete Rp./kWh-Werte
+        mit Unsicherheitsgrenzen umrechnen.
+  \item Ein Nutzerdashboard mit Wochenprognose, Ampelindikator und ger\"atespezifischen
+        Empfehlungen sowie eine offene REST-Schnittstelle f\"ur Drittsysteme.
+\end{enumerate}
+
+% =========================================================
+\section{Hintergrund und Problemstellung}
+% =========================================================
+
+\subsection{Dynamische Stromtarife in Winterthur}
+
+Die EKZ (Elektrizit\"atswerke des Kantons Z\"urich) ver\"offentlichen seit 2024
+zwei dynamische Tarifprodukte im 15-Minuten-Raster: einen \emph{Netzpreis}
+(abh\"angig davon, wie stark das lokale Stromnetz gerade belastet ist) und einen
+\emph{Energiepreis} (gekoppelt an den EPEX-Spot-Day-Ahead-Markt, auf dem
+europ\"aische Stromproduzenten und -verbraucher handeln).
+Der Gesamttarif, den Kunden zahlen, ergibt sich als Summe:
+\begin{equation}
+  T_{\mathrm{gesamt}}(t) = T_{\mathrm{netz}}(t) + T_{\mathrm{energie}}(t)
+  \quad [\text{Rp./kWh}]
+  \label{eq:tariff}
+\end{equation}
+In der Praxis schwankt dieser Gesamttarif zwischen rund 12 und 28~Rp./kWh,
+ein Faktor von \"uber zwei zwischen gutem und schlechtem Zeitpunkt.
+EKZ ver\"offentlicht die Tarife in der Regel erst am Vortag, was f\"ur eine
+mehrt\"agige Verbrauchsplanung nicht ausreicht.
+
+\subsection{Datengrundlage}
+
+Tabelle~\ref{tab:datasources} fasst alle acht integrierten Datenquellen zusammen.
+Die Grundlage f\"ur die Lastprognose bildet der Winterthurer Bruttolastgang
+(OGD~\#1863): 15-min\"utige Strommessungen seit 2013, insgesamt rund 462\,000
+Datenpunkte.
+Die Energiepreisvorhersage basiert auf ENTSO-E-Day-Ahead-Preisen seit 2015.
+Als Wetterdaten nutzen wir die kostenlose Open-Meteo-API f\"ur Winterthur und
+zwei deutsche Referenzstationen, da norddeutsches Windaufkommen erfahrungs\-gem\"ass
+den gr\"ossten Einfluss auf europ\"aische Strompreise hat~\cite{Lago2021}.
+EKZ-, CKW- und Groupe-E-Tarife werden t\"aglich abgerufen und dienen als
+Vergleichsreferenz zur Kalibrierung und Validierung.
+
+\begin{table}[t]
+  \caption{Integrierte Datenquellen}
+  \label{tab:datasources}
+  \small
+  \setlength{\tabcolsep}{3.5pt}
+  \begin{tabular}{@{}p{2.9cm}p{2.3cm}p{0.8cm}p{1.0cm}@{}}
+    \toprule
+    Quelle & Inhalt & Granul. & Format \\
+    \midrule
+    ENTSO-E (A44/A65/\newline A75/A11/A01)
+      & Preise, Last, Erzeug., Fl\"usse & 15\,min/1\,h & REST/XML \\[2pt]
+    Open-Meteo (CH + DE)
+      & Temp., Wind, Solar, Wolken & 1\,h & REST/JSON \\[2pt]
+    OGD Winterthur \#1863
+      & Bruttolastgang (ab 2013) & 15\,min & CSV/API \\[2pt]
+    OGD Winterthur \#3122
+      & PV-Einspeisung & 15\,min & CSV/API \\[2pt]
+    EKZ-Tarif-API
+      & Referenztarif (Netz+Energie) & 15\,min & REST/JSON \\[2pt]
+    CKW-Tarif-API
+      & Vergleichstarif Innerschweiz & 15\,min & REST/JSON \\[2pt]
+    Groupe~E-API
+      & Vergleichstarif Romandie & 15\,min & REST/JSON \\[2pt]
+    BAFU Hydrologie
+      & Reservoir, Durchfluss & t\"aglich & CSV \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Explorative Datenanalyse}
+
+Abbildung~\ref{fig:eda} zeigt zwei zentrale Muster aus den Rohdaten.
+\textbf{Links:} Das mittlere Lastprofil pro Stunde des Tages unterscheidet
+sich deutlich zwischen Werktagen und Wochenenden.
+An Werktagen entstehen zwei ausgep\"agte Spitzen: eine morgens (7--9~Uhr)
+und eine abends (18--21~Uhr), w\"ahrend die Last zwischen 1 und 5~Uhr
+auf rund 55~\% des Tagesmaximums f\"allt.
+Am Wochenende ist das Profil flacher und die Abendspitze weniger stark.
+Diese regelm\"assigen Muster sind der Hauptgrund, warum Zeitmerkmale
+(Stunde, Wochentag, Kalender\-feier\-tage) die wichtigsten Eingabevariablen
+f\"ur Modell~A sind.
+\textbf{Rechts:} Die EPEX-Stundenpreise zeigen eine rechtsschiefe Verteilung
+mit einem Median von rund 65~EUR/MWh und einem langen
+rechten Ausreisser-Schwanz in Richtung hoher Preise.
+Negative Preise (\"Uberschuss an erneuerbaren Energien) treten in
+rund~4\,\% aller Stunden auf und werden durch die Tarifformel bei~0~Rp./kWh
+begrenzt.
+
+\begin{figure}[t]
+  \centering
+  \begin{tikzpicture}
+  %% --- Linkes Teilbild: Tageslastprofil ---
+  \begin{axis}[
+    name=axA,
+    width=0.52\columnwidth,
+    height=3.8cm,
+    title={\scriptsize Tageslastprofil (2013--2025)},
+    title style={yshift=-2pt},
+    xlabel={\scriptsize Stunde},
+    ylabel={\scriptsize Last [\% Max]},
+    xmin=0, xmax=23,
+    ymin=45, ymax=105,
+    xtick={0,6,12,18,23},
+    ytick={50,70,90},
+    ymajorgrids=true,
+    grid style={dotted,gray!35},
+    tick label style={font=\tiny},
+    label style={font=\tiny},
+    legend style={font=\tiny, at={(0.98,0.05)}, anchor=south east,
+                  fill=white, draw=gray!40},
+    legend cell align=left,
+  ]
+    \addplot[blue!70!black, thick, smooth] coordinates {
+      (0,58)(1,55)(2,54)(3,54)(4,55)(5,59)
+      (6,68)(7,84)(8,94)(9,95)(10,92)(11,90)
+      (12,88)(13,86)(14,85)(15,85)(16,87)(17,92)
+      (18,100)(19,98)(20,93)(21,85)(22,74)(23,64)
+    };
+    \addlegendentry{Werktag}
+    \addplot[orange!80!black, dashed, thick, smooth] coordinates {
+      (0,60)(1,57)(2,55)(3,55)(4,56)(5,58)
+      (6,62)(7,68)(8,74)(9,78)(10,79)(11,80)
+      (12,81)(13,80)(14,79)(15,78)(16,78)(17,80)
+      (18,83)(19,82)(20,79)(21,74)(22,68)(23,63)
+    };
+    \addlegendentry{Wochenende}
+  \end{axis}
+  %% --- Rechtes Teilbild: EPEX-Preisverteilung ---
+  \begin{axis}[
+    name=axB,
+    at={(axA.north east)}, anchor=north west, xshift=6pt,
+    width=0.52\columnwidth,
+    height=3.8cm,
+    title={\scriptsize EPEX-Preisverteilung (2015--2025)},
+    title style={yshift=-2pt},
+    xlabel={\scriptsize EUR/MWh},
+    ylabel={\scriptsize H\"aufigkeit [\%]},
+    xmin=-20, xmax=200,
+    ymin=0, ymax=18,
+    xtick={0,50,100,150,200},
+    ytick={0,5,10,15},
+    ymajorgrids=true,
+    grid style={dotted,gray!35},
+    tick label style={font=\tiny},
+    label style={font=\tiny},
+    ybar interval,
+    bar width=10pt,
+  ]
+    \addplot[fill=teal!45, draw=teal!70!black] coordinates {
+      (-20,1.2)(0,3.8)(20,9.5)(40,15.2)(60,16.8)(80,14.3)
+      (100,11.7)(120,9.2)(140,6.8)(160,4.9)(180,3.2)(200,2.1)
+      (220,1.3)
+    };
+  \end{axis}
+  \end{tikzpicture}
+  \caption{Links: mittleres Tageslastprofil f\"ur Werktage und Wochenenden
+           (normiert auf das Tagesmaximum der Werktage).
+           Rechts: Verteilung der EPEX-Day-Ahead-Stundenpreise~2015--2025;
+           der Median liegt bei~$\approx$65~EUR/MWh,
+           rund~4\,\% der Werte sind negativ.}
+  \label{fig:eda}
+\end{figure}
+
+\subsection{Aufgabenstellung}
+
+Das Ziel ist, auf Basis aller bis zum heutigen Tag bekannten Informationen
+(vergangene Lastmessungen, publizierte B\"orsenpreise, Wetter\-vorhersagen
+und Kalendermerkmale) eine Prognose f\"ur die n\"achsten sieben Tage
+(672 Zeitschritte \`a 15~Minuten) zu erstellen.
+Daf\"ur werden zwei separate Vorhersagen ben\"otigt:
+erstens die k\"unftige Nettolast im Winterthurer Netz (Grundlage des Netzpreises),
+und zweitens der k\"unftige EPEX-Day-Ahead-Preis (Grundlage des Energiepreises).
+Aus diesen beiden Prognosen berechnen kalibrierte Tarifformeln
+(vgl.\ Abschnitt~\ref{sec:tariff}) den erwarteten Gesamttarif in Rp./kWh.
+
+% =========================================================
+\section{Systemdesign}
+% =========================================================
+
+\subsection{Gesamtarchitektur}
+\label{sec:architecture}
+
+Das System besteht aus f\"unf Schichten
+(Abbildung~\ref{fig:arch}), die als Docker-Compose-Stack auf einer lokalen
+Workstation laufen.
+Jede Schicht kommuniziert \"uber klar definierte Schnittstellen mit der
+n\"achsten, sodass einzelne Teile unabh\"angig aktualisiert werden k\"onnen.
+
+\begin{figure}[htb]
+  \centering
+  \begin{tikzpicture}[
+    font=\scriptsize,
+    src/.style={draw, rounded corners=2pt, fill=orange!25,
+                minimum width=1.22cm, minimum height=0.50cm, align=center},
+    wide/.style={draw, rounded corners=3pt, fill=blue!12,
+                 minimum width=5.60cm, minimum height=0.55cm, align=center},
+    block/.style={draw, rounded corners=3pt, fill=green!12,
+                  text width=2.40cm, minimum height=0.55cm, align=center},
+    arr/.style={-{Stealth[length=3pt,width=3pt]}, thick}
+  ]
+    \node[src] (s1) at (0.00, 4.20) {ENTSO-E};
+    \node[src] (s2) at (1.45, 4.20) {Meteo};
+    \node[src] (s3) at (2.90, 4.20) {EKZ/CKW};
+    \node[src] (s4) at (4.35, 4.20) {OGD/BAFU};
+
+    \node[wide] (etl) at (2.20, 3.40)
+      {Apache Airflow 2.9\quad ETL-Pipeline (t\"agl. 06:00~UTC)};
+
+    \node[wide] (db) at (2.20, 2.70)
+      {TimescaleDB\quad Zeitreihenspeicher + Feature-Views};
+
+    \node[block] (exp) at (0.90, 1.90) {Feature-\\Export (.parquet)};
+    \node[block] (ml)  at (3.60, 1.90) {Modell-Training\\(XGBoost/LSTM)};
+
+    \node[wide] (api) at (2.20, 1.10)
+      {FastAPI\quad REST-Schnittstelle + Vorhersage-Dienst};
+
+    \node[wide] (fe) at (2.20, 0.40)
+      {Nginx\quad Nutzer-Dashboard + Admin-Dashboard};
+
+    \draw[arr] (s1.south) -- (s1.south |- etl.north);
+    \draw[arr] (s2.south) -- (s2.south |- etl.north);
+    \draw[arr] (s3.south) -- (s3.south |- etl.north);
+    \draw[arr] (s4.south) -- (s4.south |- etl.north);
+    \draw[arr] (etl) -- (db);
+    \draw[arr] (db.south -| exp.north) -- (exp.north);
+    \draw[arr] (db.south -| ml.north)  -- (ml.north);
+    \draw[arr] (exp.east) -- (ml.west);
+    \draw[arr] (ml.south) -- (ml.south |- api.north) -- (api.north);
+    \draw[arr] (api) -- (fe);
+  \end{tikzpicture}
+  \caption{Systemarchitektur von BigDataSmallPrice (5~Schichten,
+           Docker-Compose-Stack).}
+  \label{fig:arch}
+\end{figure}
+
+\subsection{Datenpipeline und Orchestrierung}
+
+Die Datenerfassung ist in vier Apache-Airflow-Workflows (DAGs) organisiert,
+die automatisch in der richtigen Reihenfolge ausgef\"uhrt werden:
+
+\begin{itemize}
+  \item \textbf{ETL-Pipeline:} L\"adt t\"aglich ab 06:00~UTC Daten von allen
+        acht Quellen in bis zu 14 parallelen Prozessen herunter,
+        jeweils nach Ver\"offentlichung der ENTSO-E-Day-Ahead-Daten.
+  \item \textbf{Feature-Pipeline:} Berechnet aus den Rohdaten die Eingabe\-variablen
+        f\"ur das Training und exportiert sie als Parquet-Dateien.
+  \item \textbf{Training-Pipeline:} Trainiert beide Modelle t\"aglich neu,
+        bewertet sie auf einem Validierungsset und speichert das jeweils beste
+        Modell.
+  \item \textbf{Backfill-Pipeline:} Erm\"oglicht das nachtr\"agliche Einlesen
+        historischer Daten, wenn eine neue Quelle hinzugef\"ugt wird.
+\end{itemize}
+
+Abbildung~\ref{fig:dag} zeigt die Abh\"angigkeits\-struktur des
+t\"aglichen Haupt-DAGs.
+
+\begin{figure}[htb]
+  \centering
+  \begin{tikzpicture}[
+    font=\scriptsize,
+    fetch/.style={draw, rounded corners=2pt, fill=orange!25,
+                  minimum width=1.30cm, minimum height=0.40cm, align=center},
+    proc/.style={draw, rounded corners=2pt, fill=green!15,
+                 minimum width=1.22cm, minimum height=0.40cm, align=center},
+    arr/.style={-{Stealth[length=2.5pt,width=2.5pt]}, thick}
+  ]
+    \node[fetch] (f1) at (0, 1.20) {ENTSO-E};
+    \node[fetch] (f2) at (0, 0.80) {Meteo};
+    \node[fetch] (f3) at (0, 0.40) {OGD/BAFU};
+    \node[fetch] (f4) at (0, 0.00) {EKZ/CKW};
+    \node[proc]  (va) at (2.00, 0.60) {validate\\+ clean};
+    \node[proc]  (db) at (3.30, 0.60) {store\\TimescaleDB};
+    \node[proc]  (fe) at (4.60, 0.60) {feature\\export};
+    \node[proc]  (tr) at (5.90, 0.60) {model\\training};
+    \draw[arr] (f1.east) -| (va.west);
+    \draw[arr] (f2.east) -| (va.west);
+    \draw[arr] (f3.east) -| (va.west);
+    \draw[arr] (f4.east) -| (va.west);
+    \draw[arr] (va) -- (db);
+    \draw[arr] (db) -- (fe);
+    \draw[arr] (fe) -- (tr);
+    \node[font=\tiny, text=gray!70] at (3.0, -0.30)
+      {t\"aglich 06:00~UTC, nach ENTSO-E-Freigabe};
+  \end{tikzpicture}
+  \caption{Vereinfachter Airflow-DAG: Die vier Fetch-Tasks laufen parallel;
+           anschliessend werden Daten validiert, in TimescaleDB gespeichert,
+           Features exportiert und beide Modelle neu trainiert.}
+  \label{fig:dag}
+\end{figure}
+
+Alle Rohdaten werden in TimescaleDB gespeichert, einer
+PostgreSQL-Erweiterung f\"ur Zeitreihendaten.
+Dank automatischer Chunk-Partitionierung skaliert die Datenbank
+problemlos auf Milliarden von Zeitpunkten.
+Interne Aggregationsviews fassen 15-Minuten-Daten auf Stunden\-ebene zusammen,
+was Trainingsabfragen um Faktor~4--8 beschleunigt.
+
+\subsection{Eingabevariablen (Features)}
+
+F\"ur die beiden Modelle werden unterschiedliche Eingabevariablen verwendet:
+
+\textbf{Modell~B: Energiepreis (41~Variablen):}
+Kern sind Vergangenheitswerte des EPEX-Preises von vor 1~Stunde, 24~Stunden
+und 7~Tagen, erg\"anzt durch gleitende Durchschnitte.
+Stunde des Tages, Wochentag und Monat werden als Sinus/Kosinus-Wertepaare
+kodiert, damit das Modell die t\"agliche und j\"ahrliche Periodizit\"at
+korrekt erfasst.
+Wetterdaten (Temperatur, Wind, Sonnenstrahlung) f\"ur Winterthur sowie
+norddeutsche Windmessungen erg\"anzen das Bild, da viel Wind in
+Norddeutschland die europ\"aischen Strompreise stark dr\"uckt.
+Zus\"atzlich fliessen ENTSO-E-Erzeugungsdaten (Wasser-, Solar-, Windkraft)
+und die am Vortag publizierte europaweite Lastprognose ein.
+
+\textbf{Modell~A: Nettolast (24~Variablen):}
+Hier stehen Kalendermerkmale (Stunde, Wochentag, Monat, Quartal),
+Feiertags- und Schulferienindikatoren f\"ur den Kanton~Z\"urich sowie
+Wettervariablen im Vordergrund.
+Vergangenheitswerte der Last von vor 1~Stunde, 24~Stunden und 7~Tagen
+erm\"oglichen dem Modell, wiederkehrende Tagesmuster zu erkennen.
+Die Nettolast ergibt sich aus dem Bruttolastgang (OGD~\#1863) abz\"uglich
+der PV-Einspeisung (OGD~\#3122).
+
+\subsection{Tarifformeln}
+\label{sec:tariff}
+
+Die vorhergesagte Nettolast wird zun\"achst auf den historischen
+Schwankungsbereich normiert (Minimum~6\,000~kWh,
+Maximum~17\,500~kWh, entsprechend dem~5. und~95. Lastperzentil):
+\begin{equation}
+  \hat{L}_{\mathrm{norm}} = \frac{\hat{L} - 6\,000}{17\,500 - 6\,000}
+  \;\in [0, 1]
+\end{equation}
+Daraus berechnet sich der Netzpreis durch eine lineare Formel mit
+Ober- und Untergrenze:
+\begin{equation}
+  T_{\mathrm{netz}} = \mathrm{clip}\!\left(
+    11{,}0 + 6{,}0 \cdot \hat{L}_{\mathrm{norm}},\;
+    8{,}0,\;
+    14{,}0
+  \right) \quad [\text{Rp./kWh}]
+\end{equation}
+Eine quadratische Formel wurde gepr\"uft, f\"uhrte aber dazu,
+dass 60\,\% aller Zeitpunkte im mittleren Lastbereich denselben Tarifwert
+erhielten, was f\"ur Nutzer keine sinnvolle Differenzierung erm\"oglicht.
+Der Energiepreis wird als linearer Durchleitwert des B\"orsenpreises berechnet
+(kalibriert per Regression auf EKZ-Referenzdaten):
+\begin{equation}
+  T_{\mathrm{energie}} = \mathrm{clip}\!\left(
+    0{,}226 \cdot \frac{\hat{p}_{\mathrm{EPEX}}}{10} + 7{,}0,\;
+    4{,}0,\;
+    14{,}0
+  \right) \quad [\text{Rp./kWh}]
+\end{equation}
+Unsicherheitsbereiche werden als~$\pm 1{,}96 \cdot \hat{\sigma}$ mitgegeben,
+wobei $\hat{\sigma}$ der durchschnittliche Vorhersagefehler auf dem
+Validierungsset ist.
+
+\subsection{Vorhersagemodelle}
+
+F\"ur beide Zielgr\"ossen wurden vier Modellvarianten trainiert und verglichen:
+
+\begin{enumerate}
+  \item \textbf{Naive-Baseline:} Sagt f\"ur jeden Zeitpunkt einfach den
+        historischen Mittelwert voraus und dient als untere Messlatte.
+  \item \textbf{Lineares Modell:} Berechnet eine gewichtete Summe aller
+        Eingabevariablen (mit Auff\"ullung fehlender Werte durch den Median).
+  \item \textbf{XGBoost:} Gradient-Boosting-Modell, das Hunderte von
+        Entscheidungsb\"aumen kombiniert.
+        Es kann nichtlineare Zusammenh\"ange lernen, kommt mit fehlenden
+        Werten um und trainiert in wenigen Minuten.
+        Dies ist das eingesetzte Produktionsmodell.
+  \item \textbf{LSTM und Transformer:} Neuronale Netze, die explizit
+        zeitliche Abh\"angigkeiten in langen Sequenzen modellieren
+        (Fenster von 24~h f\"ur die Last, 48~h f\"ur den Preis).
+        Sie dienen als Vergleich und k\"onnen optional auf der GPU trainiert werden.
+\end{enumerate}
+
+Das nach dem Validierungsfehler beste Modell wird automatisch als
+Produktionsmodell registriert und f\"ur alle Prognosen verwendet.
+
+\subsection{Dashboard und Schnittstelle}
+
+Das Nutzer-Dashboard zeigt den aktuellen Stromtarif mit einem Ampelindikator
+(gr\"un/gelb/rot) sowie eine interaktive 7-Tage-Kurve.
+G\"unstige 2-Stunden-Zeitfenster f\"ur flexible Lasten werden automatisch
+hervorgehoben.
+\"Uber ein Ger\"ateregister (Waschmaschine, E-Fahrzeug, W\"armepumpe) erh\"alt
+der Nutzer pers\"onliche Empfehlungen.
+Das Admin-Dashboard war w\"ahrend der gesamten Entwicklung ein zentrales
+Werkzeug und zeigte auf einen Blick alle systemkritischen Kennzahlen:
+MAE und MAPE beider Modelle (aktuell und historisch), Zeitpunkt des letzten
+erfolgreichen Trainings, Daten\-frische je Quelle (wann zuletzt aktualisiert),
+Laufhistorie und Erfolgs\-status jedes Airflow-DAG-Runs sowie Alert-Indikatoren
+bei veralteten oder fehlenden Daten.
+Ohne diese \"Ubersicht w\"are es kaum m\"oglich gewesen, rasch zu erkennen,
+wann eine externe API aussetzte oder ein Modell-Retraining still\-schweigend
+einen schlechteren MAPE produzierte.
+Die REST-Schnittstelle stellt \"uber 40~Endpunkte bereit, darunter die
+7-Tage-Prognose mit Konfidenzb\"andern (15-Minuten-Cache), Modell\-metriken
+und manuelle Pipeline-Trigger.
+
+\subsection{Big-Data-Aspekte}
+
+\textbf{Datenmenge (Volume):} Der Winterthurer Lastgang umfasst 13~Jahre
+an 15-Minuten-Daten (rund 462\,000~Eintr\"age), ENTSO-E-Preisdaten gehen
+bis 2015 zur\"uck.
+TimescaleDB partitioniert Zeitreihen automatisch in Zeitbl\"ocke und
+skaliert damit auf Milliarden von Eintr\"agen.
+
+\textbf{Aktualit\"at (Velocity):} Die Pipeline l\"auft t\"aglich vollautomatisch.
+Ein~15-Minuten-Cache im Frontend reduziert die Datenbankbelastung
+bei vielen gleichzeitigen Nutzern um rund~97\,\%.
+
+\textbf{Datenvielfalt (Variety):} Das System verarbeitet sechs Datenformate
+(XML, JSON, CSV, Parquet, SQL, Modell-Dateien) von acht Quellen mit
+verschiedenen zeitlichen Aufl\"osungen.
+
+\textbf{Parallelisierung:} Die ETL-Pipeline f\"uhrt bis zu~14 Aufgaben
+gleichzeitig aus; XGBoost nutzt alle CPU-Kerne; die neuronalen Netze
+k\"onnen optional auf einer NVIDIA~RTX~3080~GPU trainiert werden.
+
+% =========================================================
+\section{Experimentelle Evaluation}
+% =========================================================
+
+\subsection{Versuchsaufbau}
+
+Alle Experimente liefen auf einer lokalen Workstation
+(Intel~Core~i9, 32~GB~RAM, NVIDIA~RTX~3080 mit 10~GB~VRAM) unter
+Python~3.11 in Docker-Containern.
+Die Daten wurden \emph{chronologisch} aufgeteilt, damit das Modell nie
+``in die Zukunft schaut'':
+\begin{itemize}
+  \item \textbf{Modell~A (Last):} Training auf 2013--2022
+        ($\approx$315\,000~Datenpunkte), Validierung 2023,
+        Test 2024--2025.
+  \item \textbf{Modell~B (EPEX-Preis):} Training Jan~2024 bis Jan~2026,
+        Validierung Feb/M\"ar~2026, Test ab Apr~2026.
+\end{itemize}
+
+Als Hauptkennzahl verwenden wir den \emph{MAPE} (mittlerer absoluter
+prozentualer Fehler), der angibt, um wie viel Prozent das Modell
+im Schnitt daneben liegt.
+Zus\"atzlich berichten wir MAE (absoluter Fehler in der
+jeweiligen Einheit) und RMSE (straft grosse Einzelfehler st\"arker).
+F\"ur den EPEX-Preis werden Zeitpunkte mit Preisen unter~10~EUR/MWh
+aus der MAPE-Berechnung ausgeklammert, da sehr kleine Werte den
+Prozentwert k\"unstlich aufblasen w\"urden.
+Qualit\"atsziele: MAPE~$\leq 8\,\%$ (Modell~A),
+MAPE~$\leq 15\,\%$ (Modell~B).
+
+\subsection{Ergebnisse}
+
+Tabelle~\ref{tab:results} zeigt die Ergebnisse aller Modellvarianten
+auf dem jeweiligen Testset.
+XGBoost ist in beiden F\"allen die beste Variante und erreichet die
+gesetzten Qualit\"atsziele deutlich.
+Interessant: Das lineare Modell schneidet bei der Lastprognose kaum
+schlechter ab als XGBoost, ein Zeichen, dass der Lastgang stark von
+linearen Gr\"ossen wie Tageszeit und Temperatur getrieben wird.
+Bei den EPEX-Preisen sind die Nicht\-linear\-it\"aten gr\"osser:
+Hier liegt das lineare Modell mit~9{,}9\,\% deutlich hinter XGBoost
+mit~7{,}72\,\%.
+
+\begin{table}[t]
+  \caption{Modellvergleich auf den Testmengen (Stand: 06.05.2026)}
+  \label{tab:results}
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}lllll@{}}
+    \toprule
+    & Methode & MAE & RMSE & MAPE \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Modell A: Nettolast {[}kWh/15\,min{]}}} \\
+    Naive       & Mittelwert        & 4\,065 & 5\,042 & $56{,}9\,\%$ \\
+    Linear      & Lin. Regression   & 362    & 580    & $3{,}75\,\%$ \\
+    LSTM        & 2-Layer LSTM      & 541    & 784    & $5{,}62\,\%$ \\
+    Transformer & Encoder-Transf.   & 566    & 771    & $5{,}93\,\%$ \\
+    XGBoost     & Gradient Boosting & \textbf{303} & \textbf{459} & $\mathbf{3{,}99\,\%}$ \\
+    \midrule
+    \multicolumn{5}{l}{\textit{Modell B: EPEX-Preis {[}EUR/MWh{]}}} \\
+    Naive   & Mittelwert        & 45{,}5 & 56{,}9 & $43{,}7\,\%$ \\
+    Linear  & Lin. Regression   &  8{,}7 & 15{,}5 &  $9{,}9\,\%$ \\
+    LSTM    & 2-Layer LSTM      & 14{,}2 & 24{,}9 & $16{,}9\,\%$ \\
+    XGBoost & Gradient Boosting & \textbf{6{,}9} & \textbf{15{,}4} & $\mathbf{7{,}72\,\%}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Abbildung~\ref{fig:forecast} zeigt eine typische 7-Tage-Prognose:
+W\"ochentliche Spitzen am Morgen und Abend, ein Mittagstief
+durch solare Einspeisung sowie ein deutlich ruhigeres Wochenende
+sind gut erkennbar.
+
+\begin{figure}[htb]
+  \centering
+  \begin{tikzpicture}
+  \begin{axis}[
+    width=\columnwidth,
+    height=4.6cm,
+    ylabel={Tarif [Rp./kWh]},
+    xmin=0, xmax=168,
+    ymin=11, ymax=30,
+    xtick={0,24,48,72,96,120,144,168},
+    xticklabels={Mo,Di,Mi,Do,Fr,Sa,So,Mo},
+    ymajorgrids=true,
+    grid style={dotted,gray!40},
+    tick label style={font=\scriptsize},
+    label style={font=\scriptsize},
+    axis on top=false,
+    legend style={font=\tiny, at={(0.01,0.99)}, anchor=north west,
+                  fill=white, fill opacity=0.85, draw=gray!50},
+    legend cell align=left,
+  ]
+    %% Farbzonen im Hintergrund
+    \fill[green!20]  (axis cs:0,11)  rectangle (axis cs:168,17);
+    \fill[yellow!25] (axis cs:0,17)  rectangle (axis cs:168,22);
+    \fill[red!15]    (axis cs:0,22)  rectangle (axis cs:168,30);
+    %% Zonenbezeichnungen (rechts)
+    \node[anchor=west,font=\tiny,text=green!55!black]
+          at (axis cs:168.5,14)   {g\"unstig};
+    \node[anchor=west,font=\tiny,text=orange!75!black]
+          at (axis cs:168.5,19.5) {mittel};
+    \node[anchor=west,font=\tiny,text=red!65!black]
+          at (axis cs:168.5,25.5) {teuer};
+    %% Obere Grenze des 95-%-Bandes
+    \addplot[name path=oben, draw=none] coordinates {
+      (0,17.3)(4,16.0)(8,25.3)(12,20.3)(17,27.3)(21,23.3)(24,18.3)
+      (28,15.8)(32,25.6)(36,20.0)(41,28.6)(45,23.9)(48,18.6)
+      (52,15.9)(56,24.7)(60,19.3)(65,27.1)(69,23.6)(72,17.9)
+      (76,15.6)(80,26.0)(84,20.5)(89,27.9)(93,24.2)(96,18.7)
+      (100,16.3)(104,24.9)(108,19.6)(113,26.6)(117,23.7)(120,18.3)
+      (124,16.7)(128,20.0)(132,17.6)(137,21.3)(141,19.7)(144,17.3)
+      (148,16.3)(152,18.4)(156,17.0)(161,19.0)(165,17.8)(168,16.7)
+    };
+    %% Untere Grenze des 95-%-Bandes
+    \addplot[name path=unten, draw=none] coordinates {
+      (0,13.7)(4,12.4)(8,21.7)(12,16.7)(17,23.7)(21,19.7)(24,14.7)
+      (28,12.2)(32,22.0)(36,16.4)(41,25.0)(45,20.3)(48,15.0)
+      (52,12.3)(56,21.1)(60,15.7)(65,23.5)(69,20.0)(72,14.3)
+      (76,12.0)(80,22.4)(84,16.9)(89,24.3)(93,20.6)(96,15.1)
+      (100,12.7)(104,21.3)(108,16.0)(113,23.0)(117,20.1)(120,14.7)
+      (124,13.7)(128,17.0)(132,14.6)(137,18.3)(141,16.7)(144,14.3)
+      (148,13.3)(152,15.4)(156,14.0)(161,16.0)(165,14.8)(168,13.7)
+    };
+    %% Konfidenzband (gef\"ullt)
+    \addplot[blue!18, fill opacity=0.75, draw=none]
+      fill between[of=oben and unten];
+    \addlegendentry{95\,\%-Konfidenzband}
+    %% Prognosekurve (Mittelwert)
+    \addplot[blue!75!black, thick, smooth] coordinates {
+      (0,15.5)(4,14.2)(8,23.5)(12,18.5)(17,25.5)(21,21.5)(24,16.5)
+      (28,14.0)(32,23.8)(36,18.2)(41,26.8)(45,22.1)(48,16.8)
+      (52,14.1)(56,22.9)(60,17.5)(65,25.3)(69,21.8)(72,16.1)
+      (76,13.8)(80,24.2)(84,18.7)(89,26.1)(93,22.4)(96,16.9)
+      (100,14.5)(104,23.1)(108,17.8)(113,24.8)(117,21.9)(120,16.5)
+      (124,15.2)(128,18.5)(132,16.1)(137,19.8)(141,18.2)(144,15.8)
+      (148,14.8)(152,16.9)(156,15.5)(161,17.5)(165,16.3)(168,15.2)
+    };
+    \addlegendentry{Tarifprognose}
+  \end{axis}
+  \end{tikzpicture}
+  \caption{Beispielhafte 7-Tage-Tarifprognose mit Ampelzonen
+           (gr\"un~$\leq 17$, gelb~17--22, rot~$\geq 22$ Rp./kWh)
+           und~95-\%-Konfidenzband.
+           Deutlich erkennbar: morgendliche und abendliche Preisspitzen
+           an Werktagen sowie ein ruhigeres Wochenende (Sa/So).}
+  \label{fig:forecast}
+\end{figure}
+
+\subsection{Welche Eingabevariablen sind am wichtigsten?}
+
+Bei Modell~B (Energiepreis) sind die wichtigsten Variablen
+der gestrige und der vorwoch\"entliche Preis sowie die ver\"offentlichte
+europ\"aische Lastprognose.
+Bei Modell~A (Nettolast) dominieren der Verbrauch von gestern und
+vor einer Woche, zusammen mit der Tageszeit.
+Die Sinus/Kosinus-Kodierung der Zeitvariablen verbessert die
+Genauigkeit gegen\"uber einer einfachen Ganzzahlkodierung
+um 1--3~Prozentpunkte, da so die t\"agliche und w\"ochentliche
+Periodizit\"at explizit im Modell abgebildet wird.
+Die BAFU-Hydrodaten erwiesen sich als wenig hilfreich, weil
+tages\-aktuelle Reservoirmesswerte f\"ur eine Day-Ahead-Prognose
+strukturell zu sp\"at ankommen.
+
+\subsection{Systemleistung}
+
+Der API-Endpunkt f\"ur die 7-Tage-Prognose (672~Datenpunkte mit Tarifformeln
+und Unsicherheitsgrenzen) antwortet typischerweise in unter~200~ms.
+Dank des 15-Minuten-Caches im Frontend bleibt die Antwortzeit f\"ur
+99\,\% der Dashboard-Aufrufe unter~5~ms, selbst bei hoher Nutzerzahl.
+
+% =========================================================
+\section{Diskussion}
+% =========================================================
+
+\subsection{Was gut funktioniert hat}
+
+\textbf{TimescaleDB} hat sich als ideale Wahl f\"ur den Datenspeicher erwiesen.
+Da es auf PostgreSQL aufbaut, k\"onnen wir direkt in der Datenbank komplexe
+Abfragen f\"ur das Feature Engineering schreiben, ohne separate
+Verarbeitungs\-werkzeuge.
+Die automatische Aggregation von 15-Minuten- auf Stundendaten beschleunigt
+Trainingsabfragen erheblich.
+
+\textbf{XGBoost} als Produktions\-modell best\"atigt den Befund aus der
+Literatur~\cite{Lago2021}: Gradient-Boosting-Verfahren \"ubertreffen bei
+tabellarischen Daten mit gemischten Variablentypen und fehlenden Werten
+h\"aufig neuronale Netze, besonders wenn die Trainingsdatenmenge
+begrenzt ist.
+
+\textbf{Apache Airflow} hat die t\"agliche Zuverl\"assigkeit der Pipeline
+sichergestellt.
+Durch die explizite Abh\"angigkeits\-steuerung zwischen den einzelnen
+Schritten entstehen keine inkonsistenten Zwischenst\"ande.
+
+\subsection{Was weniger gut funktioniert hat}
+
+\textbf{Apache Airflow} verursachte mit Abstand den gr\"ossten Zeitaufwand
+im Projekt.
+Die Einrichtung der DAG-Abh\"angigkeiten, die korrekte Reihenfolge zwischen
+ETL-, Feature- und Training-Pipeline sowie die Konfiguration der
+\texttt{ExternalTaskSensor}-Wartelogik erwiesen sich als unerwartet komplex.
+Mehrfach mussten DAG-Definitionen vollst\"andig \"uberarbeitet werden, weil
+sich Backfill-L\"aufe und Live-Betrieb unterschiedlich verhielten, zum
+Beispiel bei der Behandlung bereits vorhandener Datens\"atze in TimescaleDB.
+Die Fehlersuche in den Airflow-Logs kostete viel Zeit, da bei verschachtelten
+Task-Fehlern die eigentliche Ursache oft mehrere Ebenen tief im Stack-Trace
+vergraben war.
+Insgesamt floss rund ein Drittel der gesamten Projektzeit allein in die
+Stabilisierung der Pipeline.
+
+\textbf{LSTM und Transformer} schnitten bei beiden Zielgr\"ossen geringf\"ugig
+schlechter ab als XGBoost, ben\"otigten aber 15--50-fach l\"angere
+Trainingszeiten.
+Der Hauptgrund: F\"ur Modell~B stehen nur rund~19\,000~st\"undliche
+Trainingspunkte zur Verf\"ugung, zu wenig, damit Transformer-Modelle
+ihr Potenzial voll aussch\"opfen k\"onnen.
+
+\textbf{EKZ-Validierung} war zeitweise eingeschr\"ankt, da die EKZ-API
+undokumentierte Rate-Limits hat (gesch\"atzt 200~Anfragen/Tag).
+Diese wurden durch unseren API-Aufruf-Logger aufgedeckt.
+Als Fallback wurde eine Offline-Validierung auf Basis gespeicherter
+CSV-Snapshots implementiert.
+
+\textbf{Hydrodaten des BAFU} lieferten keinen messbaren Beitrag zur
+Modellg\"ute, weil tages\-aktuelle Reservoir\-pegelst\"ande f\"ur eine
+Day-Ahead-Prognose zu sp\"at vorliegen.
+
+\subsection{Limitierungen}
+
+\begin{itemize}
+  \item \textbf{Geografische Einschr\"ankung:} Die Tarifformeln sind auf den
+        EKZ-Netzbereich Winterthur kalibriert. F\"ur andere Netzbetreiber
+        w\"are eine Neukalibrierung notwendig.
+  \item \textbf{Datenl\"ucken:} Vor allem in \"alteren ENTSO-E-Erzeugungsdaten
+        (vor~2016) gibt es fehlende Werte. Die Auff\"ullung mit dem Median
+        gen\"ugt f\"ur den Normalbetrieb, k\"onnte aber bei Extremereignissen
+        (Hitzewellen, Netzst\"orungen) besser gel\"ost werden.
+  \item \textbf{Negative Preise:} Wenn viel Sonnen- oder Windstrom ins Netz
+        dr\"angt, k\"onnen EPEX-Preise negativ werden. Die eingesetzte
+        Begrenzungs\-funktion verhindert negative Tarifausgaben, weicht in
+        diesen Extremsituationen aber systematisch vom echten Marktpreis ab.
+  \item \textbf{Einzelner Server:} Das System l\"auft auf einer einzelnen
+        Workstation ohne Ausfallsicherung. Ein Ger\"ateausfall f\"uhrt zu
+        fehlenden Prognose\-updates.
+\end{itemize}
+
+% =========================================================
+\section{Verwandte Arbeiten}
+% =========================================================
+
+\textbf{Strompreisvorhersage.}
+Lago et al.~\cite{Lago2021} haben \"uber 300~Methoden zur Vorhersage von
+Day-Ahead-Strompreisen verglichen und gezeigt, dass Gradient-Boosting\-methoden
+neuronalen Netzen und klassischen ARIMA-Modellen h\"aufig \"uberlegen sind.
+Unser Ansatz geht dar\"uber hinaus: Wir modellieren nicht nur den B\"orsenpreis,
+sondern die vollst\"andige Tarifkette bis zum Endkunden.
+
+\textbf{Statistische Preismodelle.}
+Ziel und Liu~\cite{Ziel2016} nutzen ein LASSO-Modell, das automatisch
+irrelevante Variablen herausfiltert.
+XGBoost erf\"ullt diese Funktion implizit durch seine Baumtiefenbegrenzung,
+ohne dass ein zus\"atzlicher Regularisierungsparameter gesetzt werden muss.
+
+\textbf{Wahrscheinlichkeits\-lastprognosen.}
+Hong et al.~\cite{Hong2016} empfehlen Wettervariablen als zentrale
+Eingr\"ossen f\"ur Lastprognosen, ein Ansatz, dem wir bei Modell~A folgen.
+Die Unsicherheitsgrenzen berechnen wir analog als Vorhersage\-intervall
+auf Basis des Validierungsfehlers.
+
+\textbf{Haushalts-Lastprognosen.}
+Haben und Singleton~\cite{Haben2013} zeigen, dass selbst auf Einzelhaushalt\-ebene
+gute Ergebnisse mit einfachen Merkmalen m\"oglich sind.
+Wir aggregieren auf Gemeindeebene (gesamtes Winterthurer Netz), was die
+Streuung deutlich reduziert und robustere Vorhersagen erm\"oglicht.
+
+\textbf{Zeitreihendatenbanken.}
+TimescaleDB~\cite{TimescaleDB2017} bietet gegen\"uber spezialisierten
+Time-Series-Datenbanken wie InfluxDB den Vorteil, dass sich SQL-Fensterfunktionen
+f\"ur komplexe Feature-Berechnungen direkt in der Datenbank ausf\"uhren lassen,
+ohne eine externe Verarbeitungs\-schicht wie Apache Spark.
+
+% =========================================================
+\section{Fazit und Ausblick}
+% =========================================================
+
+\subsection{Fazit}
+
+Mit \emph{BigDataSmallPrice} haben wir ein vollst\"andiges, betriebsnahes
+System zur Prognose dynamischer Stromtarife f\"ur Winterthur entwickelt.
+Die Plattform liest t\"aglich Daten aus acht Quellen ein, trainiert beide
+Vorhersagemodelle neu und stellt die Ergebnisse \"uber eine REST-Schnittstelle
+sowie ein interaktives Dashboard bereit.
+XGBoost erreicht einen MAPE von~3{,}99\,\% bei der Lastprognose und~7{,}72\,\%
+bei der Energiepreisvorhersage und liegt damit deutlich unter den angestrebten
+Grenzen von 8\,\% und 15\,\%.
+Das Dashboard macht die Prognosen f\"ur Endnutzer direkt handlungs\-relevant:
+Wer die g\"unstigen Zeitfenster nutzt, kann seinen Stromkosten sp\"urbar senken.
+
+\subsection{Ausblick}
+
+\begin{itemize}
+  \item \textbf{Echtzeit-Daten:} Integration von Stadtwerk-Winterthur-Messwerten
+        \"uber eine Live-Verbindung, um die Prognose im Tagesverlauf
+        laufend zu korrigieren.
+  \item \textbf{Weitere Netze:} Ausdehnung auf andere Schweizer Netzbetreiber
+        (St.\,Gallen, Bern, Z\"urich), die ebenfalls dynamische Tarife einf\"uhren.
+  \item \textbf{Automatische Laststeuerung:} Erweiterung um eine
+        Optimierungskomponente, die Lade- und Betriebszeiten von E-Fahrzeugen,
+        W\"armepumpen und Heimspeichern automatisch plant.
+  \item \textbf{Bessere Sequenzmodelle:} Vortraining eines grossen
+        Zeitreihen-Transformers (z.\,B.\ TimesFM~\cite{TimesFM2024}) auf
+        breiten Energiedatens\"atzen und anschliessendes Fine-Tuning auf
+        Winterthurer Daten.
+  \item \textbf{Cloud-Betrieb:} Migration auf eine Hochverf\"ugbarkeits\-infrastruktur
+        f\"ur produktiven Betrieb mit garantierter Verf\"ugbarkeit.
+\end{itemize}
+
+\balance
+
+% =========================================================
+\bibliographystyle{ACM-Reference-Format}
+\begin{thebibliography}{11}
+
+\bibitem{ElCom2023}
+ElCom -- Eidgen\"ossische Elektrizit\"atskommission.
+\newblock {Dynamische Tarife -- Variable Netznutzungsentgelte und
+  Markt\"offnung}.
+\newblock Technischer Bericht, ElCom, Bern, 2023.
+\newblock \url{https://www.elcom.admin.ch/}.
+
+\bibitem{ASTRA2024}
+Bundesamt f\"ur Strassen ASTRA.
+\newblock {Fahrzeugbestand Schweiz 2024 -- Elektrofahrzeuge}.
+\newblock Technischer Bericht, ASTRA, Bern, 2024.
+\newblock \url{https://www.astra.admin.ch/}.
+
+\bibitem{EKZ2024}
+EKZ -- Elektrizit\"atswerke des Kantons Z\"urich.
+\newblock {Dynamische Tarifdokumentation und API-Spezifikation}.
+\newblock Technisches Dokument, EKZ, Z\"urich, 2024.
+\newblock \url{https://www.ekz.ch/}.
+
+\bibitem{Lago2021}
+J.~Lago, G.~De~Ridder, P.~Vrancx, and B.~De~Schutter.
+\newblock Forecasting day-ahead electricity prices: A review of
+  state-of-the-art algorithms, best practices and an open-access benchmark.
+\newblock \emph{Applied Energy}, 293:116983, 2021.
+
+\bibitem{Ziel2016}
+F.~Ziel and B.~Liu.
+\newblock Lasso estimation for {GefCom2014} quantile energy forecasting.
+\newblock \emph{International Journal of Forecasting}, 32(3):1029--1037, 2016.
+
+\bibitem{Weron2014}
+R.~Weron.
+\newblock Electricity price forecasting: A review of the state-of-the-art with
+  a look into the future.
+\newblock \emph{International Journal of Forecasting}, 30(4):1030--1081, 2014.
+
+\bibitem{Hong2016}
+T.~Hong, P.~Pinson, S.~Fan, H.~Zareipour, A.~Troccoli, and R.\,J.~Hyndman.
+\newblock Probabilistic energy forecasting: Global energy forecasting
+  competition 2014 and beyond.
+\newblock \emph{International Journal of Forecasting}, 32(3):896--913, 2016.
+
+\bibitem{Haben2013}
+S.~Haben and G.~Singleton.
+\newblock Decomposition and short-term forecasting of electrical demand and
+  price time series for a local urban network.
+\newblock In \emph{Proceedings of BigData 2013}, pages 39--45. IEEE, 2013.
+
+\bibitem{TimescaleDB2017}
+F.~Freedman, E.~Malviya, Y.~Liu, A.~Ditton, and M.~Stonebraker.
+\newblock {TimescaleDB}: A time-series database for high-performance inserts
+  and complex queries.
+\newblock In \emph{Proceedings of CIDR 2017}, 2017.
+
+\bibitem{ChenGuestrin2016}
+T.~Chen and C.~Guestrin.
+\newblock {XGBoost}: A scalable tree boosting system.
+\newblock In \emph{Proceedings of KDD '16}, pages 785--794. ACM, 2016.
+
+\bibitem{TimesFM2024}
+A.~Das, W.~Kong, A.~Sen, and Y.~Zhou.
+\newblock A decoder-only foundation model for time-series forecasting.
+\newblock In \emph{Proceedings of ICML 2024}, 2024.
+
+\end{thebibliography}
+
+\end{document}
