@@ -273,4 +273,38 @@ BigDataSmallPrice/
 
 ## Datenbank
 
+Die Projektdatenbank `bdsp` verwendet TimescaleDB-Hypertables für Zeitreihen.
+Wichtige Tabellen und Views sind:
 
+- `entsoe_day_ahead_prices`
+- `entsoe_actual_load`
+- `entsoe_generation`
+- `entsoe_crossborder_flows`
+- `entsoe_load_forecast`
+- `weather_hourly`
+- `ekz_tariffs_raw`, `ckw_tariffs_raw`, `groupe_e_tariffs_raw`
+- `bafu_hydro`
+- `winterthur_load`, `winterthur_pv`
+- `training_features`
+- `winterthur_net_load_features`
+
+## Troubleshooting
+
+- **`/api/forecast` gibt 503 zurück:** Es fehlen Trainingsfeatures oder
+  Modellartefakte. Zuerst ETL/Backfill und Feature-DAG ausführen, danach
+  Training starten.
+- **Airflow-DAGs bleiben pausiert:** In der Airflow UI die jeweiligen DAGs
+  aktivieren oder manuell triggern.
+- **ENTSO-E liefert Fehler oder leere Daten:** API-Token in `.env` prüfen und
+  Rate-Limits beachten.
+- **GPU ist nicht verfügbar:** Das Training kann CPU-basiert laufen; für
+  Docker-GPU-Nutzung muss der NVIDIA Container Toolkit installiert sein.
+- **Datenbank ist leer nach Schemaänderungen:** Docker-Volumes behalten alte
+  Daten. Für einen frischen Stand müssen die Volumes bewusst entfernt werden.
+
+## Dokumentation
+
+- `docs/Proposal.md`: Projektproposal.
+- `docs/req.md`: Anforderungen, Architektur und Teststrategie.
+- `analysis/cyclical_migration_analysis.md`: Analyse der zyklischen Features.
+- `docs/EKZ/`, `docs/CKW/`, `docs/GroupeE/`: Tarifdokumente und API-Hinweise.
