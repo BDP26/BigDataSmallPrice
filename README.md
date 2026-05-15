@@ -82,6 +82,62 @@ zurück.
 Trainierte Modelle und Metriken liegen unter `models/`. Das Manifest
 `models/best_models.json` steuert, welche Modelle die API bevorzugt verwendet.
 
+## Voraussetzungen
+
+- Docker und Docker Compose
+- Python 3.11 oder neuer für lokale Entwicklung
+- ENTSO-E API Token
+- Optional: NVIDIA Container Toolkit für GPU-beschleunigtes Training
+
+## Schnellstart mit Docker
+
+1. Repository klonen:
+
+```bash
+git clone https://github.com/BDP26/BigDataSmallPrice.git
+cd BigDataSmallPrice
+```
+
+2. Environment-Datei erstellen:
+
+```bash
+cp .env.example .env
+```
+
+3. `.env` anpassen:
+
+```env
+ENTSOE_API_TOKEN=...
+BDSP_DB_PASSWORD=...
+AIRFLOW_DB_PASSWORD=...
+AIRFLOW_ADMIN_USER=admin
+AIRFLOW_ADMIN_PASSWORD=...
+AIRFLOW_ADMIN_EMAIL=admin@example.com
+BDSP_JWT_SECRET=...
+```
+
+4. Services starten:
+
+```bash
+docker compose up -d --build
+```
+
+5. Status prüfen:
+
+```bash
+docker compose ps
+```
+
+Beim ersten Start initialisiert Docker Compose die TimescaleDB, migriert die
+Airflow-Datenbank, erstellt den Airflow-Admin-User und richtet Airflow-Pools
+für API-Rate-Limits ein.
+
+
+
+
+
+
+
 
 
 
