@@ -259,18 +259,18 @@ BigDataSmallPrice/
 `-- README.md
 ```
 
-weiter mit 
--wichitige dateien
--datenbank
-usw
+## Wichtige Dateien
 
+- `docker-compose.yml`: definiert TimescaleDB, Airflow, API und Frontend.
+- `infra/db/init.sql`: Datenbankschema, Hypertables, Views und Feature-Views.
+- `src/api/main.py`: REST-API, Auth, Dashboard-Routen und Airflow-Proxy.
+- `src/etl/fetch_tasks.py`: zentrale ETL-Funktionen für externe Datenquellen.
+- `src/processing/export_pipeline.py`: Feature-Export für Modelltraining.
+- `src/processing/tariff_formulas.py`: Tarifberechnung für Energie-, Netz- und Gesamttarif.
+- `src/modelling/train.py`: Training klassischer Modelle.
+- `src/modelling/sequence_models.py`: LSTM- und Transformer-Modelle.
+- `docs/req.md`: technische Anforderungen und Architekturentscheidungen.
 
-
-
-
-
-
-
-
+## Datenbank
 
 
