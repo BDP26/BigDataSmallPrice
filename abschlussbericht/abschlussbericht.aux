@@ -5,7 +5,7 @@
 \providecommand \babel@aux [2]{\global \let \babel@toc \@gobbletwo }
 \@nameuse{bbl@beforestart}
 \catcode `"\active 
-\citation{ElCom2023}
+\citation{ElCom2023,EKZ2024}
 \citation{ASTRA2024}
 \citation{EKZ2024}
 \citation{Lago2021,Weron2014}
@@ -14,26 +14,28 @@
 \babel@aux{ngerman}{}
 \@writefile{toc}{\contentsline {section}{Zusammenfassung}{1}{section*.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {1}Einleitung}{1}{section.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Beitr\"age dieser Arbeit.}{1}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Beitr\"age dieser Arbeit.}{1}{section*.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {2}Hintergrund und Problemstellung}{1}{section.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Dynamische Stromtarife in Winterthur}{1}{subsection.2.1}\protected@file@percent }
 \newlabel{eq:tariff}{{1}{1}{Dynamische Stromtarife in Winterthur}{equation.1}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Datengrundlage}{1}{subsection.2.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Integrierte Datenquellen}}{2}{table.caption.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Explorative Datenanalyse}{1}{subsection.2.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Integrierte Datenquellen}}{2}{table.caption.4}\protected@file@percent }
 \providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
-\newlabel{tab:datasources}{{1}{2}{Integrierte Datenquellen}{table.caption.6}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Explorative Datenanalyse}{2}{subsection.2.3}\protected@file@percent }
+\newlabel{tab:datasources}{{1}{2}{Integrierte Datenquellen}{table.caption.4}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Links: mittleres Tageslastprofil f\"ur Werktage und Wochenenden (normiert auf das Tagesmaximum der Werktage). Rechts: Verteilung der EPEX-Day-Ahead-Stundenpreise~2015--2025; der Median liegt bei~$\approx $65~EUR/MWh, rund~4\,\% der Werte sind negativ.}}{2}{figure.caption.5}\protected@file@percent }
+\newlabel{fig:eda}{{1}{2}{Links: mittleres Tageslastprofil f\"ur Werktage und Wochenenden (normiert auf das Tagesmaximum der Werktage). Rechts: Verteilung der EPEX-Day-Ahead-Stundenpreise~2015--2025; der Median liegt bei~$\approx $65~EUR/MWh, rund~4\,\% der Werte sind negativ}{figure.caption.5}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Aufgabenstellung}{2}{subsection.2.4}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Links: mittleres Tageslastprofil f\"ur Werktage und Wochenenden (normiert auf das Tagesmaximum der Werktage). Rechts: Verteilung der EPEX-Day-Ahead-Stundenpreise~2015--2025; der Median liegt bei~$\approx $65~EUR/MWh, rund~4\,\% der Werte sind negativ.}}{2}{figure.caption.7}\protected@file@percent }
-\newlabel{fig:eda}{{1}{2}{Links: mittleres Tageslastprofil f\"ur Werktage und Wochenenden (normiert auf das Tagesmaximum der Werktage). Rechts: Verteilung der EPEX-Day-Ahead-Stundenpreise~2015--2025; der Median liegt bei~$\approx $65~EUR/MWh, rund~4\,\% der Werte sind negativ}{figure.caption.7}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {3}Systemdesign}{2}{section.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Gesamtarchitektur}{2}{subsection.3.1}\protected@file@percent }
 \newlabel{sec:architecture}{{3.1}{2}{Gesamtarchitektur}{subsection.3.1}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Systemarchitektur von BigDataSmallPrice (5~Schichten, Docker-Compose-Stack).}}{2}{figure.caption.8}\protected@file@percent }
-\newlabel{fig:arch}{{2}{2}{Systemarchitektur von BigDataSmallPrice (5~Schichten, Docker-Compose-Stack)}{figure.caption.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Systemarchitektur von BigDataSmallPrice (5~Schichten, Docker-Compose-Stack).}}{2}{figure.caption.6}\protected@file@percent }
+\newlabel{fig:arch}{{2}{2}{Systemarchitektur von BigDataSmallPrice (5~Schichten, Docker-Compose-Stack)}{figure.caption.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Projektstruktur: Die Ordner spiegeln den Datenfluss von Orchestrierung \"uber Speicherung und Modellierung bis zur API und zum Dashboard wider.}}{2}{figure.caption.7}\protected@file@percent }
+\newlabel{fig:repo-structure}{{3}{2}{Projektstruktur: Die Ordner spiegeln den Datenfluss von Orchestrierung \"uber Speicherung und Modellierung bis zur API und zum Dashboard wider}{figure.caption.7}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Datenpipeline und Orchestrierung}{2}{subsection.3.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Vereinfachter Airflow-DAG: Die vier Fetch-Tasks laufen parallel; anschliessend werden Daten validiert, in TimescaleDB gespeichert, Features exportiert und beide Modelle neu trainiert.}}{3}{figure.caption.9}\protected@file@percent }
-\newlabel{fig:dag}{{3}{3}{Vereinfachter Airflow-DAG: Die vier Fetch-Tasks laufen parallel; anschliessend werden Daten validiert, in TimescaleDB gespeichert, Features exportiert und beide Modelle neu trainiert}{figure.caption.9}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Vereinfachter Airflow-DAG: Die Fetch-Tasks laufen parallel; anschliessend werden Daten validiert, in TimescaleDB gespeichert, Features exportiert und Modelle bei Bedarf neu trainiert.}}{3}{figure.caption.8}\protected@file@percent }
+\newlabel{fig:dag}{{4}{3}{Vereinfachter Airflow-DAG: Die Fetch-Tasks laufen parallel; anschliessend werden Daten validiert, in TimescaleDB gespeichert, Features exportiert und Modelle bei Bedarf neu trainiert}{figure.caption.8}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Eingabevariablen (Features)}{3}{subsection.3.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Tarifformeln}{3}{subsection.3.4}\protected@file@percent }
 \newlabel{sec:tariff}{{3.4}{3}{Tarifformeln}{subsection.3.4}{}}
@@ -42,24 +44,26 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {3.7}Big-Data-Aspekte}{3}{subsection.3.7}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {4}Experimentelle Evaluation}{4}{section.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Versuchsaufbau}{4}{subsection.4.1}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Modellvergleich auf den Testmengen (Stand: 06.05.2026)}}{4}{table.caption.10}\protected@file@percent }
-\newlabel{tab:results}{{2}{4}{Modellvergleich auf den Testmengen (Stand: 06.05.2026)}{table.caption.10}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Modellvergleich auf den Testmengen (Stand: 06.05.2026)}}{4}{table.caption.9}\protected@file@percent }
+\newlabel{tab:results}{{2}{4}{Modellvergleich auf den Testmengen (Stand: 06.05.2026)}{table.caption.9}{}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Ergebnisse}{4}{subsection.4.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Beispielhafte 7-Tage-Tarifprognose mit Ampelzonen (gr\"un~$\leq 17$, gelb~17--22, rot~$\geq 22$ Rp./kWh) und~95-\%-Konfidenzband. Deutlich erkennbar: morgendliche und abendliche Preisspitzen an Werktagen sowie ein ruhigeres Wochenende (Sa/So).}}{4}{figure.caption.11}\protected@file@percent }
-\newlabel{fig:forecast}{{4}{4}{Beispielhafte 7-Tage-Tarifprognose mit Ampelzonen (gr\"un~$\leq 17$, gelb~17--22, rot~$\geq 22$ Rp./kWh) und~95-\%-Konfidenzband. Deutlich erkennbar: morgendliche und abendliche Preisspitzen an Werktagen sowie ein ruhigeres Wochenende (Sa/So)}{figure.caption.11}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Beispielhafte 7-Tage-Tarifprognose mit Ampelzonen (gr\"un~$\leq 17$, gelb~17--22, rot~$\geq 22$ Rp./kWh) und~95-\%-Konfidenzband. Deutlich erkennbar: morgendliche und abendliche Preisspitzen an Werktagen sowie ein ruhigeres Wochenende (Sa/So).}}{4}{figure.caption.10}\protected@file@percent }
+\newlabel{fig:forecast}{{5}{4}{Beispielhafte 7-Tage-Tarifprognose mit Ampelzonen (gr\"un~$\leq 17$, gelb~17--22, rot~$\geq 22$ Rp./kWh) und~95-\%-Konfidenzband. Deutlich erkennbar: morgendliche und abendliche Preisspitzen an Werktagen sowie ein ruhigeres Wochenende (Sa/So)}{figure.caption.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Welche Eingabevariablen sind am wichtigsten?}{4}{subsection.4.3}\protected@file@percent }
 \citation{Lago2021}
 \citation{Lago2021}
 \citation{Ziel2016}
 \citation{Hong2016}
 \citation{Haben2013}
 \citation{TimescaleDB2017}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Welche Eingabevariablen sind am wichtigsten?}{5}{subsection.4.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Systemleistung}{5}{subsection.4.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {5}Diskussion}{5}{section.5}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Was gut funktioniert hat}{5}{subsection.5.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Was weniger gut funktioniert hat}{5}{subsection.5.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Limitierungen}{5}{subsection.5.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {6}Verwandte Arbeiten}{5}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Fazit und Ausblick}{5}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Fazit}{5}{subsection.7.1}\protected@file@percent }
 \citation{TimesFM2024}
 \bibstyle{ACM-Reference-Format}
 \bibcite{ElCom2023}{{1}{}{{}}{{}}}
@@ -81,9 +85,7 @@
 \newlabel{tocindent4}{0pt}
 \newlabel{tocindent5}{0pt}
 \providecommand\NAT@force@numbers{}\NAT@force@numbers
-\@writefile{toc}{\contentsline {section}{\numberline {7}Fazit und Ausblick}{6}{section.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Fazit}{6}{subsection.7.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Ausblick}{6}{subsection.7.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{Literatur}{6}{section*.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{Literatur}{6}{section*.12}\protected@file@percent }
 \newlabel{TotPages}{{6}{6}{}{page.6}{}}
 \gdef \@abspage@last{6}

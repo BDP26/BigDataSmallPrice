@@ -31,13 +31,21 @@
 \usepackage{url}
 \usepackage{balance}
 \usepackage{xcolor}
+\emergencystretch=2em
+\hyphenation{Zeit-rei-hen-da-ten-bank Zeit-rei-hen-da-ten-ban-ken
+  Trainings-ab-fragen Ver-ar-bei-tungs-werk-zeuge Netz-nutzungs-tarife
+  Wahr-schein-lich-keits-last-prog-no-sen Re-gu-la-ri-sie-rungs-pa-ra-me-ter
+  Hoch-ver-fueg-bar-keits-in-fra-struk-tur}
 
 % ---- ACM-Metadaten (Seminararbeit) ----
 \setcopyright{none}
 \copyrightyear{2026}
 \acmYear{2026}
 \acmDOI{}
+\acmISBN{}
 \acmConference[Big Data HS25/26]{ZHAW Big Data Seminar}{HS 2025/26}{Winterthur, Schweiz}
+\settopmatter{printacmref=false, printccs=false, printfolios=true}
+\renewcommand\footnotetextcopyrightpermission[1]{}
 
 % =========================================================
 \begin{document}
@@ -66,8 +74,8 @@
 
 % ---- Abstract ----
 \begin{abstract}
-Seit 2025 sind Schweizer Stromversorger verpflichtet, dynamische Tarife anzubieten,
-die sich alle 15~Minuten \"andern k\"onnen.
+Mit den neuen Schweizer Strommarktregeln werden dynamische Tarifmodelle ab 2026
+f\"ur Netzbetreiber und Endkunden deutlich relevanter.
 F\"ur Haushalte und Unternehmen bedeutet das eine grosse Chance: Wer weiss, wann
 Strom g\"unstig ist, kann Waschmaschine, W\"armepumpe oder E-Auto gezielt zu
 diesen Zeiten betreiben und bis zu 40\,\% Kosten sparen.
@@ -88,33 +96,6 @@ Die Prognosen werden \"uber ein interaktives Dashboard mit Ampelindikator und
 pers\"onlichen Verbrauchsempfehlungen angezeigt.
 \end{abstract}
 
-\begin{CCSXML}
-<ccs2012>
-<concept>
-<concept_id>10010147.10010178.10010179</concept_id>
-<concept_desc>Computing methodologies~Machine learning</concept_desc>
-<concept_significance>500</concept_significance>
-</concept>
-<concept>
-<concept_id>10002951.10003227.10003236</concept_id>
-<concept_desc>Information systems~Data streams</concept_desc>
-<concept_significance>300</concept_significance>
-</concept>
-<concept>
-<concept_id>10010520.10010553</concept_id>
-<concept_desc>Computer systems organization~Distributed architectures</concept_desc>
-<concept_significance>200</concept_significance>
-</concept>
-</ccs2012>
-\end{CCSXML}
-
-\ccsdesc[500]{Computing methodologies~Machine learning}
-\ccsdesc[300]{Information systems~Data streams}
-\ccsdesc[200]{Computer systems organization~Distributed architectures}
-
-\keywords{dynamische Stromtarife, Zeitreihenprognose, XGBoost, LSTM,
-          ETL-Pipeline, TimescaleDB, Apache Airflow, ENTSO-E}
-
 \maketitle
 
 % =========================================================
@@ -122,8 +103,9 @@ pers\"onlichen Verbrauchsempfehlungen angezeigt.
 % =========================================================
 
 Die Schweizer Energieversorgung befindet sich im Umbruch.
-Das revidierte Stromversorgungsgesetz verpflichtet Netzbetreiber seit
-Januar~2025, ihren Kunden variable Tarife anzubieten~\cite{ElCom2023}.
+Mit dem revidierten Stromversorgungsgesetz und der ab 2026 wirksamen
+Tarifregulierung werden dynamische Netznutzungstarife regulatorisch
+erm\"oglicht und von ersten Versorgern als Wahltarif eingef\"uhrt~\cite{ElCom2023,EKZ2024}.
 Gleichzeitig steigt die Zahl steuerbarer Ger\"ate in Schweizer Haushalten rasant:
 Der Marktanteil von Elektrofahrzeugen \"uberstieg 2024 die 25-Prozent-Marke,
 und W\"armepumpen ersetzen zunehmend Heiz\-\"ol\-anlagen~\cite{ASTRA2024}.
@@ -146,7 +128,7 @@ Wir pr\"asentieren \emph{BigDataSmallPrice} mit folgenden Beitr\"agen:
   \item Eine vollautomatische Datenpipeline, die t\"aglich Daten aus acht Quellen
         einliest, bereinigt und in einer Zeitreihendatenbank speichert.
   \item Zwei kalibrierte Vorhersagemodelle f\"ur Netz- und Energiepreis mit
-        t\"aglichem Retraining und messbaren Genauigkeitszielen.
+        nachvollziehbarem Retraining und messbaren Genauigkeitszielen.
   \item Transparente Tarifformeln, die Rohergebnisse in konkrete Rp./kWh-Werte
         mit Unsicherheitsgrenzen umrechnen.
   \item Ein Nutzerdashboard mit Wochenprognose, Ampelindikator und ger\"atespezifischen
@@ -191,26 +173,26 @@ Vergleichsreferenz zur Kalibrierung und Validierung.
 \begin{table}[t]
   \caption{Integrierte Datenquellen}
   \label{tab:datasources}
-  \small
-  \setlength{\tabcolsep}{3.5pt}
-  \begin{tabular}{@{}p{2.9cm}p{2.3cm}p{0.8cm}p{1.0cm}@{}}
+  \footnotesize
+  \setlength{\tabcolsep}{2.4pt}
+  \begin{tabular}{@{}p{2.75cm}p{2.15cm}p{0.95cm}p{1.15cm}@{}}
     \toprule
-    Quelle & Inhalt & Granul. & Format \\
+    Quelle & Inhalt & Takt & Format \\
     \midrule
     ENTSO-E (A44/A65/\newline A75/A11/A01)
-      & Preise, Last, Erzeug., Fl\"usse & 15\,min/1\,h & REST/XML \\[2pt]
+      & Preise, Last, Erzeug., Fl\"usse & 15\,min /\newline 1\,h & REST /\newline XML \\[2pt]
     Open-Meteo (CH + DE)
-      & Temp., Wind, Solar, Wolken & 1\,h & REST/JSON \\[2pt]
+      & Temp., Wind, Solar, Wolken & 1\,h & REST /\newline JSON \\[2pt]
     OGD Winterthur \#1863
-      & Bruttolastgang (ab 2013) & 15\,min & CSV/API \\[2pt]
+      & Bruttolastgang (ab 2013) & 15\,min & CSV /\newline API \\[2pt]
     OGD Winterthur \#3122
-      & PV-Einspeisung & 15\,min & CSV/API \\[2pt]
+      & PV-Einspeisung & 15\,min & CSV /\newline API \\[2pt]
     EKZ-Tarif-API
-      & Referenztarif (Netz+Energie) & 15\,min & REST/JSON \\[2pt]
+      & Referenztarif (Netz+Energie) & 15\,min & REST /\newline JSON \\[2pt]
     CKW-Tarif-API
-      & Vergleichstarif Innerschweiz & 15\,min & REST/JSON \\[2pt]
+      & Vergleichstarif Innerschweiz & 15\,min & REST /\newline JSON \\[2pt]
     Groupe~E-API
-      & Vergleichstarif Romandie & 15\,min & REST/JSON \\[2pt]
+      & Vergleichstarif Romandie & 15\,min & REST /\newline JSON \\[2pt]
     BAFU Hydrologie
       & Reservoir, Durchfluss & t\"aglich & CSV \\
     \bottomrule
@@ -308,6 +290,8 @@ begrenzt.
            Rechts: Verteilung der EPEX-Day-Ahead-Stundenpreise~2015--2025;
            der Median liegt bei~$\approx$65~EUR/MWh,
            rund~4\,\% der Werte sind negativ.}
+  \Description{Zwei Diagramme: Lastprofile f\"ur Werktage und Wochenenden
+  sowie Histogramm der EPEX-Day-Ahead-Preise.}
   \label{fig:eda}
 \end{figure}
 
@@ -338,6 +322,7 @@ n\"achsten, sodass einzelne Teile unabh\"angig aktualisiert werden k\"onnen.
 
 \begin{figure}[htb]
   \centering
+  \resizebox{\columnwidth}{!}{%
   \begin{tikzpicture}[
     font=\scriptsize,
     src/.style={draw, rounded corners=2pt, fill=orange!25,
@@ -379,34 +364,77 @@ n\"achsten, sodass einzelne Teile unabh\"angig aktualisiert werden k\"onnen.
     \draw[arr] (ml.south) -- (ml.south |- api.north) -- (api.north);
     \draw[arr] (api) -- (fe);
   \end{tikzpicture}
+  }
   \caption{Systemarchitektur von BigDataSmallPrice (5~Schichten,
            Docker-Compose-Stack).}
+  \Description{Architekturdiagramm mit externen Datenquellen, Airflow, TimescaleDB,
+  Feature-Export, Modelltraining, FastAPI und Dashboard.}
   \label{fig:arch}
+\end{figure}
+
+\begin{figure}[htb]
+  \centering
+  \resizebox{\columnwidth}{!}{%
+  \begin{tikzpicture}[
+    font=\scriptsize,
+    layer/.style={draw, rounded corners=3pt, minimum width=2.55cm,
+                  minimum height=0.55cm, align=center},
+    code/.style={draw, rounded corners=2pt, fill=gray!10,
+                 minimum width=2.55cm, minimum height=0.46cm, align=center},
+    arr/.style={-{Stealth[length=2.5pt,width=2.5pt]}, thick}
+  ]
+    \node[layer, fill=orange!20] (l1) at (0,2.0) {Orchestrierung};
+    \node[code] (c1) at (0,1.35) {\texttt{airflow/dags}};
+
+    \node[layer, fill=blue!12] (l2) at (3.0,2.0) {Daten \& DB};
+    \node[code] (c2a) at (3.0,1.35) {\texttt{src/data\_collection}};
+    \node[code] (c2b) at (3.0,0.82) {\texttt{infra/db}};
+
+    \node[layer, fill=green!14] (l3) at (6.0,2.0) {Features \& ML};
+    \node[code] (c3a) at (6.0,1.35) {\texttt{src/processing}};
+    \node[code] (c3b) at (6.0,0.82) {\texttt{src/modelling}};
+    \node[code] (c3c) at (6.0,0.29) {\texttt{models}};
+
+    \node[layer, fill=purple!12] (l4) at (9.0,2.0) {Nutzung};
+    \node[code] (c4a) at (9.0,1.35) {\texttt{src/api}};
+    \node[code] (c4b) at (9.0,0.82) {\texttt{src/frontend}};
+
+    \draw[arr] (l1) -- (l2);
+    \draw[arr] (l2) -- (l3);
+    \draw[arr] (l3) -- (l4);
+  \end{tikzpicture}
+  }
+  \caption{Projektstruktur: Die Ordner spiegeln den Datenfluss von
+           Orchestrierung \"uber Speicherung und Modellierung bis zur API
+           und zum Dashboard wider.}
+  \Description{Kompaktes Diagramm der wichtigsten Projektordner und ihrer Rollen.}
+  \label{fig:repo-structure}
 \end{figure}
 
 \subsection{Datenpipeline und Orchestrierung}
 
-Die Datenerfassung ist in vier Apache-Airflow-Workflows (DAGs) organisiert,
-die automatisch in der richtigen Reihenfolge ausgef\"uhrt werden:
+Die Datenerfassung ist in vier Apache-Airflow-Workflows (DAGs) organisiert
+(Abbildung~\ref{fig:repo-structure} ordnet die wichtigsten Codebereiche ein):
 
 \begin{itemize}
   \item \textbf{ETL-Pipeline:} L\"adt t\"aglich ab 06:00~UTC Daten von allen
-        acht Quellen in bis zu 14 parallelen Prozessen herunter,
+        acht Quellen mit parallelen Fetch-Tasks herunter,
         jeweils nach Ver\"offentlichung der ENTSO-E-Day-Ahead-Daten.
   \item \textbf{Feature-Pipeline:} Berechnet aus den Rohdaten die Eingabe\-variablen
         f\"ur das Training und exportiert sie als Parquet-Dateien.
-  \item \textbf{Training-Pipeline:} Trainiert beide Modelle t\"aglich neu,
-        bewertet sie auf einem Validierungsset und speichert das jeweils beste
-        Modell.
+  \item \textbf{Training-Pipeline:} Wird \"uber Airflow oder das Admin-Dashboard
+        ausgel\"ost, bewertet die Modelle auf einem Validierungsset und speichert
+        das jeweils beste Modell.
   \item \textbf{Backfill-Pipeline:} Erm\"oglicht das nachtr\"agliche Einlesen
         historischer Daten, wenn eine neue Quelle hinzugef\"ugt wird.
 \end{itemize}
 
-Abbildung~\ref{fig:dag} zeigt die Abh\"angigkeits\-struktur des
-t\"aglichen Haupt-DAGs.
+Abbildung~\ref{fig:dag} zeigt die vereinfachte Abh\"angigkeitsstruktur der
+t\"aglichen Daten- und Feature-Verarbeitung sowie den manuellen Training-Trigger.
 
 \begin{figure}[htb]
   \centering
+  \resizebox{\columnwidth}{!}{%
   \begin{tikzpicture}[
     font=\scriptsize,
     fetch/.style={draw, rounded corners=2pt, fill=orange!25,
@@ -422,7 +450,7 @@ t\"aglichen Haupt-DAGs.
     \node[proc]  (va) at (2.00, 0.60) {validate\\+ clean};
     \node[proc]  (db) at (3.30, 0.60) {store\\TimescaleDB};
     \node[proc]  (fe) at (4.60, 0.60) {feature\\export};
-    \node[proc]  (tr) at (5.90, 0.60) {model\\training};
+    \node[proc]  (tr) at (5.90, 0.60) {manual\\training};
     \draw[arr] (f1.east) -| (va.west);
     \draw[arr] (f2.east) -| (va.west);
     \draw[arr] (f3.east) -| (va.west);
@@ -431,11 +459,14 @@ t\"aglichen Haupt-DAGs.
     \draw[arr] (db) -- (fe);
     \draw[arr] (fe) -- (tr);
     \node[font=\tiny, text=gray!70] at (3.0, -0.30)
-      {t\"aglich 06:00~UTC, nach ENTSO-E-Freigabe};
+      {ETL t\"aglich 06:00~UTC, Feature-Export 07:00~UTC};
   \end{tikzpicture}
-  \caption{Vereinfachter Airflow-DAG: Die vier Fetch-Tasks laufen parallel;
+  }
+  \caption{Vereinfachter Airflow-DAG: Die Fetch-Tasks laufen parallel;
            anschliessend werden Daten validiert, in TimescaleDB gespeichert,
-           Features exportiert und beide Modelle neu trainiert.}
+           Features exportiert und Modelle bei Bedarf neu trainiert.}
+  \Description{DAG-Diagramm mit parallelen Fetch-Tasks, Validierung,
+  Speicherung, Feature-Export und manuellem Training.}
   \label{fig:dag}
 \end{figure}
 
@@ -474,34 +505,42 @@ der PV-Einspeisung (OGD~\#3122).
 \subsection{Tarifformeln}
 \label{sec:tariff}
 
-Die vorhergesagte Nettolast wird zun\"achst auf den historischen
-Schwankungsbereich normiert (Minimum~6\,000~kWh,
-Maximum~17\,500~kWh, entsprechend dem~5. und~95. Lastperzentil):
+Die vorhergesagte Nettolast wird auf den historischen Schwankungsbereich
+normiert. Als robuste Grenzen verwenden wir das 5. und 95.~Perzentil:
+6\,000~kWh und 17\,500~kWh.
+\begingroup\small
 \begin{equation}
-  \hat{L}_{\mathrm{norm}} = \frac{\hat{L} - 6\,000}{17\,500 - 6\,000}
-  \;\in [0, 1]
+  \hat{L}_{\mathrm{norm}}
+  = \frac{\hat{L} - 6\,000}{17\,500 - 6\,000}
+  \in [0, 1]
 \end{equation}
+\endgroup
 Daraus berechnet sich der Netzpreis durch eine lineare Formel mit
 Ober- und Untergrenze:
+\begingroup\small
 \begin{equation}
   T_{\mathrm{netz}} = \mathrm{clip}\!\left(
     11{,}0 + 6{,}0 \cdot \hat{L}_{\mathrm{norm}},\;
     8{,}0,\;
     14{,}0
-  \right) \quad [\text{Rp./kWh}]
+  \right)
 \end{equation}
+\endgroup
+Die Einheit aller Tarifwerte ist Rp./kWh.
 Eine quadratische Formel wurde gepr\"uft, f\"uhrte aber dazu,
 dass 60\,\% aller Zeitpunkte im mittleren Lastbereich denselben Tarifwert
 erhielten, was f\"ur Nutzer keine sinnvolle Differenzierung erm\"oglicht.
 Der Energiepreis wird als linearer Durchleitwert des B\"orsenpreises berechnet
 (kalibriert per Regression auf EKZ-Referenzdaten):
+\begingroup\small
 \begin{equation}
   T_{\mathrm{energie}} = \mathrm{clip}\!\left(
     0{,}226 \cdot \frac{\hat{p}_{\mathrm{EPEX}}}{10} + 7{,}0,\;
     4{,}0,\;
     14{,}0
-  \right) \quad [\text{Rp./kWh}]
+  \right)
 \end{equation}
+\endgroup
 Unsicherheitsbereiche werden als~$\pm 1{,}96 \cdot \hat{\sigma}$ mitgegeben,
 wobei $\hat{\sigma}$ der durchschnittliche Vorhersagefehler auf dem
 Validierungsset ist.
@@ -547,7 +586,7 @@ Ohne diese \"Ubersicht w\"are es kaum m\"oglich gewesen, rasch zu erkennen,
 wann eine externe API aussetzte oder ein Modell-Retraining still\-schweigend
 einen schlechteren MAPE produzierte.
 Die REST-Schnittstelle stellt \"uber 40~Endpunkte bereit, darunter die
-7-Tage-Prognose mit Konfidenzb\"andern (15-Minuten-Cache), Modell\-metriken
+7-Tage-Prognose mit Konfidenzb\"andern, Modell\-metriken, Datenbankstatus
 und manuelle Pipeline-Trigger.
 
 \subsection{Big-Data-Aspekte}
@@ -571,13 +610,12 @@ der Originalgr\"osse, sodass die Gesamtl\"osung auf Milliarden
 von Eintr\"agen skaliert.
 
 \textbf{Aktualit\"at (Velocity):}
-Die vollautomatische Pipeline l\"auft t\"aglich um 06:00~UTC;
-der gesamte Zyklus von Datenabholung \"uber Feature-Engineering bis
-zum frisch trainierten Produktionsmodell dauert weniger als~35~Minuten.
-Das 7-Tage-Prognose-Endpunkt antwortet typischerweise in unter~200~ms;
-ein~15-Minuten-Cache im Frontend reduziert die Daten\-bank\-belastung
-bei vielen gleichzeitigen Nutzern um rund~97\,\%, sodass
-99\,\% aller Dashboard-Aufrufe in unter~5~ms bedient werden.
+Die ETL-Pipeline l\"auft t\"aglich um 06:00~UTC; eine Stunde sp\"ater erzeugt
+die Feature-Pipeline neue Parquet-Exporte.
+Das Training wird bei Bedarf \"uber das Admin-Dashboard oder Airflow gestartet.
+Der 7-Tage-Prognose-Endpunkt liefert 672~Zeitpunkte mit Tarifkomponenten;
+ein 15-Minuten-Cache verhindert wiederholte Datenbankabfragen f\"ur identische
+Dashboard-Anfragen.
 
 \textbf{Datenvielfalt (Variety):}
 Das System verarbeitet sechs Daten\-formate (REST/JSON, REST/XML,
@@ -642,7 +680,7 @@ MAPE~$\leq 15\,\%$ (Modell~B).
 
 Tabelle~\ref{tab:results} zeigt die Ergebnisse aller Modellvarianten
 auf dem jeweiligen Testset.
-XGBoost ist in beiden F\"allen die beste Variante und erreichet die
+XGBoost ist in beiden F\"allen die beste Variante und erreicht die
 gesetzten Qualit\"atsziele deutlich.
 Interessant: Das lineare Modell schneidet bei der Lastprognose kaum
 schlechter ab als XGBoost, ein Zeichen, dass der Lastgang stark von
@@ -754,6 +792,8 @@ sind gut erkennbar.
            und~95-\%-Konfidenzband.
            Deutlich erkennbar: morgendliche und abendliche Preisspitzen
            an Werktagen sowie ein ruhigeres Wochenende (Sa/So).}
+  \Description{Liniendiagramm einer 7-Tage-Tarifprognose mit gr\"unen,
+  gelben und roten Preiszonen sowie Konfidenzband.}
   \label{fig:forecast}
 \end{figure}
 
@@ -774,10 +814,10 @@ strukturell zu sp\"at ankommen.
 
 \subsection{Systemleistung}
 
-Der API-Endpunkt f\"ur die 7-Tage-Prognose (672~Datenpunkte mit Tarifformeln
-und Unsicherheitsgrenzen) antwortet typischerweise in unter~200~ms.
-Dank des 15-Minuten-Caches im Frontend bleibt die Antwortzeit f\"ur
-99\,\% der Dashboard-Aufrufe unter~5~ms, selbst bei hoher Nutzerzahl.
+Der API-Endpunkt f\"ur die 7-Tage-Prognose liefert 672~Datenpunkte mit
+Tarifformeln und Unsicherheitsgrenzen.
+Da das Dashboard identische Prognoseabfragen f\"ur 15~Minuten cacht,
+muss die Datenbank bei wiederholten Aufrufen nicht erneut belastet werden.
 
 % =========================================================
 \section{Diskussion}
@@ -842,10 +882,10 @@ Day-Ahead-Prognose zu sp\"at vorliegen.
   \item \textbf{Geografische Einschr\"ankung:} Die Tarifformeln sind auf den
         EKZ-Netzbereich Winterthur kalibriert. F\"ur andere Netzbetreiber
         w\"are eine Neukalibrierung notwendig.
-  \item \textbf{Datenl\"ucken:} Vor allem in \"alteren ENTSO-E-Erzeugungsdaten
-        (vor~2016) gibt es fehlende Werte. Die Auff\"ullung mit dem Median
-        gen\"ugt f\"ur den Normalbetrieb, k\"onnte aber bei Extremereignissen
-        (Hitzewellen, Netzst\"orungen) besser gel\"ost werden.
+  \item \textbf{Datenl\"ucken:} In \"alteren ENTSO-E-Erzeugungs\-daten
+        (vor~2016) fehlen einzelne Werte. Die Median-Auff\"ullung reicht
+        f\"ur den Normalbetrieb, k\"onnte aber bei Extremereignissen
+        besser gel\"ost werden.
   \item \textbf{Negative Preise:} Wenn viel Sonnen- oder Windstrom ins Netz
         dr\"angt, k\"onnen EPEX-Preise negativ werden. Die eingesetzte
         Begrenzungs\-funktion verhindert negative Tarifausgaben, weicht in
@@ -896,11 +936,12 @@ ohne eine externe Verarbeitungs\-schicht wie Apache Spark.
 
 \subsection{Fazit}
 
-Mit \emph{BigDataSmallPrice} haben wir ein vollst\"andiges, betriebsnahes
-System zur Prognose dynamischer Stromtarife f\"ur Winterthur entwickelt.
-Die Plattform liest t\"aglich Daten aus acht Quellen ein, trainiert beide
-Vorhersagemodelle neu und stellt die Ergebnisse \"uber eine REST-Schnittstelle
-sowie ein interaktives Dashboard bereit.
+Mit \emph{BigDataSmallPrice} haben wir ein betriebsnahes System zur Prognose
+dynamischer Stromtarife f\"ur Winterthur entwickelt.
+Die Plattform liest t\"aglich Daten aus acht Quellen ein, erzeugt daraus
+Trainingsfeatures, nutzt die besten gespeicherten Modelle und stellt die
+Ergebnisse \"uber eine REST-Schnittstelle sowie ein interaktives Dashboard
+bereit.
 XGBoost erreicht einen MAPE von~3{,}99\,\% bei der Lastprognose und~7{,}72\,\%
 bei der Energiepreisvorhersage und liegt damit deutlich unter den angestrebten
 Grenzen von 8\,\% und 15\,\%.
