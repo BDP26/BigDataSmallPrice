@@ -1,6 +1,6 @@
 % !TEX encoding = UTF-8 Unicode
 % BigDataSmallPrice -- Abschlussbericht
-% ZHAW Big Data Seminar HS 2025/2026
+% ZHAW Big Data Seminar HS 2026
 % Vorlage: ACM sigconf (zweispaltig)
 \documentclass[sigconf]{acmart}
 
@@ -43,7 +43,7 @@
 \acmYear{2026}
 \acmDOI{}
 \acmISBN{}
-\acmConference[Big Data HS25/26]{ZHAW Big Data Seminar}{HS 2025/26}{Winterthur, Schweiz}
+\acmConference[Big Data]{ZHAW Big Data}{HS26}{Winterthur, Schweiz}
 \settopmatter{printacmref=false, printccs=false, printfolios=true}
 \renewcommand\footnotetextcopyrightpermission[1]{}
 
@@ -72,6 +72,8 @@
   \city{Winterthur}
   \country{Schweiz}}
 
+\renewcommand{\shortauthors}{Ryan Bachmann, Dinis Silva Miguel, Gian Ruchti}
+
 % ---- Abstract ----
 \begin{abstract}
 Mit den neuen Schweizer Strommarktregeln werden dynamische Tarifmodelle ab 2026
@@ -97,6 +99,12 @@ pers\"onlichen Verbrauchsempfehlungen angezeigt.
 \end{abstract}
 
 \maketitle
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Big Data, HS26, Winterthur, Schweiz}
+\fancyhead[R]{Ryan Bachmann, Dinis Silva Miguel, Gian Ruchti}
+\fancyfoot[C]{\thepage}
+
 
 % =========================================================
 \section{Einleitung}
@@ -585,7 +593,7 @@ bei veralteten oder fehlenden Daten.
 Ohne diese \"Ubersicht w\"are es kaum m\"oglich gewesen, rasch zu erkennen,
 wann eine externe API aussetzte oder ein Modell-Retraining still\-schweigend
 einen schlechteren MAPE produzierte.
-Die REST-Schnittstelle stellt \"uber 40~Endpunkte bereit, darunter die
+Die REST-Schnittstelle stellt \"uber 20~Endpunkte bereit, darunter die
 7-Tage-Prognose mit Konfidenzb\"andern, Modell\-metriken, Datenbankstatus
 und manuelle Pipeline-Trigger.
 
@@ -627,19 +635,20 @@ ein einheitliches 15-Minuten-Raster; fehlende Werte werden quell\-spezifisch
 mit Median-Imputation oder Vorw\"artsf\"ullung aufgef\"ullt.
 
 \textbf{Datenqualit\"at (Veracity):}
-Jede Datenquelle durchl\"auft nach dem Download einen Validierungsschritt:
-Bereichspr\"ufung (Lastgang $>0$, Preise $>-500$\,EUR/MWh), Vollst\"andig\-keits\-
-pr\"ufung (maximal~5\,\% fehlende Werte pro Tag erlaubt) und Plausibilit\"ats\-
-pr\"ufung gegen den gleitenden Median der letzten~7~Tage.
-Datens\"atze, die diese Checks nicht bestehen, l\"osen einen Airflow-Alert aus
-und werden nicht f\"ur das Training verwendet.
-Dieser Schritt war entscheidend, da mehrere Quellen gelegentlich
-inkonsistente oder verz\"ogerte Daten lieferten.
+Die Datenquellen werden nach dem Download auf grundlegende Konsistenz
+gepr\"uft: Zeitstempel m\"ussen g\"ultig und aufsteigend sein, Pflichtfelder
+d\"urfen nicht fehlen, und fehlerhafte API-Antworten werden protokolliert.
+Zus\"atzlich verhindern Leakage-Checks, dass Zielvariablen oder operative
+Metadaten in die Trainingsfeatures gelangen.
+Fehlende Feature-Spalten und verz\"ogerte Datenquellen werden in der
+Pipeline sichtbar gemacht, sodass sie vor Training und Evaluation erkannt
+werden k\"onnen.
 
 \textbf{Parallelisierung (Value \& Processing):}
-Die ETL-Pipeline f\"uhrt bis zu~14~Fetch-Tasks gleichzeitig aus,
-was die Gesamtlaufzeit gegen\"uber sequenzieller Verarbeitung
-von \"uber~20~auf unter~8~Minuten reduziert.
+Die ETL-Pipeline f\"uhrt zahlreiche Fetch-Tasks parallel aus;
+Tarif-APIs werden wegen Rate-Limits bewusst sequenziell abgefragt.
+Dadurch sinkt die Gesamtlaufzeit gegen\"uber einer rein sequenziellen
+Verarbeitung deutlich.
 XGBoost nutzt alle CPU-Kerne des i9-Prozessors (16~logische Kerne)
 f\"ur das parallele Baum-Training.
 Die neuronalen Netze k\"onnen optional auf einer NVIDIA~RTX~3080~GPU
