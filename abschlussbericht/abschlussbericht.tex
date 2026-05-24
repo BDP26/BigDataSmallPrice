@@ -93,7 +93,7 @@ Zwei XGBoost-Modelle prognostizieren jeweils den Netzpreis (basierend auf der
 lokalen Stromnachfrage) und den Energiepreis (basierend auf den europ\"aischen
 B\"orsenpreisen).
 Mit einem mittleren Fehler von~3{,}99\,\% beim Lastmodell und~7{,}72\,\%
-beim Preismodell liegen beide deutlich unter den gesetzten Qualit\"atszielen.
+beim Preismodell liegen beide unter den gesetzten Qualit\"atszielen.
 Die Prognosen werden \"uber ein interaktives Dashboard mit Ampelindikator und
 pers\"onlichen Verbrauchsempfehlungen angezeigt.
 \end{abstract}
@@ -171,7 +171,7 @@ Tabelle~\ref{tab:datasources} fasst alle acht integrierten Datenquellen zusammen
 Die Grundlage f\"ur die Lastprognose bildet der Winterthurer Bruttolastgang
 (OGD~\#1863): 15-min\"utige Strommessungen seit 2013, insgesamt rund 462\,000
 Datenpunkte.
-Die Energiepreisvorhersage basiert auf ENTSO-E-Day-Ahead-Preisen seit 2015.
+Die Energiepreisvorhersage basiert auf ENTSO-E-Day-Ahead-Preisen seit 2024.
 Als Wetterdaten nutzen wir die kostenlose Open-Meteo-API f\"ur Winterthur und
 zwei deutsche Referenzstationen, da norddeutsches Windaufkommen erfahrungs\-gem\"ass
 den gr\"ossten Einfluss auf europ\"aische Strompreise hat~\cite{Lago2021}.
@@ -691,9 +691,12 @@ Tabelle~\ref{tab:results} zeigt die Ergebnisse aller Modellvarianten
 auf dem jeweiligen Testset.
 XGBoost ist in beiden F\"allen die beste Variante und erreicht die
 gesetzten Qualit\"atsziele deutlich.
-Interessant: Das lineare Modell schneidet bei der Lastprognose kaum
-schlechter ab als XGBoost, ein Zeichen, dass der Lastgang stark von
-linearen Gr\"ossen wie Tageszeit und Temperatur getrieben wird.
+Interessant: Das lineare Modell schneidet aktuel bei der Lastprognose einwenig
+besser ab als XGBoost, ein Zeichen, dass der Lastgang stark von
+linearen Gr\"ossen wie Tageszeit und Temperatur getrieben wird. 
+Weil diese \"Aenderung kurz vor dem Ende dieser Arbeit eintrat, 
+haben wir uns entschieden vorerst noch XGBoost als Prognosemodel 
+zu nutzen, da es w\"ahrend der Entwicklungszeit stetig besser abschnitt als das lineare Modell.
 Bei den EPEX-Preisen sind die Nicht\-linear\-it\"aten gr\"osser:
 Hier liegt das lineare Modell mit~9{,}9\,\% deutlich hinter XGBoost
 mit~7{,}72\,\%.
@@ -760,7 +763,7 @@ sind gut erkennbar.
     \node[anchor=west,font=\tiny,text=red!65!black]
           at (axis cs:168.5,25.5) {teuer};
     %% Obere Grenze des 95-%-Bandes
-    \addplot[name path=oben, draw=none] coordinates {
+    \addplot[name path=oben, draw=red, smooth] coordinates {
       (0,17.3)(4,16.0)(8,25.3)(12,20.3)(17,27.3)(21,23.3)(24,18.3)
       (28,15.8)(32,25.6)(36,20.0)(41,28.6)(45,23.9)(48,18.6)
       (52,15.9)(56,24.7)(60,19.3)(65,27.1)(69,23.6)(72,17.9)
@@ -769,8 +772,9 @@ sind gut erkennbar.
       (124,16.7)(128,20.0)(132,17.6)(137,21.3)(141,19.7)(144,17.3)
       (148,16.3)(152,18.4)(156,17.0)(161,19.0)(165,17.8)(168,16.7)
     };
+    \addlegendentry{95\,\%-Konfidenzgrenzen}
     %% Untere Grenze des 95-%-Bandes
-    \addplot[name path=unten, draw=none] coordinates {
+    \addplot[name path=unten, draw=red, smooth, forget plot] coordinates {
       (0,13.7)(4,12.4)(8,21.7)(12,16.7)(17,23.7)(21,19.7)(24,14.7)
       (28,12.2)(32,22.0)(36,16.4)(41,25.0)(45,20.3)(48,15.0)
       (52,12.3)(56,21.1)(60,15.7)(65,23.5)(69,20.0)(72,14.3)
@@ -779,10 +783,7 @@ sind gut erkennbar.
       (124,13.7)(128,17.0)(132,14.6)(137,18.3)(141,16.7)(144,14.3)
       (148,13.3)(152,15.4)(156,14.0)(161,16.0)(165,14.8)(168,13.7)
     };
-    %% Konfidenzband (gef\"ullt)
-    \addplot[blue!18, fill opacity=0.75, draw=none]
-      fill between[of=oben and unten];
-    \addlegendentry{95\,\%-Konfidenzband}
+
     %% Prognosekurve (Mittelwert)
     \addplot[blue!75!black, thick, smooth] coordinates {
       (0,15.5)(4,14.2)(8,23.5)(12,18.5)(17,25.5)(21,21.5)(24,16.5)
@@ -892,7 +893,7 @@ Day-Ahead-Prognose zu sp\"at vorliegen.
         EKZ-Netzbereich Winterthur kalibriert. F\"ur andere Netzbetreiber
         w\"are eine Neukalibrierung notwendig.
   \item \textbf{Datenl\"ucken:} In \"alteren ENTSO-E-Erzeugungs\-daten
-        (vor~2016) fehlen einzelne Werte. Die Median-Auff\"ullung reicht
+        (vor~2024) fehlen einzelne Werte. Die Median-Auff\"ullung reicht
         f\"ur den Normalbetrieb, k\"onnte aber bei Extremereignissen
         besser gel\"ost werden.
   \item \textbf{Negative Preise:} Wenn viel Sonnen- oder Windstrom ins Netz
@@ -952,7 +953,7 @@ Trainingsfeatures, nutzt die besten gespeicherten Modelle und stellt die
 Ergebnisse \"uber eine REST-Schnittstelle sowie ein interaktives Dashboard
 bereit.
 XGBoost erreicht einen MAPE von~3{,}99\,\% bei der Lastprognose und~7{,}72\,\%
-bei der Energiepreisvorhersage und liegt damit deutlich unter den angestrebten
+bei der Energiepreisvorhersage und liegt damit unter den angestrebten
 Grenzen von 8\,\% und 15\,\%.
 Das Dashboard macht die Prognosen f\"ur Endnutzer direkt handlungs\-relevant:
 Wer die g\"unstigen Zeitfenster nutzt, kann seinen Stromkosten sp\"urbar senken.
