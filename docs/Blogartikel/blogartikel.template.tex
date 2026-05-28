@@ -1,0 +1,50 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[ngerman]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+
+\geometry{margin=25mm}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.72em}
+\setlength{\headheight}{14pt}
+\emergencystretch=2em
+\sloppy
+\setlist[itemize]{leftmargin=*, itemsep=0.2em}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue!55!black
+}
+
+\titleformat{\section}
+  {\Large\bfseries\color{black}}
+  {}
+  {0pt}
+  {}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{BigDataSmallPrice}
+\rhead{Blogartikel}
+\cfoot{\thepage}
+
+\title{\textbf{@@TITLE@@}}
+\author{@@AUTHORS@@}
+\date{PM4, ZHAW School of Engineering}
+
+\begin{document}
+\maketitle
+\thispagestyle{fancy}
+
+@@CONTENT@@
+
+\end{document}

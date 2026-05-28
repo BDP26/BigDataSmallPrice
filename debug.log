@@ -1,0 +1,2 @@
+[0528/153007.554:ERROR:third_party\crashpad\crashpad\util\win\registration_protocol_win.cc:108] CreateFile: Zugriff verweigert (0x5)
+[0528/153119.652:ERROR:third_party\crashpad\crashpad\util\win\registration_protocol_win.cc:108] CreateFile: Zugriff verweigert (0x5)
