@@ -44,6 +44,10 @@ Für beide Modelle haben wir verschiedene Verfahren getestet, darunter naive Bas
 
 Die Ergebnisse zeigen, dass sich dynamische Stromtarife mit öffentlich verfügbaren Daten gut prognostizieren lassen. Im Test erreichte das Lastmodell einen mittleren prozentualen Fehler von **3,99 Prozent**. Das Energiepreismodell lag bei **7,72 Prozent**. Beide Werte liegen deutlich unter unseren ursprünglichen Qualitätszielen von 8 Prozent für die Lastprognose und 15 Prozent für die Energiepreisprognose.
 
+![Dashboard mit prognostizierten Stromtarifen](bilder/image%20(1).png)
+
+*Das Dashboard visualisiert die prognostizierten Stromtarife und markiert günstige Zeitfenster für verschiedene Geräte.*
+
 Für Nutzerinnen und Nutzer wird daraus eine 7-Tage-Prognose im 15-Minuten-Raster. Das Dashboard zeigt nicht nur eine Preiskurve, sondern markiert günstige, mittlere und teure Zeitfenster. So lässt sich zum Beispiel erkennen, wann das Laden eines E-Autos oder der Betrieb einer Waschmaschine besonders sinnvoll ist. Eine Ampellogik macht aus vielen Datenpunkten eine konkrete Entscheidungshilfe.
 
 ## Big Data im Kleinen

@@ -37,6 +37,7 @@ function Convert-InlineMarkdown {
 
     $result = Escape-Latex $Text
     $result = $result -replace '\*\*(.+?)\*\*', '\textbf{$1}'
+    $result = $result -replace '\*(.+?)\*', '\emph{$1}'
     $result = $result -replace '(https?://[^\s]+)', '\url{$1}'
     return $result
 }
@@ -79,6 +80,22 @@ function Convert-MarkdownToLatex {
                 $inItemize = $true
             }
             $latexLines.Add("  \item $((Convert-InlineMarkdown $Matches[1]))")
+            continue
+        }
+
+        if ($line -match '^!\[(.*?)\]\((.*)\)$') {
+            if ($inItemize) {
+                $latexLines.Add("\end{itemize}")
+                $inItemize = $false
+            }
+
+            $imagePath = $Matches[2].Trim()
+            $imagePath = $imagePath.Trim("<", ">")
+            $imagePath = $imagePath -replace '%20', ' '
+            $quotedImagePath = '"' + $imagePath + '"'
+            $latexLines.Add("\begin{center}")
+            $latexLines.Add("\includegraphics[width=\linewidth]{$quotedImagePath}")
+            $latexLines.Add("\end{center}")
             continue
         }
 
