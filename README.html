@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.30">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>readme</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="README_files/libs/clipboard/clipboard.min.js"></script>
+<script src="README_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="README_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="README_files/libs/quarto-html/popper.min.js"></script>
+<script src="README_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="README_files/libs/quarto-html/anchor.min.js"></script>
+<link href="README_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="README_files/libs/quarto-html/quarto-syntax-highlighting-de070a7b0ab54f8780927367ac907214.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="README_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="README_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="README_files/libs/bootstrap/bootstrap-bb462d781dde1847d9e3ccf7736099dd.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+
+
+
+<section id="bigdatasmallprice" class="level1">
+<h1>BigDataSmallPrice</h1>
+<p>BigDataSmallPrice ist eine End-to-End-Plattform zur Prognose dynamischer Stromtarife für Winterthur. Das Projekt verbindet Strommarkt-, Wetter-, Tarif- und lokale Lastdaten, speichert sie in TimescaleDB, orchestriert die Daten- und ML-Pipelines mit Apache Airflow und stellt Prognosen über eine FastAPI sowie Web-Dashboards bereit.</p>
+<p>Das Projekt entstand im Rahmen von PM4 an der ZHAW.</p>
+<section id="kurzüberblick" class="level2">
+<h2 class="anchored" data-anchor-id="kurzüberblick">Kurzüberblick</h2>
+<ul>
+<li>Prognose des EPEX-Day-Ahead-Strompreises für die Schweiz.</li>
+<li>Prognose der lokalen Winterthurer Netto-Netzlast aus Bruttolast und PV-Einspeisung.</li>
+<li>Berechnung eines geschätzten Gesamttarifs in Rp./kWh aus Energie-, Netzpreis- und Tarifkomponenten.</li>
+<li>Automatisierte Datenbeschaffung für ENTSO-E, Open-Meteo, EKZ, CKW, Groupe E, BAFU und Stadtwerk Winterthur.</li>
+<li>Feature Engineering für Zeitreihenmodelle mit Lags, rollierenden Kennzahlen, Kalenderfeatures, zyklischen Features und Wetterfeatures.</li>
+<li>Modelltraining mit Naive-Baselines, linearen Modellen, XGBoost, LSTM und Transformer-Varianten.</li>
+<li>User-Dashboard für Tarifprognosen und Admin-Dashboard für Datenbankstatus, Backfills, Trainingsjobs, Rate-Limits, Feature-Status und Modellmetriken.</li>
+</ul>
+</section>
+<section id="architektur" class="level2">
+<h2 class="anchored" data-anchor-id="architektur">Architektur</h2>
+<pre class="text"><code>Externe Datenquellen
+        |
+        v
+Apache Airflow DAGs  ---&gt;  TimescaleDB / PostgreSQL
+        |                         |
+        |                         v
+        +---------------&gt;  Feature Views / Parquet Exports
+                                  |
+                                  v
+                          Modelltraining
+                                  |
+                                  v
+FastAPI Backend  &lt;-------  Modellartefakte
+        |
+        v
+Nginx / Dashboards</code></pre>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Bereich</th>
+<th>Technologie / Pfad</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Orchestrierung</td>
+<td>Apache Airflow, <code>airflow/dags/</code></td>
+</tr>
+<tr class="even">
+<td>Projektdatenbank</td>
+<td>TimescaleDB/PostgreSQL, <code>infra/db/init.sql</code></td>
+</tr>
+<tr class="odd">
+<td>Airflow-Metadatenbank</td>
+<td>PostgreSQL</td>
+</tr>
+<tr class="even">
+<td>Backend</td>
+<td>FastAPI, <code>src/api/main.py</code></td>
+</tr>
+<tr class="odd">
+<td>Frontend</td>
+<td>Statische HTML/JS-Dashboards, <code>src/frontend/</code></td>
+</tr>
+<tr class="even">
+<td>Datenbeschaffung</td>
+<td>Collector in <code>src/data_collection/</code> und ETL-Tasks in <code>src/etl/</code></td>
+</tr>
+<tr class="odd">
+<td>Feature Engineering</td>
+<td>SQL-Views in <code>infra/db/init.sql</code>, Exporte in <code>src/processing/</code></td>
+</tr>
+<tr class="even">
+<td>Modellierung</td>
+<td>scikit-learn, XGBoost, PyTorch, <code>src/modelling/</code></td>
+</tr>
+<tr class="odd">
+<td>Deployment</td>
+<td>Docker Compose</td>
+</tr>
+<tr class="even">
+<td>Tests</td>
+<td>pytest, <code>src/testing/</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="datenquellen" class="level2">
+<h2 class="anchored" data-anchor-id="datenquellen">Datenquellen</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Quelle</th>
+<th>Zweck</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>ENTSO-E Transparency Platform</td>
+<td>Day-Ahead-Preise, tatsächliche Last, Lastprognosen, Erzeugung und Grenzflüsse</td>
+</tr>
+<tr class="even">
+<td>Open-Meteo</td>
+<td>Wetterdaten für Winterthur sowie deutsche Wind- und Solar-Proxies</td>
+</tr>
+<tr class="odd">
+<td>EKZ</td>
+<td>Dynamische Tarifdaten und Tarifformeln</td>
+</tr>
+<tr class="even">
+<td>CKW / Groupe E</td>
+<td>Vergleichbare dynamische Tarife</td>
+</tr>
+<tr class="odd">
+<td>BAFU</td>
+<td>Hydrologische Daten</td>
+</tr>
+<tr class="even">
+<td>Stadtwerk Winterthur</td>
+<td>Lokale Bruttolast und PV-Einspeisung</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="modelle" class="level2">
+<h2 class="anchored" data-anchor-id="modelle">Modelle</h2>
+<p>Das Projekt trennt zwei Vorhersageaufgaben:</p>
+<ul>
+<li><strong>Model B / Energy:</strong> prognostiziert den EPEX-Day-Ahead-Preis in EUR/MWh.</li>
+<li><strong>Model A / Load:</strong> prognostiziert die lokale Netto-Netzlast in kWh.</li>
+</ul>
+<p>Die API kombiniert beide Outputs mit den Tarifformeln aus <code>src/processing/tariff_formulas.py</code>. Falls noch kein Lastmodell verfügbar ist, fällt die Prognose auf einen Energy-only-Modus mit Standard-Netzpreis zurück.</p>
+<p>Trainierte Modelle und Metriken liegen unter <code>models/</code>. Das Manifest <code>models/best_models.json</code> steuert, welche Modelle die API bevorzugt verwendet.</p>
+</section>
+<section id="voraussetzungen" class="level2">
+<h2 class="anchored" data-anchor-id="voraussetzungen">Voraussetzungen</h2>
+<ul>
+<li>Docker und Docker Compose</li>
+<li>Python 3.11 oder neuer für lokale Entwicklung</li>
+<li>ENTSO-E API-Token</li>
+<li>Optional: NVIDIA Container Toolkit für GPU-beschleunigtes Training</li>
+</ul>
+</section>
+<section id="schnellstart-mit-docker" class="level2">
+<h2 class="anchored" data-anchor-id="schnellstart-mit-docker">Schnellstart mit Docker</h2>
+<ol type="1">
+<li>Repository klonen:</li>
+</ol>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/BDP26/BigDataSmallPrice.git</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> BigDataSmallPrice</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ol start="2" type="1">
+<li>Environment-Datei erstellen:</li>
+</ol>
+<div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cp</span> .env.example .env</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ol start="3" type="1">
+<li><code>.env</code> anpassen:</li>
+</ol>
+<pre class="env"><code>AIRFLOW_DB_USER=airflow
+AIRFLOW_DB_PASSWORD=...
+AIRFLOW_ADMIN_USER=admin
+AIRFLOW_ADMIN_PASSWORD=...
+AIRFLOW_ADMIN_EMAIL=admin@example.com
+BDSP_DB_PASSWORD=...
+BDSP_JWT_SECRET=...
+ENTSOE_API_TOKEN=...</code></pre>
+<ol start="4" type="1">
+<li>Services starten:</li>
+</ol>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose up <span class="at">-d</span> <span class="at">--build</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ol start="5" type="1">
+<li>Status prüfen:</li>
+</ol>
+<div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose ps</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Beim ersten Start initialisiert Docker Compose die TimescaleDB, migriert die Airflow-Datenbank, erstellt den Airflow-Admin-User und richtet Airflow-Pools für API-Rate-Limits ein.</p>
+</section>
+<section id="verfügbare-services" class="level2">
+<h2 class="anchored" data-anchor-id="verfügbare-services">Verfügbare Services</h2>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Dienst</th>
+<th>URL</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>User-Dashboard über Nginx</td>
+<td>http://localhost:8002</td>
+</tr>
+<tr class="even">
+<td>User-Dashboard über API</td>
+<td>http://localhost:8001/dashboard</td>
+</tr>
+<tr class="odd">
+<td>Admin-Dashboard</td>
+<td>http://localhost:8001/</td>
+</tr>
+<tr class="even">
+<td>API / Swagger</td>
+<td>http://localhost:8001/docs</td>
+</tr>
+<tr class="odd">
+<td>Airflow Web UI</td>
+<td>http://localhost:8080</td>
+</tr>
+<tr class="even">
+<td>TimescaleDB vom Host</td>
+<td><code>localhost:5433</code></td>
+</tr>
+</tbody>
+</table>
+<p>Hinweis: Die API läuft im Container auf Port <code>8000</code> und ist auf dem Host unter Port <code>8001</code> erreichbar. Das Nginx-Frontend läuft auf Port <code>8002</code> und proxyt <code>/api/</code>, <code>/docs</code> und <code>/openapi.json</code> an die API.</p>
+</section>
+<section id="airflow-dags" class="level2">
+<h2 class="anchored" data-anchor-id="airflow-dags">Airflow DAGs</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>DAG</th>
+<th>Zeitplan</th>
+<th>Zweck</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>bdsp_etl_daily</code></td>
+<td>täglich 06:00</td>
+<td>Importiert aktuelle Daten aus allen Quellen in TimescaleDB</td>
+</tr>
+<tr class="even">
+<td><code>bdsp_feature_daily</code></td>
+<td>täglich 07:00</td>
+<td>Erstellt Energy- und Load-Features und schreibt Parquet-Exporte</td>
+</tr>
+<tr class="odd">
+<td><code>bdsp_training_daily</code></td>
+<td>manuell</td>
+<td>Trainiert Energy- und Load-Modelle</td>
+</tr>
+<tr class="even">
+<td><code>bdsp_backfill</code></td>
+<td>manuell</td>
+<td>Lädt historische Daten für einen Zeitraum nach</td>
+</tr>
+</tbody>
+</table>
+<p>Die DAGs sind beim Erstellen standardmäßig pausiert. Sie können in der Airflow Web UI oder über das Admin-Dashboard aktiviert bzw. gestartet werden.</p>
+</section>
+<section id="historischen-backfill-starten" class="level2">
+<h2 class="anchored" data-anchor-id="historischen-backfill-starten">Historischen Backfill starten</h2>
+<p>Der Backfill kann über das Admin-Dashboard oder direkt über die API gestartet werden:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-X</span> POST http://localhost:8001/api/backfill/trigger <span class="dt">\</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">"Content-Type: application/json"</span> <span class="dt">\</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-d</span> <span class="st">'{"start_date": "2024-01-01", "end_date": "2024-01-31"}'</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Alternativ gibt es ein Hilfsskript:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">./scripts/trigger_historical_backfill.sh</span> <span class="at">--from</span> 2024-01-01</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Das Skript ist für Bash/Linux-Umgebungen geschrieben und beachtet die ENTSO-E-Rate-Limits durch chunked Backfills.</p>
+</section>
+<section id="wichtige-api-endpunkte" class="level2">
+<h2 class="anchored" data-anchor-id="wichtige-api-endpunkte">Wichtige API-Endpunkte</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Endpoint</th>
+<th>Beschreibung</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>GET /api/forecast</code></td>
+<td>Aktuelle Tarifprognose mit Energie-, Netz- und Gesamttarif</td>
+</tr>
+<tr class="even">
+<td><code>GET /api/forecast/week</code></td>
+<td>Wochenprognose für günstige Zeitfenster</td>
+</tr>
+<tr class="odd">
+<td><code>GET /api/price-history</code></td>
+<td>Letzte ENTSO-E-Preise</td>
+</tr>
+<tr class="even">
+<td><code>GET /api/db-status</code></td>
+<td>Tabellenstatistiken und Datenbankstatus</td>
+</tr>
+<tr class="odd">
+<td><code>GET /api/db-explorer/schema</code></td>
+<td>Datenbankschema für das Admin-Dashboard</td>
+</tr>
+<tr class="even">
+<td><code>GET /api/db-explorer/rows/{table}</code></td>
+<td>Paginiertes Anzeigen von Tabellenzeilen</td>
+</tr>
+<tr class="odd">
+<td><code>GET /api/timeseries/{table}</code></td>
+<td>Zeitreihendaten für Dashboard-Charts</td>
+</tr>
+<tr class="even">
+<td><code>GET /api/feature-status</code></td>
+<td>Status der Trainingsfeatures</td>
+</tr>
+<tr class="odd">
+<td><code>GET /api/airflow/dags</code></td>
+<td>Airflow-DAG-Status über API-Proxy</td>
+</tr>
+<tr class="even">
+<td><code>GET /api/rate-limits</code></td>
+<td>Aktuelle API-Call- und Rate-Limit-Übersicht</td>
+</tr>
+<tr class="odd">
+<td><code>GET /api/rate-limits/history</code></td>
+<td>Historie der API-Aufrufe</td>
+</tr>
+<tr class="even">
+<td><code>POST /api/backfill/estimate</code></td>
+<td>Schätzung für Backfill-Aufwand</td>
+</tr>
+<tr class="odd">
+<td><code>POST /api/backfill/trigger</code></td>
+<td>Startet <code>bdsp_backfill</code></td>
+</tr>
+<tr class="even">
+<td><code>GET /api/backfill/status/{dag_run_id}</code></td>
+<td>Status eines Backfill-Runs</td>
+</tr>
+<tr class="odd">
+<td><code>GET /api/models/status</code></td>
+<td>Trainierte Modelle und Metriken</td>
+</tr>
+<tr class="even">
+<td><code>GET /api/models/validation/{model_name}</code></td>
+<td>Validierungsdaten für ein Modell</td>
+</tr>
+<tr class="odd">
+<td><code>POST /api/training/trigger</code></td>
+<td>Startet <code>bdsp_training_daily</code></td>
+</tr>
+<tr class="even">
+<td><code>GET /api/training/status/{dag_run_id}</code></td>
+<td>Status eines Trainings-Runs</td>
+</tr>
+<tr class="odd">
+<td><code>GET /api/training/tasks/{dag_run_id}</code></td>
+<td>Task-Status eines Trainings-Runs</td>
+</tr>
+<tr class="even">
+<td><code>POST /auth/register</code></td>
+<td>Test-User für JWT-Endpunkte erstellen</td>
+</tr>
+<tr class="odd">
+<td><code>POST /auth/login</code></td>
+<td>JWT beziehen</td>
+</tr>
+<tr class="even">
+<td><code>POST /api/predict</code></td>
+<td>Direkte Modellinferenz mit Feature-Dict, JWT erforderlich</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="lokale-entwicklung" class="level2">
+<h2 class="anchored" data-anchor-id="lokale-entwicklung">Lokale Entwicklung</h2>
+<p>Eine lokale Python-Umgebung kann so eingerichtet werden:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> venv .venv</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> .venv/bin/activate</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">-r</span> requirements.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Unter Windows PowerShell:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode powershell code-with-copy"><code class="sourceCode powershell"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>python <span class="op">-</span>m venv <span class="op">.</span><span class="fu">venv</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="op">.</span>\<span class="op">.</span><span class="fu">venv</span>\Scripts\Activate<span class="op">.</span><span class="fu">ps1</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>pip install <span class="op">-</span>r requirements<span class="op">.</span><span class="fu">txt</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Die Tests können ohne laufende Docker-Services gestartet werden, solange keine Integrationstests gegen die Datenbank benötigt werden:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> pytest src/testing/unittests</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Alle Tests:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> <span class="at">-m</span> pytest src/testing</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="projektstruktur" class="level2">
+<h2 class="anchored" data-anchor-id="projektstruktur">Projektstruktur</h2>
+<pre class="text"><code>BigDataSmallPrice/
+|-- airflow/
+|   |-- dags/                  # ETL-, Feature-, Training- und Backfill-DAGs
+|   `-- Dockerfile
+|-- abschlussbericht/          # Abschlussbericht als LaTeX/PDF
+|-- analysis/                  # Technische Analysen
+|-- data/                      # Lokale Daten und Parquet-Exporte
+|-- docs/                      # Proposal, Anforderungen, Tarifdokumente, Slides
+|-- infra/db/                  # TimescaleDB-Schema und Migrationen
+|-- models/                    # Modellartefakte und best_models.json
+|-- scripts/                   # Backfill- und Backup-Hilfsskripte
+|-- src/
+|   |-- api/                   # FastAPI-Anwendung
+|   |-- data_collection/       # Collector für externe APIs
+|   |-- data_cleaning/         # Transformationen und Validierungen
+|   |-- db/                    # TimescaleDB-Client
+|   |-- etl/                   # Fetch-Tasks für Airflow
+|   |-- frontend/              # Dashboards und Nginx-Konfiguration
+|   |-- modelling/             # Training, Evaluation und Prediction
+|   |-- processing/            # Feature-Export und Tarifformeln
+|   |-- testing/               # Unit- und Integrationstests
+|   `-- utils/                 # Hilfsskripte zur API-/Provider-Inspektion
+|-- docker-compose.yml
+|-- pyproject.toml
+|-- requirements.txt
+`-- README.md</code></pre>
+</section>
+<section id="wichtige-dateien" class="level2">
+<h2 class="anchored" data-anchor-id="wichtige-dateien">Wichtige Dateien</h2>
+<ul>
+<li><code>docker-compose.yml</code>: definiert TimescaleDB, Airflow, API und Frontend.</li>
+<li><code>infra/db/init.sql</code>: Datenbankschema, Hypertables, Views und Feature-Views.</li>
+<li><code>airflow/dags/etl_pipeline_dag.py</code>: tägliche Datenbeschaffung.</li>
+<li><code>airflow/dags/feature_pipeline_dag.py</code>: Export von Energy- und Load-Features.</li>
+<li><code>airflow/dags/training_dag.py</code>: On-demand-Training der Modelle.</li>
+<li><code>airflow/dags/backfill_dag.py</code>: historischer Backfill mit Rate-Limit-Schutz.</li>
+<li><code>src/api/main.py</code>: REST-API, Auth, Dashboard-Routen und Airflow-Proxy.</li>
+<li><code>src/etl/fetch_tasks.py</code>: zentrale ETL-Funktionen für externe Datenquellen.</li>
+<li><code>src/processing/export_pipeline.py</code>: Feature-Export für Modelltraining.</li>
+<li><code>src/processing/tariff_formulas.py</code>: Tarifberechnung für Energie-, Netz- und Gesamttarif.</li>
+<li><code>src/modelling/train.py</code>: Training klassischer und sequenzieller Modelle.</li>
+<li><code>src/modelling/sequence_models.py</code>: LSTM- und Transformer-Modelle.</li>
+<li><code>docs/req.md</code>: technische Anforderungen und Architekturentscheidungen.</li>
+</ul>
+</section>
+<section id="datenbank" class="level2">
+<h2 class="anchored" data-anchor-id="datenbank">Datenbank</h2>
+<p>Die Projektdatenbank <code>bdsp</code> verwendet TimescaleDB-Hypertables für Zeitreihen. Wichtige Tabellen und Views sind:</p>
+<ul>
+<li><code>entsoe_day_ahead_prices</code></li>
+<li><code>entsoe_actual_load</code></li>
+<li><code>entsoe_generation</code></li>
+<li><code>entsoe_crossborder_flows</code></li>
+<li><code>entsoe_load_forecast</code></li>
+<li><code>weather_hourly</code></li>
+<li><code>ekz_tariffs_raw</code>, <code>ckw_tariffs_raw</code>, <code>groupe_e_tariffs_raw</code></li>
+<li><code>ekz_tariffs_hourly</code>, <code>ckw_tariffs_hourly</code>, <code>groupe_e_tariffs_hourly</code></li>
+<li><code>bafu_hydro</code></li>
+<li><code>winterthur_load</code>, <code>winterthur_pv</code></li>
+<li><code>training_features</code></li>
+<li><code>winterthur_net_load_features</code></li>
+<li><code>api_call_log</code></li>
+</ul>
+</section>
+<section id="troubleshooting" class="level2">
+<h2 class="anchored" data-anchor-id="troubleshooting">Troubleshooting</h2>
+<ul>
+<li><strong><code>/api/forecast</code> gibt 503 zurück:</strong> Es fehlen Trainingsfeatures oder Modellartefakte. Zuerst ETL/Backfill und Feature-DAG ausführen, danach Training starten.</li>
+<li><strong>Airflow-DAGs bleiben pausiert:</strong> In der Airflow UI die jeweiligen DAGs aktivieren oder manuell triggern.</li>
+<li><strong>ENTSO-E liefert Fehler oder leere Daten:</strong> API-Token in <code>.env</code> prüfen und Rate-Limits beachten.</li>
+<li><strong>Docker meldet ein GPU-/NVIDIA-Problem:</strong> Das Training kann CPU-basiert laufen. Ohne NVIDIA Container Toolkit muss die GPU-Reservation im Airflow-Service von <code>docker-compose.yml</code> entfernt oder auskommentiert werden.</li>
+<li><strong>Datenbank ist leer nach Schemaänderungen:</strong> Docker-Volumes behalten alte Daten. Für einen frischen Stand müssen die Volumes bewusst entfernt werden.</li>
+<li><strong>Admin-Dashboard unter <code>localhost:8002/admin</code> ist nicht erreichbar:</strong> Das Admin-Dashboard wird vom API-Service unter <code>http://localhost:8001/</code> ausgeliefert. Port <code>8002</code> ist primär das Nginx-User-Dashboard.</li>
+</ul>
+</section>
+<section id="dokumentation" class="level2">
+<h2 class="anchored" data-anchor-id="dokumentation">Dokumentation</h2>
+<ul>
+<li><code>docs/Proposal.md</code>: Projektproposal.</li>
+<li><code>docs/req.md</code>: Anforderungen, Architektur und Teststrategie.</li>
+<li><code>abschlussbericht/abschlussbericht.pdf</code>: Abschlussbericht.</li>
+<li><code>analysis/cyclical_migration_analysis.md</code>: Analyse der zyklischen Features.</li>
+<li><code>docs/EKZ/</code>, <code>docs/CKW/</code>, <code>docs/GroupeE/</code>: Tarifdokumente und API-Hinweise.</li>
+</ul>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
