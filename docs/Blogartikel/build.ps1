@@ -5,11 +5,12 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$MarkdownPath = Join-Path $ScriptDir "blogartikel.md"
+$PostName = "2026-05-31-bigdatasmallprice-stromtarife"
+$MarkdownPath = Join-Path $ScriptDir "$PostName.md"
 $TemplatePath = Join-Path $ScriptDir "blogartikel.template.tex"
 $BuildDir = Join-Path $ScriptDir "_build"
-$GeneratedTexPath = Join-Path $BuildDir "blogartikel.tex"
-$JobName = "blogartikel"
+$GeneratedTexPath = Join-Path $BuildDir "$PostName.tex"
+$JobName = $PostName
 
 function Escape-Latex {
     param([string]$Text)
@@ -35,10 +36,23 @@ function Escape-Latex {
 function Convert-InlineMarkdown {
     param([string]$Text)
 
-    $result = Escape-Latex $Text
+    $links = New-Object System.Collections.Generic.List[string]
+    $prepared = [regex]::Replace($Text, '\[([^\]]+)\]\((https?://[^)]+)\)', {
+        param($match)
+        $index = $links.Count
+        $label = Escape-Latex $match.Groups[1].Value
+        $url = $match.Groups[2].Value
+        $links.Add("\href{$url}{$label}")
+        return "@@LINK$index@@"
+    })
+
+    $result = Escape-Latex $prepared
     $result = $result -replace '\*\*(.+?)\*\*', '\textbf{$1}'
     $result = $result -replace '\*(.+?)\*', '\emph{$1}'
     $result = $result -replace '(https?://[^\s]+)', '\url{$1}'
+    for ($i = 0; $i -lt $links.Count; $i++) {
+        $result = $result.Replace("@@LINK$i@@", $links[$i])
+    }
     return $result
 }
 
@@ -134,7 +148,7 @@ function Get-YamlValue {
 }
 
 if ($Clean) {
-    Get-ChildItem $ScriptDir -Filter "blogartikel.*" |
+    Get-ChildItem $ScriptDir -Filter "$PostName.*" |
         Where-Object { $_.Extension -in ".aux", ".fdb_latexmk", ".fls", ".log", ".out", ".synctex.gz" } |
         Remove-Item -Force
     if (Test-Path $BuildDir) {
@@ -147,7 +161,7 @@ $markdownLines = Get-Content $MarkdownPath -Encoding UTF8
 $template = Get-Content $TemplatePath -Encoding UTF8 -Raw
 
 $title = Get-YamlValue $markdownLines "title"
-$authors = Get-YamlValue $markdownLines "authors"
+$authors = Get-YamlValue $markdownLines "author"
 $content = Convert-MarkdownToLatex $markdownLines
 
 $tex = $template.Replace("@@TITLE@@", (Escape-Latex $title))
