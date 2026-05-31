@@ -3,7 +3,7 @@ layout: post
 title: "Strom sparen mit Daten: Wann ist Strom in Winterthur günstig?"
 author: "Ryan Bachmann, Miguel Dinis Silva & Gian Ruchti"
 ---
-
+    
 *Strom ist nicht immer gleich teuer. Wer den richtigen Zeitpunkt kennt, kann flexible Geräte günstiger betreiben.*
 
 Mit dynamischen Tarifen kann der Preis je nach Tageszeit, Netzbelastung und Marktsituation deutlich schwanken. Für Haushalte wird damit eine einfache Frage spannend: **Soll die Waschmaschine jetzt laufen, oder lohnt sich Warten?**
